@@ -24,7 +24,7 @@ pub trait State {
 }
 
 pub struct StateApp {
-    pub mesh: Arc<Mutex< StateMesh>>,
+    pub mesh: Arc<Mutex<StateMesh>>,
     imgui: StateImgui,
     renderer: StateRenderer,
     //puffin_ui : puffin_imgui::ProfilerUi,
@@ -67,7 +67,7 @@ impl StateApp {
     pub async fn new(renderer: StateRenderer) -> Self {
         Self {
             imgui: StateImgui::init(&renderer),
-            mesh: Arc::new(Mutex::new( StateMesh::init(&renderer))),
+            mesh: Arc::new(Mutex::new(StateMesh::init(&renderer))),
             renderer,
             //puffin_ui
         }
@@ -131,7 +131,9 @@ impl StateApp {
             bytemuck::cast_slice(&[self.renderer.camera_uniform]),
         );
 
-        self.mesh.lock().unwrap()
+        self.mesh
+            .lock()
+            .unwrap()
             .render_pass(&self.renderer, &mut encoder, &output, &view);
 
         self.imgui

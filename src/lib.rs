@@ -1,10 +1,10 @@
+pub mod bsp;
 pub mod camera;
 pub mod camera_controller;
 mod state;
-pub mod vertex;
 pub mod state_imgui;
 pub mod state_mesh;
-
+pub mod vertex;
 use std::thread;
 
 use state::{StateApp, StateRenderer};
@@ -22,25 +22,19 @@ pub async fn run() {
 
     let renderer = StateRenderer::new(window).await;
 
+    let mut state = StateApp::new(renderer).await;
 
- 
+    let instance = state.renderer().instance();
+    let mesh = state.mesh.clone();
 
-    let mut state = StateApp::new( renderer).await;
-
-	let instance=  state.renderer().instance();
-	let mesh = state.mesh.clone();
-
-	thread::spawn(move || {
-
-		StateMesh::load_mesh(mesh, instance);
-		
+    thread::spawn(move || {
+        StateMesh::load_mesh(mesh, instance);
     });
 
     event_loop.run(move |event, _, control_flow| {
-        
-		state.handle_event(&event);
-		
-		match event {
+        state.handle_event(&event);
+
+        match event {
             Event::WindowEvent {
                 ref event,
                 window_id,
