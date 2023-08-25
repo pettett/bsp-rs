@@ -24,7 +24,7 @@ use super::{consts::MAX_MAP_PLANES, Lump};
 ///
 /// There can be up to 65536 planes in a map (`MAX_MAP_PLANES`).
 #[repr(C, packed)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct dplane_t {
     normal: Vec3, // normal vector
     dist: f32,    // distance from origin
@@ -36,9 +36,9 @@ impl Lump for dplane_t {
         MAX_MAP_PLANES
     }
 
-    fn validate(lump: &Vec<Self>) {
+    fn validate(lump: &Box<[Self]>) {
         assert!(lump.len() < MAX_MAP_PLANES);
-        for plane in lump {
+        for plane in lump.iter() {
             let axis = plane.axis;
             assert!((0..=5).contains(&axis));
         }

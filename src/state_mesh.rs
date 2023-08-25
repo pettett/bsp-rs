@@ -1,9 +1,12 @@
-use std::{sync::{Arc, Mutex}, cell::RefCell};
+use std::{
+    cell::RefCell,
+    sync::{Arc, Mutex},
+};
 
 use gltf::mesh::util::ReadIndices;
 use wgpu::util::DeviceExt;
 
-use crate::state::{State, StateRenderer, StateInstance};
+use crate::state::{State, StateInstance, StateRenderer};
 
 pub struct StateMesh {
     vertex_buffer: wgpu::Buffer,
@@ -52,7 +55,6 @@ impl State for StateMesh {
     }
 
     fn init(renderer: &StateRenderer) -> Self {
-
         let vertex_buffer =
             renderer
                 .device()
@@ -75,7 +77,7 @@ impl State for StateMesh {
             vertex_buffer,
             index_buffer,
             num_indices: 0,
-            index_format : wgpu::IndexFormat::Uint16,
+            index_format: wgpu::IndexFormat::Uint16,
         }
     }
 }
@@ -135,14 +137,13 @@ impl StateMesh {
             }
             _ => panic!("No indices"),
         };
-		// Update the value stored in this mesh
-		let mut into = into.lock().unwrap();
-		*into = StateMesh {
+        // Update the value stored in this mesh
+        let mut into = into.lock().unwrap();
+        *into = StateMesh {
             vertex_buffer,
             index_buffer,
             num_indices: num_indices as u32,
             index_format,
         };
-
     }
 }

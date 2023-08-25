@@ -15,7 +15,7 @@ use super::{consts::MAX_MAP_FACES, Lump};
 ///Both the face and original face arrays are culled; that is, many faces present before compilation of the map (primarily those that face towards the "void" outside the map) are removed from the array.
 
 #[repr(C, packed)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct dface_t {
     planenum: u16,                         // the plane number
     side: i8,                              // faces opposite to the node's plane direction
@@ -41,8 +41,8 @@ impl Lump for dface_t {
         MAX_MAP_FACES
     }
 
-    fn validate(lump: &Vec<Self>) {
-        for face in lump {
+    fn validate(lump: &Box<[Self]>) {
+        for face in lump.iter() {
             assert!((0..=1).contains(&face.side));
         }
         println!("validated face lump!");

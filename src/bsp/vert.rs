@@ -7,8 +7,12 @@ impl Lump for Vec3 {
         MAX_MAP_VERTS
     }
 
-    fn validate(lump: &Vec<Self>) {
+    fn validate(lump: &Box<[Self]>) {
         assert!(lump.len() < MAX_MAP_VERTS);
+
+        for i in 0..100 {
+            println!("{:?}", lump[i * 100]);
+        }
 
         println!("validated vert lump!");
     }

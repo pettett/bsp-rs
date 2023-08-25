@@ -7,6 +7,7 @@ pub mod state_mesh;
 pub mod vertex;
 use std::thread;
 
+use bsp::edges_debug_mesh::EdgesDebugMesh;
 use state::{StateApp, StateRenderer};
 use state_mesh::StateMesh;
 use winit::{
@@ -31,6 +32,11 @@ pub async fn run() {
         StateMesh::load_mesh(mesh, instance);
     });
 
+    let instance = state.renderer().instance();
+    let debug_mesh = state.debug_mesh.clone();
+    thread::spawn(move || {
+        EdgesDebugMesh::load_mesh(debug_mesh, instance);
+    });
     event_loop.run(move |event, _, control_flow| {
         state.handle_event(&event);
 

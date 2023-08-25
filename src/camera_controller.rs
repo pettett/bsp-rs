@@ -1,4 +1,7 @@
-use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::{
+    dpi::PhysicalPosition,
+    event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
+};
 
 use crate::camera::Camera;
 
@@ -8,6 +11,8 @@ pub struct CameraController {
     is_backward_pressed: bool,
     is_left_pressed: bool,
     is_right_pressed: bool,
+    last_mouse_pos: PhysicalPosition<f64>,
+    mouse_delta: PhysicalPosition<f64>,
 }
 
 impl CameraController {
@@ -18,6 +23,8 @@ impl CameraController {
             is_backward_pressed: false,
             is_left_pressed: false,
             is_right_pressed: false,
+            last_mouse_pos: Default::default(),
+            mouse_delta: Default::default(),
         }
     }
 
@@ -53,6 +60,13 @@ impl CameraController {
                     _ => false,
                 }
             }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.mouse_delta.x = self.last_mouse_pos.x - position.x;
+                self.mouse_delta.y = self.last_mouse_pos.y - position.y;
+                self.last_mouse_pos = *position;
+                true
+            }
+
             _ => false,
         }
     }

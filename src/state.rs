@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
+use crate::bsp::edges_debug_mesh::EdgesDebugMesh;
 use crate::camera::{Camera, CameraUniform};
 use crate::camera_controller::CameraController;
 use crate::state_imgui::StateImgui;
@@ -25,6 +26,7 @@ pub trait State {
 
 pub struct StateApp {
     pub mesh: Arc<Mutex<StateMesh>>,
+    pub debug_mesh: Arc<Mutex<EdgesDebugMesh>>,
     imgui: StateImgui,
     renderer: StateRenderer,
     //puffin_ui : puffin_imgui::ProfilerUi,
@@ -68,6 +70,7 @@ impl StateApp {
         Self {
             imgui: StateImgui::init(&renderer),
             mesh: Arc::new(Mutex::new(StateMesh::init(&renderer))),
+            debug_mesh: Arc::new(Mutex::new(EdgesDebugMesh::init(&renderer))),
             renderer,
             //puffin_ui
         }
@@ -132,6 +135,10 @@ impl StateApp {
         );
 
         self.mesh
+            .lock()
+            .unwrap()
+            .render_pass(&self.renderer, &mut encoder, &output, &view);
+        self.debug_mesh
             .lock()
             .unwrap()
             .render_pass(&self.renderer, &mut encoder, &output, &view);
@@ -280,7 +287,7 @@ impl StateRenderer {
                 })],
             }),
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList, // 1.
+                topology: wgpu::PrimitiveTopology::LineList, // 1.
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw, // 2.
                 cull_mode: Some(wgpu::Face::Back),
@@ -300,7 +307,7 @@ impl StateRenderer {
             multiview: None, // 5.
         });
 
-        let camera_controller = CameraController::new(0.2);
+        let camera_controller = CameraController::new(20.0);
 
         puffin::set_scopes_on(true); // you may want to control this with a flag
                                      //let  puffin_ui = puffin_imgui::ProfilerUi::default();

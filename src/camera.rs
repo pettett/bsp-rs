@@ -25,15 +25,15 @@ impl Camera {
         Self {
             // position the camera one unit up and 2 units back
             // +z is out of the screen
-            eye: (0.0, 1.0, 2.0).into(),
+            eye: Vec3::new(2000.0, 1.0, 200.0),
             // have it look at the origin
-            target: (0.0, 0.0, 0.0).into(),
+            target: Vec3::new(0.0, 0.0, 0.0),
             // which way is "up"
-            up: Vec3::Y,
+            up: Vec3::Z,
             aspect,
             fovy: 45.0,
             znear: 0.1,
-            zfar: 100.0,
+            zfar: 10000.0,
         }
     }
     pub fn build_view_projection_matrix(&self) -> Mat4 {

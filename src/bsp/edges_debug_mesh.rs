@@ -1,12 +1,11 @@
-use std::{
-    cell::RefCell,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
-use gltf::mesh::util::ReadIndices;
+use glam::Vec3;
 use wgpu::util::DeviceExt;
 
 use crate::state::{State, StateInstance, StateRenderer};
+
+use super::{consts::LumpType, edge::dedge_t, header::dheader_t};
 
 pub struct EdgesDebugMesh {
     vertex_buffer: wgpu::Buffer,
@@ -84,16 +83,20 @@ impl State for EdgesDebugMesh {
 
 impl EdgesDebugMesh {
     pub fn load_mesh(into: Arc<Mutex<EdgesDebugMesh>>, instance: Arc<StateInstance>) {
-        let (document, buffers, images) =
-            gltf::import("assets/dragon_high.glb").expect("Torus import should work");
+        let (header,mut buffer) = dheader_t::load(
+			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_01.bsp").unwrap();
 
-        let mesh = document.meshes().next().unwrap();
-        let prim = mesh.primitives().next().unwrap();
+        header.validate();
 
-        let reader = prim.reader(|buffer| Some(&buffers[buffer.index()]));
+        // let planes: Vec<dplane_t> = header.get_lump(LumpType::PLANES).decode(&mut buffer);
+        // Lump::validate(&planes);
 
-        let iter = reader.read_positions().unwrap();
-        let verts: Vec<[f32; 3]> = iter.collect();
+        // let faces: Vec<dface_t> = header.get_lump(LumpType::FACES).decode(&mut buffer);
+        // Lump::validate(&faces);
+
+        let edges: Box<[dedge_t]> = header.get_lump(LumpType::EDGES).decode(&mut buffer);
+
+        let verts: Box<[Vec3]> = header.get_lump(LumpType::VERTEXES).decode(&mut buffer);
 
         let vertex_buffer =
             instance
@@ -104,46 +107,22 @@ impl EdgesDebugMesh {
                     usage: wgpu::BufferUsages::VERTEX,
                 });
 
-        let (index_buffer, index_format, num_indices) = match reader.read_indices() {
-            Some(ReadIndices::U16(iter)) => {
-                let indicies: Vec<u16> = iter.collect();
+        let index_buffer =
+            instance
+                .device()
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Index Buffer"),
+                    contents: bytemuck::cast_slice(&edges[..]),
+                    usage: wgpu::BufferUsages::INDEX,
+                });
 
-                (
-                    instance
-                        .device()
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Index Buffer"),
-                            contents: bytemuck::cast_slice(&indicies[..]),
-                            usage: wgpu::BufferUsages::INDEX,
-                        }),
-                    wgpu::IndexFormat::Uint16,
-                    indicies.len(),
-                )
-            }
-            Some(ReadIndices::U32(iter)) => {
-                let indicies: Vec<u32> = iter.collect();
-
-                (
-                    instance
-                        .device()
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Index Buffer"),
-                            contents: bytemuck::cast_slice(&indicies[..]),
-                            usage: wgpu::BufferUsages::INDEX,
-                        }),
-                    wgpu::IndexFormat::Uint32,
-                    indicies.len(),
-                )
-            }
-            _ => panic!("No indices"),
-        };
         // Update the value stored in this mesh
         let mut into = into.lock().unwrap();
         *into = EdgesDebugMesh {
             vertex_buffer,
             index_buffer,
-            num_indices: num_indices as u32,
-            index_format,
+            num_indices: edges.len() as u32,
+            index_format: wgpu::IndexFormat::Uint16,
         };
     }
 }

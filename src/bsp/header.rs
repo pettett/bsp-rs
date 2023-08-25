@@ -1,5 +1,10 @@
 use crate::bsp::consts::HEADER_LUMPS;
-use std::fmt;
+use std::{
+    fmt,
+    fs::File,
+    io::{self, BufReader, Read},
+    mem, slice,
+};
 
 use crate::bsp::consts::LumpType;
 use num_traits::FromPrimitive;
@@ -7,7 +12,7 @@ use num_traits::FromPrimitive;
 use super::lump::lump_t;
 
 #[repr(C, packed)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct dheader_t {
     ident: [u8; 4],                // BSP file identifier
     version: i32,                  // BSP file version
@@ -39,6 +44,23 @@ impl fmt::Debug for dheader_t {
 }
 
 impl dheader_t {
+    pub fn load(path: &str) -> io::Result<(Self, BufReader<File>)> {
+        let file = File::open(path)?;
+        let mut buffer = BufReader::new(file);
+
+        let mut header: dheader_t = unsafe { mem::zeroed() };
+
+        let header_size = mem::size_of::<dheader_t>();
+        unsafe {
+            let header_slice =
+                slice::from_raw_parts_mut(&mut header as *mut _ as *mut u8, header_size);
+            // `read_exact()` comes from `Read` impl for `&[u8]`
+            buffer.read_exact(header_slice).unwrap();
+        }
+        //buffer.read_exact(&mut header.ident).unwrap();
+        Ok((header, buffer))
+    }
+
     pub fn get_lump(&self, lump: LumpType) -> &lump_t {
         &self.lumps[lump as usize]
     }
