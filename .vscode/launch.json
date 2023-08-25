@@ -1,0 +1,81 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'bsp-explorer'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=bsp-explorer"
+				],
+				"filter": {
+					"name": "bsp-explorer",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'control_renderer'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=control_renderer",
+					"--package=bsp-explorer"
+				],
+				"filter": {
+					"name": "control_renderer",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},	{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'bsp_readout'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=bsp_readout",
+					"--package=bsp-explorer"
+				],
+				"filter": {
+					"name": "bsp_readout",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in executable 'control_renderer'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=control_renderer",
+					"--package=bsp-explorer"
+				],
+				"filter": {
+					"name": "control_renderer",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		}
+	]
+}
