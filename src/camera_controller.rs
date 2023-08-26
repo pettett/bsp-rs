@@ -1,3 +1,4 @@
+use glam::Vec3A;
 use winit::{
     dpi::PhysicalPosition,
     event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -11,6 +12,8 @@ pub struct CameraController {
     is_backward_pressed: bool,
     is_left_pressed: bool,
     is_right_pressed: bool,
+    is_up_pressed: bool,
+    is_down_pressed: bool,
     last_mouse_pos: PhysicalPosition<f64>,
     mouse_delta: PhysicalPosition<f64>,
 }
@@ -23,6 +26,8 @@ impl CameraController {
             is_backward_pressed: false,
             is_left_pressed: false,
             is_right_pressed: false,
+            is_up_pressed: false,
+            is_down_pressed: false,
             last_mouse_pos: Default::default(),
             mouse_delta: Default::default(),
         }
@@ -57,6 +62,14 @@ impl CameraController {
                         self.is_right_pressed = is_pressed;
                         true
                     }
+                    VirtualKeyCode::E => {
+                        self.is_up_pressed = is_pressed;
+                        true
+                    }
+                    VirtualKeyCode::Q => {
+                        self.is_down_pressed = is_pressed;
+                        true
+                    }
                     _ => false,
                 }
             }
@@ -72,33 +85,37 @@ impl CameraController {
     }
 
     pub fn update_camera(&self, camera: &mut Camera) {
-        let forward = camera.target - camera.eye;
-        let forward_norm = forward.normalize();
-        let forward_mag = forward.length();
+        let forward = camera.transform.forward();
 
         // Prevents glitching when camera gets too close to the
         // center of the scene.
-        if self.is_forward_pressed && forward_mag > self.speed {
-            camera.eye += forward_norm * self.speed;
+        if self.is_forward_pressed {
+            camera.transform.translate(forward * self.speed);
         }
         if self.is_backward_pressed {
-            camera.eye -= forward_norm * self.speed;
+            camera.transform.translate(-forward * self.speed);
         }
 
-        let right = forward_norm.cross(camera.up);
-
-        // Redo radius calc in case the fowrard/backward is pressed.
-        let forward = camera.target - camera.eye;
-        let forward_mag = forward.length();
+        let left = camera.transform.left();
 
         if self.is_right_pressed {
-            // Rescale the distance between the target and eye so
-            // that it doesn't change. The eye therefore still
-            // lies on the circle made by the target and eye.
-            camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
+            camera.transform.translate(-left * self.speed);
         }
         if self.is_left_pressed {
-            camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
+            camera.transform.translate(left * self.speed);
         }
+
+        let up = camera.transform.up();
+
+        if self.is_down_pressed {
+            camera.transform.translate(-up * self.speed);
+        }
+        if self.is_up_pressed {
+            camera.transform.translate(up * self.speed);
+        }
+
+        camera
+            .transform
+            .look_at(Vec3A::new(-5603.8857, -3556.1858, -132.67264))
     }
 }

@@ -35,30 +35,18 @@ impl State for StateImgui {
         let ui = self.imgui.frame();
 
         {
-            let window = ui.window("Hello world");
-            window
-                .size([300.0, 100.0], Condition::FirstUseEver)
-                .build(|| {
-                    ui.text("Hello world!");
-                    ui.text("This...is...imgui-rs on WGPU!");
-                    ui.separator();
-                    let mouse_pos = ui.io().mouse_pos;
-                    ui.text(format!(
-                        "Mouse Position: ({:.1},{:.1})",
-                        mouse_pos[0], mouse_pos[1]
-                    ));
-                });
-
-            let window = ui.window("Hello too");
+            let window = ui.window("Camera");
             window
                 .size([400.0, 200.0], Condition::FirstUseEver)
                 .position([400.0, 200.0], Condition::FirstUseEver)
                 .build(|| {
                     ui.text(format!("Frametime: {delta_s:?}"));
-                });
 
-            let mut demo_open = true;
-            ui.show_demo_window(&mut demo_open);
+                    ui.text(format!(
+                        "Camera Pos: {}",
+                        state.camera().transform().get_pos()
+                    ))
+                });
 
             //self.puffin_ui.window(ui);
         }

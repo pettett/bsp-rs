@@ -307,7 +307,7 @@ impl StateRenderer {
             multiview: None, // 5.
         });
 
-        let camera_controller = CameraController::new(20.0);
+        let camera_controller = CameraController::new(10.0);
 
         puffin::set_scopes_on(true); // you may want to control this with a flag
                                      //let  puffin_ui = puffin_imgui::ProfilerUi::default();
@@ -355,5 +355,8 @@ impl StateRenderer {
 
     pub fn instance(&self) -> Arc<StateInstance> {
         self.instance.clone()
+    }
+    pub fn camera(&self) -> &Camera {
+        &self.camera
     }
 }

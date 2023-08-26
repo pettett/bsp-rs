@@ -1,9 +1,9 @@
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Quat, Vec3, Vec3A};
+
+use crate::transform::Transform;
 
 pub struct Camera {
-    pub eye: Vec3,
-    pub target: Vec3,
-    pub up: Vec3,
+    pub transform: Transform,
     pub aspect: f32,
     pub fovy: f32,
     pub znear: f32,
@@ -23,22 +23,19 @@ pub const OPENGL_TO_WGPU_MATRIX: Mat4 = Mat4::from_cols_array(
 impl Camera {
     pub fn new(aspect: f32) -> Self {
         Self {
-            // position the camera one unit up and 2 units back
-            // +z is out of the screen
-            eye: Vec3::new(2000.0, 1.0, 200.0),
-            // have it look at the origin
-            target: Vec3::new(0.0, 0.0, 0.0),
-            // which way is "up"
-            up: Vec3::Z,
+            transform: Transform::new(Vec3A::new(2000.0, 1.0, 200.0), Quat::IDENTITY),
             aspect,
             fovy: 45.0,
             znear: 0.1,
             zfar: 10000.0,
         }
     }
+    pub fn transform(&self) -> &Transform {
+        &self.transform
+    }
     pub fn build_view_projection_matrix(&self) -> Mat4 {
         // 1.
-        let view = Mat4::look_at_rh(self.eye, self.target, self.up);
+        let view = self.transform.get_local_to_world().inverse();
         // 2.
         let proj = Mat4::perspective_rh(self.fovy, self.aspect, self.znear, self.zfar);
 

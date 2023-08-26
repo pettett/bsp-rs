@@ -10,10 +10,13 @@ impl Lump for Vec3 {
     fn validate(lump: &Box<[Self]>) {
         assert!(lump.len() < MAX_MAP_VERTS);
 
-        for i in 0..100 {
-            println!("{:?}", lump[i * 100]);
+        let mut sum = Vec3::ZERO;
+        for &v in lump.iter() {
+            sum += v;
         }
+        sum /= lump.len() as f32;
 
+        println!("Average vertex {sum}");
         println!("validated vert lump!");
     }
 }
