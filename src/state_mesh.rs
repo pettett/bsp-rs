@@ -1,6 +1,14 @@
-use crate::vertex::Vertex;
+use crate::{
+    bsp::{
+        edges::{dedge_t, dsurfedge_t},
+        face::dface_t,
+        header::dheader_t,
+    },
+    vertex::Vertex,
+};
 use std::sync::{Arc, Mutex};
 
+use glam::Vec3;
 use gltf::mesh::util::ReadIndices;
 use wgpu::util::DeviceExt;
 
@@ -14,35 +22,16 @@ pub struct StateMesh {
     num_indices: u32,
     //puffin_ui : puffin_imgui::ProfilerUi,
 }
-impl State for StateMesh {
-    fn render_pass(
-        &mut self,
-        state: &StateRenderer,
-        encoder: &mut wgpu::CommandEncoder,
+
+impl StateMesh {
+    pub fn draw<'a>(
+        &'a self,
+        state: &'a StateRenderer,
+        render_pass: &mut wgpu::RenderPass<'a>,
         output: &wgpu::SurfaceTexture,
         view: &wgpu::TextureView,
     ) {
         // 1.
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[
-                // This is what @location(0) in the fragment shader targets
-                Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
-                            a: 1.0,
-                        }),
-                        store: true,
-                    },
-                }),
-            ],
-            depth_stencil_attachment: None,
-        });
 
         render_pass.set_pipeline(&self.render_pipeline);
 
@@ -53,7 +42,7 @@ impl State for StateMesh {
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
     }
 
-    fn init(renderer: &StateRenderer) -> Self {
+    pub fn new(renderer: &StateRenderer, topology: wgpu::PrimitiveTopology) -> Self {
         let vertex_buffer =
             renderer
                 .device()
@@ -107,7 +96,7 @@ impl State for StateMesh {
                         })],
                     }),
                     primitive: wgpu::PrimitiveState {
-                        topology: wgpu::PrimitiveTopology::TriangleList, // 1.
+                        topology, // 1.
                         strip_index_format: None,
                         front_face: wgpu::FrontFace::Ccw, // 2.
                         cull_mode: Some(wgpu::Face::Back),
@@ -135,10 +124,8 @@ impl State for StateMesh {
             index_format: wgpu::IndexFormat::Uint16,
         }
     }
-}
 
-impl StateMesh {
-    pub fn load_mesh(into: Arc<Mutex<StateMesh>>, instance: Arc<StateInstance>) {
+    pub fn load_glb_mesh(&mut self, instance: Arc<StateInstance>) {
         let (document, buffers, images) =
             gltf::import("assets/dragon_high.glb").expect("Torus import should work");
 
@@ -150,7 +137,7 @@ impl StateMesh {
         let iter = reader.read_positions().unwrap();
         let verts: Vec<[f32; 3]> = iter.collect();
 
-        let vertex_buffer =
+        self.vertex_buffer =
             instance
                 .device()
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -193,10 +180,90 @@ impl StateMesh {
             _ => panic!("No indices"),
         };
         // Update the value stored in this mesh
-        let mut into = into.lock().unwrap();
-        into.vertex_buffer = vertex_buffer;
-        into.index_buffer = index_buffer;
-        into.num_indices = num_indices as u32;
-        into.index_format = index_format;
+        self.index_buffer = index_buffer;
+
+        self.num_indices = num_indices as u32;
+        self.index_format = index_format;
+    }
+
+    pub fn load_debug_edges(&mut self, instance: Arc<StateInstance>) {
+        let (header,mut buffer) = dheader_t::load(
+			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp").unwrap();
+
+        header.validate();
+
+        let edges = header.get_lump::<dedge_t>(&mut buffer);
+        let verts = header.get_lump::<Vec3>(&mut buffer);
+
+        self.vertex_buffer =
+            instance
+                .device()
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Vertex Buffer"),
+                    contents: bytemuck::cast_slice(&verts[..]),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+
+        self.index_buffer =
+            instance
+                .device()
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Index Buffer"),
+                    contents: bytemuck::cast_slice(&edges[..]),
+                    usage: wgpu::BufferUsages::INDEX,
+                });
+
+        // Update the value stored in this mesh
+
+        self.num_indices = edges.len() as u32;
+        self.index_format = wgpu::IndexFormat::Uint16;
+    }
+
+    pub fn load_debug_faces(&mut self, instance: Arc<StateInstance>) {
+        let (header,mut buffer) = dheader_t::load(
+			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp").unwrap();
+
+        header.validate();
+
+        let faces = header.get_lump::<dface_t>(&mut buffer);
+        let surfedges = header.get_lump::<dsurfedge_t>(&mut buffer);
+        let edges = header.get_lump::<dedge_t>(&mut buffer);
+        let verts = header.get_lump::<Vec3>(&mut buffer);
+
+        let mut tris = Vec::<u16>::new();
+
+        for face in faces.iter() {
+            let root_edge_index = face.first_edge as usize;
+            let root_edge = surfedges[root_edge_index].get_edge(&edges);
+
+            for i in 1..(face.num_edges as usize) {
+                let edge = surfedges[root_edge_index + i].get_edge(&edges);
+
+                tris.extend([edge.0, root_edge.0, edge.1])
+            }
+        }
+
+        self.vertex_buffer =
+            instance
+                .device()
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Vertex Buffer"),
+                    contents: bytemuck::cast_slice(&verts[..]),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+
+        self.index_buffer =
+            instance
+                .device()
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Index Buffer"),
+                    contents: bytemuck::cast_slice(&tris[..]),
+                    usage: wgpu::BufferUsages::INDEX,
+                });
+
+        // Update the value stored in this mesh
+
+        self.num_indices = tris.len() as u32;
+        self.index_format = wgpu::IndexFormat::Uint16;
     }
 }

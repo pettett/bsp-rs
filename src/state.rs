@@ -24,7 +24,7 @@ pub trait State {
 }
 
 pub struct StateApp {
-    pub mesh: Arc<Mutex<StateMesh>>,
+    meshes: Arc<Mutex<Vec<StateMesh>>>,
     imgui: StateImgui,
     renderer: StateRenderer,
     //puffin_ui : puffin_imgui::ProfilerUi,
@@ -67,10 +67,14 @@ impl StateApp {
     pub async fn new(renderer: StateRenderer) -> Self {
         Self {
             imgui: StateImgui::init(&renderer),
-            mesh: Arc::new(Mutex::new(StateMesh::init(&renderer))),
+            meshes: Arc::new(Mutex::new(Vec::new())),
             renderer,
             //puffin_ui
         }
+    }
+
+    pub fn add_mesh(&self, mesh: StateMesh) {
+        self.meshes.lock().unwrap().push(mesh)
     }
 
     pub fn renderer(&self) -> &StateRenderer {
@@ -122,6 +126,7 @@ impl StateApp {
         self.renderer
             .camera_controller
             .update_camera(&mut self.renderer.camera);
+
         self.renderer
             .camera_uniform
             .update_view_proj(&self.renderer.camera);
@@ -131,10 +136,33 @@ impl StateApp {
             bytemuck::cast_slice(&[self.renderer.camera_uniform]),
         );
 
-        self.mesh
-            .lock()
-            .unwrap()
-            .render_pass(&self.renderer, &mut encoder, &output, &view);
+        {
+            let meshes = self.meshes.lock().unwrap();
+            let mut render_pass: wgpu::RenderPass<'_> =
+                encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Render Pass"),
+                    color_attachments: &[
+                        // This is what @location(0) in the fragment shader targets
+                        Some(wgpu::RenderPassColorAttachment {
+                            view: &view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color {
+                                    r: 0.1,
+                                    g: 0.2,
+                                    b: 0.3,
+                                    a: 1.0,
+                                }),
+                                store: true,
+                            },
+                        }),
+                    ],
+                    depth_stencil_attachment: None,
+                });
+            for mesh in meshes.iter() {
+                mesh.draw(&self.renderer, &mut render_pass, &output, &view);
+            }
+        }
         // self.debug_mesh
         //     .lock()
         //     .unwrap()

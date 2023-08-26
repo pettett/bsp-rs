@@ -1,4 +1,4 @@
-use glam::Vec3A;
+use glam::{Quat, Vec2, Vec3, Vec3A};
 use winit::{
     dpi::PhysicalPosition,
     event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -14,8 +14,9 @@ pub struct CameraController {
     is_right_pressed: bool,
     is_up_pressed: bool,
     is_down_pressed: bool,
+    dragging: bool,
     last_mouse_pos: PhysicalPosition<f64>,
-    mouse_delta: PhysicalPosition<f64>,
+    mouse_delta: Vec2,
 }
 
 impl CameraController {
@@ -28,6 +29,7 @@ impl CameraController {
             is_right_pressed: false,
             is_up_pressed: false,
             is_down_pressed: false,
+            dragging: false,
             last_mouse_pos: Default::default(),
             mouse_delta: Default::default(),
         }
@@ -73,9 +75,24 @@ impl CameraController {
                     _ => false,
                 }
             }
+            WindowEvent::MouseInput {
+                device_id,
+                state,
+                button,
+                ..
+            } => match button {
+                winit::event::MouseButton::Left => {
+                    self.dragging = match state {
+                        ElementState::Pressed => true,
+                        ElementState::Released => false,
+                    };
+                    true
+                }
+                _ => false,
+            },
             WindowEvent::CursorMoved { position, .. } => {
-                self.mouse_delta.x = self.last_mouse_pos.x - position.x;
-                self.mouse_delta.y = self.last_mouse_pos.y - position.y;
+                self.mouse_delta.x = (self.last_mouse_pos.x - position.x) as f32;
+                self.mouse_delta.y = (self.last_mouse_pos.y - position.y) as f32;
                 self.last_mouse_pos = *position;
                 true
             }
@@ -84,7 +101,7 @@ impl CameraController {
         }
     }
 
-    pub fn update_camera(&self, camera: &mut Camera) {
+    pub fn update_camera(&mut self, camera: &mut Camera) {
         let forward = camera.transform.forward();
 
         // Prevents glitching when camera gets too close to the
@@ -113,5 +130,14 @@ impl CameraController {
         if self.is_up_pressed {
             camera.transform.translate(up * self.speed);
         }
+
+        // rotate camera
+        if self.dragging {
+            let rot = camera.transform.get_rot_mut();
+            *rot = Quat::from_axis_angle(Vec3::Z, self.mouse_delta.x / 100.0) * *rot;
+
+            *rot *= Quat::from_axis_angle(left.into(), -self.mouse_delta.y / 100.0);
+        }
+        self.mouse_delta = Vec2::ZERO;
     }
 }

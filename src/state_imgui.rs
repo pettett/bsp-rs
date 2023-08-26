@@ -45,7 +45,16 @@ impl State for StateImgui {
                     ui.text(format!(
                         "Camera Pos: {}",
                         state.camera().transform().get_pos()
-                    ))
+                    ));
+
+                    ui.text(format!(
+                        "Camera Rot: {:?}",
+                        state
+                            .camera()
+                            .transform()
+                            .get_rot()
+                            .to_euler(glam::EulerRot::XYZ)
+                    ));
                 });
 
             //self.puffin_ui.window(ui);

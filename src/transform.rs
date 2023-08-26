@@ -36,7 +36,9 @@ impl Transform {
     pub fn get_rot(&self) -> &Quat {
         &self.rot
     }
-
+    pub fn get_rot_mut(&mut self) -> &mut Quat {
+        &mut self.rot
+    }
     pub fn get_local_to_world(&self) -> Mat4 {
         Mat4::from_rotation_translation(self.rot, self.pos.into())
     }

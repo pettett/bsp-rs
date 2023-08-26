@@ -22,7 +22,7 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput; 
     out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0);;
-	out.color = model.position + vec3<f32>(0.5,0.5,0.5);
+	out.color = model.position * 0.01 + vec3<f32>(0.5,0.5,0.5);
     return out;
 }
 // Fragment shader

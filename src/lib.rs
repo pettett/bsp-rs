@@ -1,7 +1,7 @@
 pub mod bsp;
 pub mod camera;
 pub mod camera_controller;
-mod state;
+pub mod state;
 pub mod state_imgui;
 pub mod state_mesh;
 pub mod transform;
@@ -16,7 +16,10 @@ use winit::{
     window::WindowBuilder,
 };
 
-pub async fn run() {
+pub async fn run<F>(init: F)
+where
+    F: Fn(&mut StateApp) -> (),
+{
     env_logger::init();
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
@@ -25,11 +28,7 @@ pub async fn run() {
 
     let mut state = StateApp::new(renderer).await;
 
-    let instance = state.renderer().instance();
-    let mesh = state.mesh.clone();
-    thread::spawn(move || {
-        StateMesh::load_mesh(mesh, instance);
-    });
+    init(&mut state);
 
     //let instance = state.renderer().instance();
     //let debug_mesh = state.debug_mesh.clone();
