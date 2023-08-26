@@ -13,11 +13,12 @@ impl Transform {
     pub fn get_pos(&self) -> &Vec3A {
         &self.pos
     }
-
     pub fn translate(&mut self, translation: Vec3A) {
         self.pos += translation
     }
-
+    pub fn translate_local(&mut self, translation: Vec3A) {
+        self.pos += self.rot.mul_vec3a(translation)
+    }
     pub fn forward(&self) -> Vec3A {
         self.rot.mul_vec3a(Vec3A::X)
     }
@@ -29,7 +30,7 @@ impl Transform {
     }
 
     pub fn look_at(&mut self, target: Vec3A) {
-        self.rot = Quat::from_rotation_arc(Vec3::X, (self.pos - target).into());
+        self.rot = Quat::from_rotation_arc(Vec3::X, (self.pos - target).normalize().into());
     }
 
     pub fn get_rot(&self) -> &Quat {

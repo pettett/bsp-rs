@@ -113,9 +113,5 @@ impl CameraController {
         if self.is_up_pressed {
             camera.transform.translate(up * self.speed);
         }
-
-        camera
-            .transform
-            .look_at(Vec3A::new(-5603.8857, -3556.1858, -132.67264))
     }
 }
