@@ -1,6 +1,5 @@
 pub mod consts;
 pub mod edges;
-pub mod edges_debug_mesh;
 pub mod face;
 pub mod header;
 pub mod lump;

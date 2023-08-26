@@ -19,23 +19,19 @@ pub fn main() -> io::Result<()> {
     let (header, mut buffer) = dheader_t::load("D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_01.bsp")?;
     header.validate();
 
-    let planes: Box<[dplane_t]> = header.get_lump_header(LumpType::PLANES).decode(&mut buffer);
+    let planes = header.get_lump::<dplane_t>(&mut buffer);
     Lump::validate(&planes);
 
-    let faces: Box<[dface_t]> = header.get_lump_header(LumpType::FACES).decode(&mut buffer);
+    let faces = header.get_lump::<dface_t>(&mut buffer);
     Lump::validate(&faces);
 
-    let edges: Box<[dedge_t]> = header.get_lump_header(LumpType::EDGES).decode(&mut buffer);
+    let edges = header.get_lump::<dedge_t>(&mut buffer);
     Lump::validate(&edges);
 
-    let surfedges: Box<[dsurfedge_t]> = header
-        .get_lump_header(LumpType::SURFEDGES)
-        .decode(&mut buffer);
+    let surfedges = header.get_lump::<dsurfedge_t>(&mut buffer);
     Lump::validate(&surfedges);
 
-    let verts: Box<[Vec3]> = header
-        .get_lump_header(LumpType::VERTEXES)
-        .decode(&mut buffer);
+    let verts = header.get_lump::<Vec3>(&mut buffer);
     Lump::validate(&verts);
 
     Ok(())
