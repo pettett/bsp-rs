@@ -9,15 +9,15 @@ use std::{
 use crate::bsp::consts::LumpType;
 use num_traits::FromPrimitive;
 
-use super::lump::lump_t;
+use super::{lump::lump_t, Lump};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct dheader_t {
-    ident: [u8; 4],                // BSP file identifier
-    version: i32,                  // BSP file version
-    lumps: [lump_t; HEADER_LUMPS], // lump directory array
-    mapRevision: i32,              // the map's revision (iteration, version) number
+    pub ident: [u8; 4],                // BSP file identifier
+    pub version: i32,                  // BSP file version
+    pub lumps: [lump_t; HEADER_LUMPS], // lump directory array
+    pub mapRevision: i32,              // the map's revision (iteration, version) number
 }
 
 impl Default for dheader_t {
@@ -61,10 +61,12 @@ impl dheader_t {
         Ok((header, buffer))
     }
 
-    pub fn get_lump(&self, lump: LumpType) -> &lump_t {
+    pub fn get_lump_header(&self, lump: LumpType) -> &lump_t {
         &self.lumps[lump as usize]
     }
-
+    pub fn get_lump<T: Lump>(&self, buffer: &mut BufReader<File>) -> Box<[T]> {
+        self.get_lump_header(T::lump_type()).decode(buffer)
+    }
     pub fn validate(&self) {
         // Check the magic number
         // This way around means little endian, PSBV is big endian

@@ -26,9 +26,9 @@ use super::{consts::MAX_MAP_PLANES, Lump};
 #[repr(C, packed)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct dplane_t {
-    normal: Vec3, // normal vector
-    dist: f32,    // distance from origin
-    axis: i32,    // plane axis identifier
+    pub normal: Vec3, // normal vector
+    pub dist: f32,    // distance from origin
+    pub axis: i32,    // plane axis identifier
 }
 
 impl Lump for dplane_t {
@@ -43,5 +43,9 @@ impl Lump for dplane_t {
             assert!((0..=5).contains(&axis));
         }
         println!("Validated planes lump!")
+    }
+
+    fn lump_type() -> super::consts::LumpType {
+        super::consts::LumpType::PLANES
     }
 }

@@ -1,4 +1,7 @@
-use super::{consts::MAX_MAP_FACES, Lump};
+use super::{
+    consts::{LumpType, MAX_MAP_FACES},
+    Lump,
+};
 
 ///The first member planenum is the plane number, i.e., the index into the plane array that corresponds to the plane that is aligned with this face in the world. Side is zero if this plane faces in the same direction as the face (i.e. "out" of the face) or non-zero otherwise.
 ///
@@ -17,30 +20,32 @@ use super::{consts::MAX_MAP_FACES, Lump};
 #[repr(C, packed)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct dface_t {
-    planenum: u16,                         // the plane number
-    side: i8,                              // faces opposite to the node's plane direction
-    onNode: i8,                            // 1 of on node, 0 if in leaf
-    firstedge: i32,                        // index into surfedges
-    numedges: i16,                         // number of surfedges
-    texinfo: i16,                          // texture info
-    dispinfo: i16,                         // displacement info
-    surfaceFogVolumeID: i16,               // ?
-    styles: [i8; 4],                       // switchable lighting info
-    lightofs: i32,                         // offset into lightmap lump
-    area: f32,                             // face area in units^2
-    LightmapTextureMinsInLuxels: [i32; 2], // texture lighting info
-    LightmapTextureSizeInLuxels: [i32; 2], // texture lighting info
-    origFace: i32,                         // original face this was split from
-    numPrims: u16,                         // primitives
-    firstPrimID: u16,                      //
-    smoothingGroups: u32,                  // lightmap smoothing group
+    pub planenum: u16,                         // the plane number
+    pub side: i8,                              // faces opposite to the node's plane direction
+    pub onNode: i8,                            // 1 of on node, 0 if in leaf
+    pub firstedge: i32,                        // index into surfedges
+    pub numedges: i16,                         // number of surfedges
+    pub texinfo: i16,                          // texture info
+    pub dispinfo: i16,                         // displacement info
+    pub surfaceFogVolumeID: i16,               // ?
+    pub styles: [i8; 4],                       // switchable lighting info
+    pub lightofs: i32,                         // offset into lightmap lump
+    pub area: f32,                             // face area in units^2
+    pub LightmapTextureMinsInLuxels: [i32; 2], // texture lighting info
+    pub LightmapTextureSizeInLuxels: [i32; 2], // texture lighting info
+    pub origFace: i32,                         // original face this was split from
+    pub numPrims: u16,                         // primitives
+    pub firstPrimID: u16,                      //
+    pub smoothingGroups: u32,                  // lightmap smoothing group
 }
 
 impl Lump for dface_t {
     fn max() -> usize {
         MAX_MAP_FACES
     }
-
+    fn lump_type() -> LumpType {
+        LumpType::FACES
+    }
     fn validate(lump: &Box<[Self]>) {
         for face in lump.iter() {
             assert!((0..=1).contains(&face.side));

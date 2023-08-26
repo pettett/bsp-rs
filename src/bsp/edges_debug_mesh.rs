@@ -5,7 +5,7 @@ use wgpu::util::DeviceExt;
 
 use crate::state::{State, StateInstance, StateRenderer};
 
-use super::{consts::LumpType, edge::dedge_t, header::dheader_t};
+use super::{consts::LumpType, edges::dedge_t, header::dheader_t};
 
 pub struct EdgesDebugMesh {
     vertex_buffer: wgpu::Buffer,
@@ -94,9 +94,11 @@ impl EdgesDebugMesh {
         // let faces: Vec<dface_t> = header.get_lump(LumpType::FACES).decode(&mut buffer);
         // Lump::validate(&faces);
 
-        let edges: Box<[dedge_t]> = header.get_lump(LumpType::EDGES).decode(&mut buffer);
+        let edges: Box<[dedge_t]> = header.get_lump_header(LumpType::EDGES).decode(&mut buffer);
 
-        let verts: Box<[Vec3]> = header.get_lump(LumpType::VERTEXES).decode(&mut buffer);
+        let verts: Box<[Vec3]> = header
+            .get_lump_header(LumpType::VERTEXES)
+            .decode(&mut buffer);
 
         let vertex_buffer =
             instance

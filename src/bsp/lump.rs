@@ -4,11 +4,16 @@ use std::{
     mem, slice,
 };
 
+use bytemuck::Zeroable;
+
+use super::consts::LumpType;
+
 pub trait Lump
 where
-    Self: Sized,
+    Self: Sized + Zeroable + Clone,
 {
     fn max() -> usize;
+    fn lump_type() -> LumpType;
     fn validate(lump: &Box<[Self]>);
 }
 
@@ -16,10 +21,10 @@ where
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct lump_t {
-    fileofs: i32,    // offset into file (i8s)
-    filelen: i32,    // length of lump (i8s)
-    version: i32,    // lump format version
-    fourCC: [u8; 4], // lump ident code
+    pub fileofs: i32,    // offset into file (i8s)
+    pub filelen: i32,    // length of lump (i8s)
+    pub version: i32,    // lump format version
+    pub fourCC: [u8; 4], // lump ident code
 }
 impl lump_t {
     pub fn decode<T: Clone + bytemuck::Zeroable>(&self, buffer: &mut BufReader<File>) -> Box<[T]> {

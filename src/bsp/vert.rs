@@ -1,12 +1,17 @@
 use glam::Vec3;
 
-use super::{consts::MAX_MAP_VERTS, Lump};
+use super::{
+    consts::{LumpType, MAX_MAP_VERTS},
+    Lump,
+};
 
 impl Lump for Vec3 {
     fn max() -> usize {
         MAX_MAP_VERTS
     }
-
+    fn lump_type() -> LumpType {
+        LumpType::VERTEXES
+    }
     fn validate(lump: &Box<[Self]>) {
         assert!(lump.len() < MAX_MAP_VERTS);
 

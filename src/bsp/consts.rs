@@ -1,12 +1,18 @@
 use flagset::{flags, FlagSet};
 use num_derive::FromPrimitive;
 
-pub const MAX_MAP_PLANES: usize = 65536;
 pub const HEADER_LUMPS: usize = 64;
+// Geometry
+pub const MAX_MAP_PLANES: usize = 65536;
 pub const MAX_MAP_VERTS: usize = 65536;
 pub const MAX_MAP_EDGES: usize = 256000;
 pub const MAX_MAP_SURFEDGES: usize = 512000;
 pub const MAX_MAP_FACES: usize = 65536;
+// Textures
+pub const MAX_MAP_TEXINFO: usize = 12288;
+pub const MAX_MAP_TEXDATA: usize = 2048;
+pub const MAX_MAP_TEXDATA_STRING_DATA: i32 = 256000;
+pub const TEXTURE_NAME_LENGTH: usize = 128;
 
 #[derive(Copy, Clone, FromPrimitive, Debug)]
 pub enum LumpType {
