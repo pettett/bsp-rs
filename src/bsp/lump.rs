@@ -27,25 +27,32 @@ pub struct lump_t {
     pub fourCC: [u8; 4], // lump ident code
 }
 impl lump_t {
-    pub fn decode<T: Clone + bytemuck::Zeroable>(&self, buffer: &mut BufReader<File>) -> Box<[T]> {
+    pub fn decode<T: Clone + bytemuck::Zeroable>(
+        &self,
+        buffer: &mut BufReader<File>,
+    ) -> io::Result<Box<[T]>> {
         let item_size = mem::size_of::<T>();
 
         assert_eq!(self.filelen as usize % item_size, 0);
 
         let len = self.filelen as usize / item_size;
 
-        let mut planes = bytemuck::zeroed_slice_box(len);
+        let mut table = bytemuck::zeroed_slice_box(len);
 
         unsafe {
             let header_slice =
-                slice::from_raw_parts_mut(&mut planes[0] as *mut _ as *mut u8, len * item_size);
-            buffer
-                .seek(io::SeekFrom::Start(self.fileofs as u64))
-                .unwrap();
+                slice::from_raw_parts_mut(&mut table[0] as *mut _ as *mut u8, len * item_size);
+            buffer.seek(io::SeekFrom::Start(self.fileofs as u64))?;
             // `read_exact()` comes from `Read` impl for `&[u8]`
-            buffer.read_exact(header_slice).unwrap();
+            buffer.read_exact(header_slice)?;
         }
 
-        planes
+        Ok(table)
+    }
+    pub fn get_bytes(&self, buffer: &mut BufReader<File>) -> io::Result<Box<[u8]>> {
+        buffer.seek(std::io::SeekFrom::Start(self.fileofs as u64))?;
+        let mut bytes = bytemuck::zeroed_slice_box(self.filelen as usize);
+        buffer.read_exact(&mut bytes)?;
+        Ok(bytes)
     }
 }

@@ -94,11 +94,8 @@ impl EdgesDebugMesh {
         // let faces: Vec<dface_t> = header.get_lump(LumpType::FACES).decode(&mut buffer);
         // Lump::validate(&faces);
 
-        let edges: Box<[dedge_t]> = header.get_lump_header(LumpType::EDGES).decode(&mut buffer);
-
-        let verts: Box<[Vec3]> = header
-            .get_lump_header(LumpType::VERTEXES)
-            .decode(&mut buffer);
+        let edges = header.get_lump::<dedge_t>(&mut buffer);
+        let verts = header.get_lump::<Vec3>(&mut buffer);
 
         let vertex_buffer =
             instance

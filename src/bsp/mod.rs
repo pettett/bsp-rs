@@ -99,13 +99,7 @@ mod bsp_tests {
         let (header, mut buffer) = dheader_t::load(PATH).unwrap();
         let pakfile = header.get_lump_header(LumpType::PAKFILE);
 
-        buffer
-            .seek(std::io::SeekFrom::Start(pakfile.fileofs as u64))
-            .unwrap();
-
-        let mut pakfile_data = vec![0; pakfile.filelen as usize];
-
-        buffer.read_exact(&mut pakfile_data).unwrap();
+        let mut pakfile_data = pakfile.get_bytes(&mut buffer).unwrap();
 
         let mut zip_reader = ZipReader::default();
 
@@ -116,7 +110,7 @@ mod bsp_tests {
         zip_reader.finish();
         let entries = zip_reader.drain_entries();
         for entry in entries {
-            println!("entry: {:?}", entry);
+            println!("entry: {:?}", entry.header().filename);
             // write to disk or whatever you need.
         }
     }
@@ -132,13 +126,8 @@ mod bsp_tests {
 
         assert!(texdatastringdata.filelen <= MAX_MAP_TEXDATA_STRING_DATA);
 
-        buffer
-            .seek(std::io::SeekFrom::Start(texdatastringdata.fileofs as u64))
-            .unwrap();
+        let mut strings = texdatastringdata.get_bytes(&mut buffer).unwrap();
 
-        let mut strings = vec![0; texdatastringdata.filelen as usize];
-
-        buffer.read_exact(&mut strings).unwrap();
         // ensure it's utf8
         let all_textures = std::str::from_utf8(&strings).unwrap();
 
@@ -180,7 +169,10 @@ mod bsp_tests {
 
     fn test_lump<T: Lump + Clone + Zeroable>() {
         let (header, mut buffer) = dheader_t::load(PATH).unwrap();
-        let lump: Box<[T]> = header.get_lump_header(T::lump_type()).decode(&mut buffer);
+        let lump: Box<[T]> = header
+            .get_lump_header(T::lump_type())
+            .decode(&mut buffer)
+            .unwrap();
         Lump::validate(&lump);
     }
 }

@@ -65,7 +65,7 @@ impl dheader_t {
         &self.lumps[lump as usize]
     }
     pub fn get_lump<T: Lump>(&self, buffer: &mut BufReader<File>) -> Box<[T]> {
-        self.get_lump_header(T::lump_type()).decode(buffer)
+        self.get_lump_header(T::lump_type()).decode(buffer).unwrap()
     }
     pub fn validate(&self) {
         // Check the magic number
