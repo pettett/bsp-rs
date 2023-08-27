@@ -1,5 +1,150 @@
 // // Valve Texture File
 
+use std::io::Read;
+
+use bytemuck::Pod;
+
+use crate::binaries::BinaryData;
+
+use self::consts::ImageFormat;
+
+#[derive(Debug)]
+pub struct VTF {
+    header: VTFHEADER,
+    low_res: Vec<u8>,
+}
+
+impl VTF {}
+
+impl BinaryData for VTF {
+    fn read(buffer: &mut std::io::BufReader<std::fs::File>) -> std::io::Result<Self> {
+        let header = VTFHEADER::read(buffer)?;
+        let mut low_res = Vec::new();
+
+        if header.version[0] == 7 && header.version[1] == 3 {
+            let header_7_3 = VTFHEADER_7_3::read(buffer)?;
+
+            println!("Loading entries");
+            for i in 0..header_7_3.numResources {
+                if let Ok(entry) = ResourceEntryInfo::read(buffer) {
+                    match entry.tag {
+                        [b'\x01', b'\0', b'\0'] => println!("{:?}", entry), //  Low-res (thumbnail) image data
+                        [b'\x30', b'\0', b'\0'] => println!("{:?}", entry), //- High-res image data.
+                        [b'\x10', b'\0', b'\0'] => println!("{:?}", entry), //- Animated particle sheet data.
+                        [b'C', b'R', b'C'] => println!("{:?}", entry),      //- CRC data.
+                        [b'L', b'O', b'D'] => println!("{:?}", entry), //- Texture LOD control information.
+                        [b'T', b'S', b'O'] => println!("{:?}", entry), //- Game-defined "extended" VTF flags.
+                        [b'K', b'V', b'D'] => println!("{:?}", entry), //- Arbitrary KeyValues data.
+                        _ => {
+                            println!("Invalid entry {:?}", entry.tag);
+                            break;
+                        }
+                    };
+                } else {
+                    break;
+                }
+            }
+        } else {
+            let lowResImageFormat = header.lowResImageFormat;
+            // load data
+            let low_res_size = lowResImageFormat.bytes_for_size(
+                header.lowResImageWidth as usize,
+                header.lowResImageHeight as usize,
+            );
+            low_res = vec![0; low_res_size];
+            buffer.read_exact(&mut low_res[..])?;
+        }
+        Ok(Self { header, low_res })
+    }
+}
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+struct VTFHEADER {
+    signature: [i8; 4], // File signature ("VTF\0"). (or as little-endian integer, 0x00465456)
+    version: [u32; 2],  // version[0].version[1] (currently 7.2).
+    headerSize: u32, // Size of the header struct  (16 byte aligned, currently 80 bytes) + size of the resources dictionary (7.3+).
+    width: u16,      // Width of the largest mipmap in pixels. Must be a power of 2.
+    height: u16,     // Height of the largest mipmap in pixels. Must be a power of 2.
+    flags: u32,      // VTF flags.
+    frames: u16,     // Number of frames, if animated (1 for no animation).
+    firstFrame: u16, // First frame in animation (0 based). Can be -1 in environment maps older than 7.5, meaning there are 7 faces, not 6.
+    padding0: [u8; 4], // reflectivity padding (16 byte alignment).
+    reflectivity: [f32; 3], // reflectivity vector.
+    padding1: [u8; 4], // reflectivity padding (8 byte packing).
+    bumpmapScale: f32, // Bumpmap scale.
+    highResImageFormat: ImageFormat, // High resolution image format.
+    mipmapCount: u8, // Number of mipmaps.
+    lowResImageFormat: ImageFormat, // Low resolution image format (always DXT1).
+    lowResImageWidth: u8, // Low resolution image width.
+    lowResImageHeight: u8, // Low resolution image height.
+}
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+struct VTFHEADER_7_3 {
+    // 7.2+
+    depth: i16, // Depth of the largest mipmap in pixels. Must be a power of 2. Is 1 for a 2D texture.
+
+    // 7.3+
+    padding2: [u8; 3], // depth padding (4 byte alignment).
+    numResources: u32, // Number of resources this vtf has. The max appears to be 32.
+
+    padding3: [u8; 8], // Necessary on certain compilers
+}
+
+impl BinaryData for VTFHEADER {}
+impl BinaryData for VTFHEADER_7_3 {}
+
+///Tags
+///    { '\x01', '\0', '\0' } - Low-res (thumbnail) image data.
+///    { '\x30', '\0', '\0' } - High-res image data.
+///    { '\x10', '\0', '\0' } - Animated particle sheet data.
+///    { 'C', 'R', 'C' } - CRC data.
+///    { 'L', 'O', 'D' } - Texture LOD control information.
+///    { 'T', 'S', 'O' } - Game-defined "extended" VTF flags.
+///    { 'K', 'V', 'D' } - Arbitrary KeyValues data.
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+struct ResourceEntryInfo {
+    tag: [u8; 3], // A three-byte "tag" that identifies what this resource is.
+    flags: u8, // Resource entry flags. The only known flag is 0x2, which indicates that no data chunk corresponds to this resource.
+    offset: u32, // The offset of this resource's data in the file.
+}
+
+impl BinaryData for ResourceEntryInfo {}
+
+mod vtf_tests {
+    use std::path::PathBuf;
+
+    use crate::vpk::VPKDirectory;
+
+    use super::*;
+
+    const PATH: &str =
+        "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";
+
+    #[test]
+    fn test_load() {
+        let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
+        for file in dir.get_file_names() {
+            if file.contains(".vtf") {
+                let data = dir.load_vtf(file).unwrap();
+                println!("{} {:?}", file, data);
+            }
+        }
+    }
+    #[test]
+    fn test_load_materials_concrete_concretefloor007a() {
+        let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
+
+        let data = dir
+            .load_vtf("materials/concrete/concretefloor007a.vtf")
+            .unwrap();
+        println!("{:?}", data);
+    }
+}
+
 // import ArrayBufferSlice from "../ArrayBufferSlice.js";
 // import { GfxTexture, GfxDevice, GfxFormat, GfxSampler, GfxWrapMode, GfxTexFilterMode, GfxMipFilterMode, GfxTextureDescriptor, GfxTextureDimension, GfxTextureUsage } from "../gfx/platform/GfxPlatform.js";
 // import { readString, assert, nArray, assertExists } from "../util.js";
@@ -414,3 +559,4 @@
 //         this.gfxTextures.length = 0;
 //     }
 // }
+pub mod consts;

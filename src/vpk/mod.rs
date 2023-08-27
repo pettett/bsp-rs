@@ -1,5 +1,7 @@
 // // Valve Packfile. Only handles newest VPK version.
 
+// https://developer.valvesoftware.com/wiki/VPK_(file_format)#Tree
+
 // import ArrayBufferSlice from "../ArrayBufferSlice.js";
 // import { assert, readString, leftPad, nullify } from "../util.js";
 // import { DataFetcher, AbortedCallback } from "../DataFetcher.js";
@@ -23,15 +25,18 @@
 // }
 
 use std::{
+    cell::{OnceCell, RefCell},
     collections::HashMap,
     fs::File,
     io::{self, BufRead, BufReader, Read},
-    mem, slice,
+    mem,
+    path::{Path, PathBuf},
+    slice,
 };
 
 use bytemuck::Zeroable;
 
-use crate::binaries::BinaryData;
+use crate::{binaries::BinaryData, vtf::VTF};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -83,17 +88,22 @@ impl BinaryData for VPKDirectoryEntry {}
 pub struct VPKFile {
     entry: VPKDirectoryEntry,
     preload: Option<Vec<u8>>,
-    load: Option<Vec<u8>>,
+    vtf: OnceCell<VTF>,
 }
 
 pub struct VPKDirectory {
+    dir_path: PathBuf,
     header: VPKHeader_v2,
+    maxPackFile: u16,
     files: HashMap<String, VPKFile>,
 }
 
 impl VPKDirectory {
-    pub fn load(dir_path: &str) -> io::Result<Self> {
-        let file = File::open(dir_path)?;
+    pub fn get_file_names(&self) -> std::collections::hash_map::Keys<'_, String, VPKFile> {
+        self.files.keys()
+    }
+    pub fn load(dir_path: PathBuf) -> io::Result<Self> {
+        let file = File::open(&dir_path)?;
         let mut buffer = BufReader::new(file);
 
         let header = VPKHeader_v2::read(&mut buffer)?;
@@ -125,10 +135,14 @@ impl VPKDirectory {
                     let path = format!("{dirPrefix}{filename}.{ext}");
 
                     let entry = VPKDirectoryEntry::read(&mut buffer).unwrap();
-                    let Terminator = entry.Terminator;
-                    assert_eq!(Terminator, 0xffff);
+                    let terminator = entry.Terminator;
 
-                    //chunks.push({ packFileIdx, chunkOffset, chunkSize });
+                    assert_eq!(terminator, 0xffff);
+
+                    if (entry.ArchiveIndex != 0x7fff) {
+                        // 0x7fff means contained in this same file
+                        maxPackFile = u16::max(entry.ArchiveIndex, maxPackFile);
+                    }
 
                     // Read metadata.
                     let preload = if entry.PreloadBytes != 0 {
@@ -144,7 +158,7 @@ impl VPKDirectory {
                         VPKFile {
                             entry,
                             preload,
-                            load: None,
+                            vtf: OnceCell::new(),
                         },
                     );
 
@@ -153,7 +167,43 @@ impl VPKDirectory {
             }
         }
 
-        Ok(Self { header, files })
+        Ok(Self {
+            dir_path,
+            header,
+            maxPackFile,
+            files,
+        })
+    }
+}
+
+impl VPKDirectory {
+    pub fn load_vtf(&self, vpk_path: &str) -> io::Result<&VTF> {
+        let file_data = self.files.get(vpk_path).ok_or(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "File path not present",
+        ))?;
+
+        if let Some(vtf) = file_data.vtf.get() {
+            return Ok(vtf);
+        } else {
+            // Attempt to load
+
+            let index = file_data.entry.ArchiveIndex;
+            // replace dir with number
+            let mut header_pak_path = self.dir_path.to_path_buf();
+            let dir_file = self.dir_path.file_name().unwrap().to_string_lossy();
+            header_pak_path.set_file_name(dir_file.replace("_dir", &format!("_{index:0>3}")));
+
+            // open file
+            let file = File::open(header_pak_path).unwrap();
+            let mut buffer = BufReader::new(file);
+            // seek and load
+            buffer.seek_relative(file_data.entry.EntryOffset as i64)?;
+
+            file_data.vtf.set(VTF::read(&mut buffer)?).unwrap();
+
+            return Ok(file_data.vtf.get().unwrap());
+        }
     }
 }
 
@@ -198,10 +248,10 @@ mod vpk_tests {
 
     #[test]
     fn test_dir() {
-        let dir = VPKDirectory::load(PATH).unwrap();
+        let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
 
         for file in dir.files.keys() {
-            if file.contains("metalwall091") {
+            if file.contains("floor") {
                 println!("{}", file);
             }
         }

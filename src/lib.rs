@@ -9,6 +9,7 @@ pub mod texture;
 pub mod transform;
 pub mod vertex;
 pub mod vpk;
+pub mod vtf;
 use std::thread;
 
 use state::{StateApp, StateRenderer};

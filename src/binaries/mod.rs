@@ -4,14 +4,12 @@ use std::{
     mem, slice,
 };
 
-use bytemuck::Zeroable;
-
 pub trait BinaryData {
     fn read(buffer: &mut BufReader<File>) -> io::Result<Self>
     where
-        Self: Zeroable,
+        Self: Sized,
     {
-        let mut header = Self::zeroed();
+        let mut header = unsafe { mem::zeroed() };
 
         let header_size = mem::size_of::<Self>();
         unsafe {
