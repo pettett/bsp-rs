@@ -3,8 +3,9 @@
 use std::io::Read;
 
 use bytemuck::Pod;
+use wgpu::{Device, Queue};
 
-use crate::binaries::BinaryData;
+use crate::{binaries::BinaryData, texture::Texture};
 
 use self::consts::ImageFormat;
 
@@ -12,31 +13,125 @@ use self::consts::ImageFormat;
 pub struct VTF {
     header: VTFHEADER,
     low_res: Vec<u8>,
+    high_res: Vec<u8>,
 }
 
-impl VTF {}
+impl VTF {
+    pub fn upload_high_res(&self, device: &Device, queue: &Queue) -> Texture {
+        self.upload(
+            device,
+            queue,
+            self.header.width as u32,
+            self.header.height as u32,
+            self.header.highResImageFormat,
+            &self.high_res,
+        )
+    }
+
+    pub fn upload_low_res(&self, device: &Device, queue: &Queue) -> Texture {
+        self.upload(
+            device,
+            queue,
+            self.header.lowResImageWidth as u32,
+            self.header.lowResImageHeight as u32,
+            self.header.lowResImageFormat,
+            &self.low_res,
+        )
+    }
+
+    pub fn upload(
+        &self,
+        device: &Device,
+        queue: &Queue,
+        width: u32,
+        height: u32,
+        format: ImageFormat,
+        data: &Vec<u8>,
+    ) -> Texture {
+        let size = wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+        let wgpu_format = format.try_into().unwrap();
+        println!("{:?} {:?}", format, wgpu_format);
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            // All textures are stored as 3D, we represent our 2D texture
+            // by setting depth to 1.
+            size,
+            mip_level_count: 1, // We'll talk about this a little later
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            // Most images are stored using sRGB so we need to reflect that here.
+            format: wgpu_format,
+            // TEXTURE_BINDING tells wgpu that we want to use this texture in shaders
+            // COPY_DST means that we want to copy data to this texture
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            label: Some("diffuse_texture"),
+            // This is the same as with the SurfaceConfig. It
+            // specifies what texture formats can be used to
+            // create TextureViews for this texture. The base
+            // texture format (Rgba8UnormSrgb in this case) is
+            // always supported. Note that using a different
+            // texture format is not supported on the WebGL2
+            // backend.
+            view_formats: &[],
+        });
+
+        queue.write_texture(
+            // Tells wgpu where to copy the pixel data
+            wgpu::ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            // The actual pixel data
+            &data,
+            // The layout of the texture
+            format.layout(width, height),
+            size,
+        );
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        Texture::new(texture, view, sampler)
+    }
+}
 
 impl BinaryData for VTF {
     fn read(buffer: &mut std::io::BufReader<std::fs::File>) -> std::io::Result<Self> {
         let header = VTFHEADER::read(buffer)?;
+
+        assert!(header.width < 4096);
+        assert!(header.height < 4096);
+
         let mut low_res = Vec::new();
+        let mut high_res = Vec::new();
 
         if header.version[0] == 7 && header.version[1] == 3 {
             let header_7_3 = VTFHEADER_7_3::read(buffer)?;
 
-            println!("Loading entries");
+            //println!("Loading entries");
             for i in 0..header_7_3.numResources {
                 if let Ok(entry) = ResourceEntryInfo::read(buffer) {
                     match entry.tag {
-                        [b'\x01', b'\0', b'\0'] => println!("{:?}", entry), //  Low-res (thumbnail) image data
-                        [b'\x30', b'\0', b'\0'] => println!("{:?}", entry), //- High-res image data.
-                        [b'\x10', b'\0', b'\0'] => println!("{:?}", entry), //- Animated particle sheet data.
-                        [b'C', b'R', b'C'] => println!("{:?}", entry),      //- CRC data.
-                        [b'L', b'O', b'D'] => println!("{:?}", entry), //- Texture LOD control information.
-                        [b'T', b'S', b'O'] => println!("{:?}", entry), //- Game-defined "extended" VTF flags.
-                        [b'K', b'V', b'D'] => println!("{:?}", entry), //- Arbitrary KeyValues data.
+                        [b'\x01', b'\0', b'\0'] => (), //  Low-res (thumbnail) image data
+                        [b'\x30', b'\0', b'\0'] => (), //- High-res image data.
+                        [b'\x10', b'\0', b'\0'] => (), //- Animated particle sheet data.
+                        [b'C', b'R', b'C'] => (),      //- CRC data.
+                        [b'L', b'O', b'D'] => (),      //- Texture LOD control information.
+                        [b'T', b'S', b'O'] => (),      //- Game-defined "extended" VTF flags.
+                        [b'K', b'V', b'D'] => (),      //- Arbitrary KeyValues data.
                         _ => {
-                            println!("Invalid entry {:?}", entry.tag);
                             break;
                         }
                     };
@@ -45,16 +140,48 @@ impl BinaryData for VTF {
                 }
             }
         } else {
+            println!("{:?}", header);
+
             let lowResImageFormat = header.lowResImageFormat;
+            let highResImageFormat = header.highResImageFormat;
             // load data
             let low_res_size = lowResImageFormat.bytes_for_size(
                 header.lowResImageWidth as usize,
                 header.lowResImageHeight as usize,
             );
+            let high_res_size = highResImageFormat
+                .bytes_for_size(header.width as usize, header.height as usize)
+                * 12;
+            //println!("{:?}", header);
+            //println!("{:?}", highResImageFormat);
+            //println!("{}", high_res_size);
             low_res = vec![0; low_res_size];
+            high_res = vec![0; high_res_size];
             buffer.read_exact(&mut low_res[..])?;
+
+            // seek forward through mip maps
+            //buffer.seek_relative(
+            //    highResImageFormat
+            //        .bytes_for_size(header.width as usize / 2, header.height as usize / 2)
+            //        as i64,
+            //)?;
+
+            buffer.read_exact(&mut high_res[..])?;
+
+            // Do things like add empty alpha channels
+            high_res = image_format_convert_data(
+                highResImageFormat,
+                high_res,
+                header.width as usize * 2,
+                header.height as usize * 2,
+                header.frames as usize,
+            )
         }
-        Ok(Self { header, low_res })
+        Ok(Self {
+            header,
+            low_res,
+            high_res,
+        })
     }
 }
 
@@ -130,18 +257,20 @@ mod vtf_tests {
         for file in dir.get_file_names() {
             if file.contains(".vtf") {
                 let data = dir.load_vtf(file).unwrap();
-                println!("{} {:?}", file, data);
+                let lr = data.header.lowResImageFormat;
+                let hr = data.header.highResImageFormat;
+                if hr != ImageFormat::DXT5 && hr != ImageFormat::DXT1 {
+                    println!("{} {:?}", file, hr);
+                }
             }
         }
     }
     #[test]
-    fn test_load_materials_concrete_concretefloor007a() {
+    fn test_load_materials_metal_metalfence001a() {
         let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
 
-        let data = dir
-            .load_vtf("materials/concrete/concretefloor007a.vtf")
-            .unwrap();
-        println!("{:?}", data);
+        let data = dir.load_vtf("materials/metal/metalfence001a.vtf").unwrap();
+        println!("{:?}", data.header);
     }
 }
 
@@ -168,186 +297,90 @@ mod vtf_tests {
 //     RGBA16161616F = 0x18,
 // }
 
-// function imageFormatIsBlockCompressed(fmt: ImageFormat): boolean {
-//     if (fmt === ImageFormat.DXT1)
-//         return true;
-//     if (fmt === ImageFormat.DXT3)
-//         return true;
-//     if (fmt === ImageFormat.DXT5)
-//         return true;
-
-//     return false;
-// }
-
-// function imageFormatGetBPP(fmt: ImageFormat): number {
-//     if (fmt === ImageFormat.RGBA16161616F)
-//         return 8;
-//     if (fmt === ImageFormat.RGBA8888)
-//         return 4;
-//     if (fmt === ImageFormat.ABGR8888)
-//         return 4;
-//     if (fmt === ImageFormat.ARGB8888)
-//         return 4;
-//     if (fmt === ImageFormat.BGRA8888)
-//         return 4;
-//     if (fmt === ImageFormat.BGRX8888)
-//         return 4;
-//     if (fmt === ImageFormat.RGB888)
-//         return 3;
-//     if (fmt === ImageFormat.BGR888)
-//         return 3;
-//     if (fmt === ImageFormat.BGRA5551)
-//         return 2;
-//     if (fmt === ImageFormat.UV88)
-//         return 2;
-//     if (fmt === ImageFormat.I8)
-//         return 1;
-//     throw "whoops";
-// }
-
-// function imageFormatCalcLevelSize(fmt: ImageFormat, width: number, height: number, depth: number): number {
-//     if (imageFormatIsBlockCompressed(fmt)) {
-//         width = Math.max(width, 4);
-//         height = Math.max(height, 4);
-//         const count = ((width * height) / 16) * depth;
-//         if (fmt === ImageFormat.DXT1)
-//             return count * 8;
-//         else if (fmt === ImageFormat.DXT3)
-//             return count * 16;
-//         else if (fmt === ImageFormat.DXT5)
-//             return count * 16;
-//         else
-//             throw "whoops";
-//     } else {
-//         return (width * height * depth) * imageFormatGetBPP(fmt);
-//     }
-// }
-
-// function imageFormatToGfxFormat(device: GfxDevice, fmt: ImageFormat, srgb: boolean): GfxFormat {
-//     // TODO(jstpierre): Software decode BC1 if necessary.
-//     if (fmt === ImageFormat.DXT1)
-//         return srgb ? GfxFormat.BC1_SRGB : GfxFormat.BC1;
-//     else if (fmt === ImageFormat.DXT3)
-//         return srgb ? GfxFormat.BC2_SRGB : GfxFormat.BC2;
-//     else if (fmt === ImageFormat.DXT5)
-//         return srgb ? GfxFormat.BC3_SRGB : GfxFormat.BC3;
-//     else if (fmt === ImageFormat.RGBA8888)
-//         return srgb ? GfxFormat.U8_RGBA_SRGB : GfxFormat.U8_RGBA_NORM;
-//     else if (fmt === ImageFormat.RGB888)
-//         return srgb ? GfxFormat.U8_RGBA_SRGB : GfxFormat.U8_RGBA_NORM;
-//     else if (fmt === ImageFormat.BGR888)
-//         return srgb ? GfxFormat.U8_RGBA_SRGB : GfxFormat.U8_RGBA_NORM;
-//     else if (fmt === ImageFormat.BGRA8888)
-//         return srgb ? GfxFormat.U8_RGBA_SRGB : GfxFormat.U8_RGBA_NORM;
-//     else if (fmt === ImageFormat.ABGR8888)
-//         return srgb ? GfxFormat.U8_RGBA_SRGB : GfxFormat.U8_RGBA_NORM;
-//     else if (fmt === ImageFormat.BGRX8888)
-//         return srgb ? GfxFormat.U8_RGBA_SRGB : GfxFormat.U8_RGBA_NORM;
-//     else if (fmt === ImageFormat.BGRA5551)
-//         return GfxFormat.U16_RGBA_5551; // TODO(jstpierre): sRGB?
-//     else if (fmt === ImageFormat.UV88)
-//         return GfxFormat.S8_RG_NORM;
-//     else if (fmt === ImageFormat.I8)
-//         return GfxFormat.U8_RGBA_NORM;
-//     else if (fmt === ImageFormat.RGBA16161616F)
-//         return GfxFormat.F16_RGBA;
-//     else
-//         throw "whoops";
-// }
-
-// function imageFormatConvertData(device: GfxDevice, fmt: ImageFormat, data: ArrayBufferSlice, width: number, height: number, depth: number): ArrayBufferView {
-//     if (fmt === ImageFormat.BGR888) {
-//         // BGR888 => RGBA8888
-//         const src = data.createDataView();
-//         const n = width * height * depth * 4;
-//         const dst = new Uint8Array(n);
-//         let p = 0;
-//         for (let i = 0; i < n;) {
-//             dst[i++] = src.getUint8(p + 2);
-//             dst[i++] = src.getUint8(p + 1);
-//             dst[i++] = src.getUint8(p + 0);
-//             dst[i++] = 255;
-//             p += 3;
-//         }
-//         return dst;
-//     } else if (fmt === ImageFormat.RGB888) {
-//         // RGB888 => RGBA8888
-//         const src = data.createDataView();
-//         const n = width * height * depth * 4;
-//         const dst = new Uint8Array(n);
-//         let p = 0;
-//         for (let i = 0; i < n;) {
-//             dst[i++] = src.getUint8(p + 0);
-//             dst[i++] = src.getUint8(p + 1);
-//             dst[i++] = src.getUint8(p + 2);
-//             dst[i++] = 255;
-//             p += 3;
-//         }
-//         return dst;
-//     } else if (fmt === ImageFormat.ABGR8888) {
-//         // ABGR8888 => RGBA8888
-//         const src = data.createDataView();
-//         const n = width * height * depth * 4;
-//         const dst = new Uint8Array(n);
-//         let p = 0;
-//         for (let i = 0; i < n;) {
-//             dst[i++] = src.getUint8(p + 3);
-//             dst[i++] = src.getUint8(p + 2);
-//             dst[i++] = src.getUint8(p + 1);
-//             dst[i++] = src.getUint8(p + 0);
-//             p += 4;
-//         }
-//         return dst;
-//     } else if (fmt === ImageFormat.BGRA8888) {
-//         // BGRA8888 => RGBA8888
-//         const src = data.createDataView();
-//         const n = width * height * depth * 4;
-//         const dst = new Uint8Array(n);
-//         let p = 0;
-//         for (let i = 0; i < n;) {
-//             dst[i++] = src.getUint8(p + 2);
-//             dst[i++] = src.getUint8(p + 1);
-//             dst[i++] = src.getUint8(p + 0);
-//             dst[i++] = src.getUint8(p + 3);
-//             p += 4;
-//         }
-//         return dst;
-//     } else if (fmt === ImageFormat.BGRX8888) {
-//         // BGRX8888 => RGBA8888
-//         const src = data.createDataView();
-//         const n = width * height * depth * 4;
-//         const dst = new Uint8Array(n);
-//         let p = 0;
-//         for (let i = 0; i < n;) {
-//             dst[i++] = src.getUint8(p + 2);
-//             dst[i++] = src.getUint8(p + 1);
-//             dst[i++] = src.getUint8(p + 0);
-//             dst[i++] = 0xFF;
-//             p += 4;
-//         }
-//         return dst;
-//     } else if (fmt === ImageFormat.UV88) {
-//         return data.createTypedArray(Int8Array);
-//     } else if (fmt === ImageFormat.BGRA5551 || fmt === ImageFormat.RGBA16161616F) {
-//         return data.createTypedArray(Uint16Array);
-//     } else if (fmt === ImageFormat.I8) {
-//         // I8 => RGBA8888
-//         const src = data.createDataView();
-//         const n = width * height * depth * 4;
-//         const dst = new Uint8Array(n);
-//         let p = 0;
-//         for (let i = 0; i < n;) {
-//             const m = src.getUint8(p++);
-//             dst[i++] = m;
-//             dst[i++] = m;
-//             dst[i++] = m;
-//             dst[i++] = 0xFF;
-//         }
-//         return dst;
-//     } else {
-//         return data.createTypedArray(Uint8Array);
-//     }
-// }
+fn image_format_convert_data(
+    fmt: ImageFormat,
+    data: Vec<u8>,
+    width: usize,
+    height: usize,
+    depth: usize,
+) -> Vec<u8> {
+    if (fmt == ImageFormat::BGR888) {
+        // BGR888 => RGBA8888
+        let n = width * height * depth * 4;
+        let mut dst = vec![0; n];
+        let mut p = 0;
+        for i in (0..(n - 4)).step_by(4) {
+            dst[i + 0] = data[p + 0];
+            dst[i + 1] = data[p + 1];
+            dst[i + 2] = data[p + 2];
+            dst[i + 3] = 255;
+            p += 3;
+        }
+        return dst;
+    } else if (fmt == ImageFormat::RGB888) {
+        // RGB888 => RGBA8888
+        let n = width * height * depth * 4;
+        let mut dst = vec![0; n];
+        let mut p = 0;
+        for i in (0..(n - 4)).step_by(4) {
+            dst[i + 0] = data[p + 0];
+            dst[i + 1] = data[p + 1];
+            dst[i + 2] = data[p + 2];
+            dst[i + 3] = 255;
+            p += 3;
+        }
+        return dst;
+    } else if (fmt == ImageFormat::ABGR8888) {
+        // ABGR8888 => RGBA8888
+        let n = width * height * depth * 4;
+        let mut dst = vec![0; n];
+        for i in (0..(n - 4)).step_by(4) {
+            dst[i + 0] = data[i + 3];
+            dst[i + 1] = data[i + 2];
+            dst[i + 2] = data[i + 1];
+            dst[i + 3] = data[i + 0];
+        }
+        return dst;
+    } else if (fmt == ImageFormat::BGRA8888) {
+        // BGRA8888 => RGBA8888
+        let n = width * height * depth * 4;
+        let mut dst = vec![0; n];
+        for i in (0..(n - 4)).step_by(4) {
+            dst[i + 0] = data[i + 2];
+            dst[i + 1] = data[i + 1];
+            dst[i + 2] = data[i + 0];
+            dst[i + 3] = data[i + 3];
+        }
+        return dst;
+    } else if (fmt == ImageFormat::BGRX8888) {
+        // BGRX8888 => RGBA8888
+        let n = width * height * depth * 4;
+        let mut dst = vec![0; n];
+        let mut p = 0;
+        for i in (0..(n - 4)).step_by(4) {
+            dst[i + 0] = data[p + 2];
+            dst[i + 1] = data[p + 1];
+            dst[i + 2] = data[p + 0];
+            dst[i + 3] = 0xFF;
+            p += 3;
+        }
+        return dst;
+    } else if (fmt == ImageFormat::I8) {
+        // I8 => RGBA8888
+        let n = width * height * depth * 4;
+        let mut dst = vec![0; n as usize];
+        for i in (0..(n - 4)).step_by(4) {
+            let m = data[i / 4];
+            dst[i + 0] = m;
+            dst[i + 1] = m;
+            dst[i + 2] = m;
+            dst[i + 3] = 0xFF;
+        }
+        return dst;
+    } else {
+        return data;
+    }
+}
 
 // export const enum VTFFlags {
 //     NONE          = 0,
@@ -385,14 +418,14 @@ mod vtf_tests {
 //     private versionMinor: number;
 
 //     constructor(device: GfxDevice, cache: GfxRenderCache, buffer: ArrayBufferSlice | null, private name: string, srgb: boolean, public lateBinding: string | null = null) {
-//         if (buffer === null)
+//         if (buffer == null)
 //             return;
 
 //         const view = buffer.createDataView();
 
-//         assert(readString(buffer, 0x00, 0x04, false) === 'VTF\0');
+//         assert(readString(buffer, 0x00, 0x04, false) == 'VTF\0');
 //         this.versionMajor = view.getUint32(0x04, true);
-//         assert(this.versionMajor === 7);
+//         assert(this.versionMajor == 7);
 //         this.versionMinor = view.getUint32(0x08, true);
 //         assert(this.versionMinor >= 0 && this.versionMinor <= 5);
 //         const headerSize = view.getUint32(0x0C, true);
@@ -400,7 +433,7 @@ mod vtf_tests {
 //         let dataIdx: number;
 //         let imageDataIdx: number = 0;
 
-//         if (this.versionMajor === 0x07) {
+//         if (this.versionMajor == 0x07) {
 //             assert(this.versionMinor >= 0x00);
 
 //             this.width = view.getUint16(0x10, true);
@@ -413,10 +446,10 @@ mod vtf_tests {
 //             const reflectivityB = view.getFloat32(0x28, true);
 //             const bumpScale = view.getFloat32(0x30, true);
 //             this.format = view.getUint32(0x34, true);
-//             this.numLevels = view.getUint8(0x38);
+//             this.numLevels = view[0x38);
 //             const lowresImageFormat = view.getUint32(0x39, true);
-//             const lowresImageWidth = view.getUint8(0x3D);
-//             const lowresImageHeight = view.getUint8(0x3E);
+//             const lowresImageWidth = view[0x3D);
+//             const lowresImageHeight = view[0x3E);
 
 //             dataIdx = 0x40;
 
@@ -436,17 +469,17 @@ mod vtf_tests {
 //                     const dataOffs = view.getUint32(dataIdx + 0x04, true);
 
 //                     // RSRCFHAS_NO_DATA_CHUNK
-//                     if (rsrcFlag === 0x02)
+//                     if (rsrcFlag == 0x02)
 //                         continue;
 
 //                     // Legacy resources don't have a size tag.
 
-//                     if (rsrcID === 0x01000000) { // VTF_LEGACY_RSRC_LOW_RES_IMAGE
+//                     if (rsrcID == 0x01000000) { // VTF_LEGACY_RSRC_LOW_RES_IMAGE
 //                         // Skip.
 //                         continue;
 //                     }
 
-//                     if (rsrcID === 0x30000000) { // VTF_LEGACY_RSRC_IMAGE
+//                     if (rsrcID == 0x30000000) { // VTF_LEGACY_RSRC_IMAGE
 //                         imageDataIdx = dataOffs;
 //                         continue;
 //                     }
@@ -520,7 +553,7 @@ mod vtf_tests {
 //         const forceTrilinear = true;
 //         const mipFilter = (!nomip && (forceTrilinear || !!(this.flags & VTFFlags.TRILINEAR))) ? GfxMipFilterMode.Linear : GfxMipFilterMode.Nearest;
 
-//         const canSupportAnisotropy = texFilter === GfxTexFilterMode.Bilinear && mipFilter === GfxMipFilterMode.Linear;
+//         const canSupportAnisotropy = texFilter == GfxTexFilterMode.Bilinear && mipFilter == GfxMipFilterMode.Linear;
 //         const maxAnisotropy = canSupportAnisotropy ? 16 : 1;
 //         this.gfxSampler = cache.createSampler({
 //             wrapS, wrapT, minFilter, magFilter, mipFilter,
@@ -536,7 +569,7 @@ mod vtf_tests {
 //     }
 
 //     public fillTextureMapping(m: TextureMapping, frame: number = 0): void {
-//         if (this.gfxTextures.length === 0) {
+//         if (this.gfxTextures.length == 0) {
 //             m.gfxTexture = null;
 //         } else {
 //             if (frame < 0 || frame >= this.gfxTextures.length)

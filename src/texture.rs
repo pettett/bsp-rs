@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 pub struct Texture {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
@@ -6,6 +8,34 @@ pub struct Texture {
 
 impl Texture {
     pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float; // 1.
+
+    pub fn to_imgui(
+        self,
+        device: &wgpu::Device,
+        renderer: &imgui_wgpu::Renderer,
+    ) -> imgui_wgpu::Texture {
+        let size = self.texture.size();
+        imgui_wgpu::Texture::from_raw_parts(
+            device,
+            renderer,
+            Arc::new(self.texture),
+            Arc::new(self.view),
+            None,
+            Some(&imgui_wgpu::RawTextureConfig {
+                label: Some("Test"),
+                sampler_desc: Default::default(),
+            }),
+            size,
+        )
+    }
+
+    pub fn new(texture: wgpu::Texture, view: wgpu::TextureView, sampler: wgpu::Sampler) -> Self {
+        Self {
+            texture,
+            view,
+            sampler,
+        }
+    }
 
     pub fn view(&self) -> &wgpu::TextureView {
         &self.view

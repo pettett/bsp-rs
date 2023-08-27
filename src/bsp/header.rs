@@ -85,9 +85,9 @@ impl dheader_t {
         //buffer.read_exact(&mut i8s).unwrap();
         //header.version = i32::from_le_i8s(i8s);
 
-        println!("{self:?}");
-        for i in 0..self.lumps.len() {
-            println!("{:?} {:?}", LumpType::from_usize(i), self.lumps[i]);
-        }
+        //println!("{self:?}");
+        //for i in 0..self.lumps.len() {
+        //    println!("{:?} {:?}", LumpType::from_usize(i), self.lumps[i]);
+        //}
     }
 }

@@ -1,10 +1,15 @@
-use std::time::Instant;
+use std::{path::PathBuf, time::Instant};
 
-use imgui::{Condition, FontSource};
+use imgui::{Condition, FontSource, Image};
 use imgui_wgpu::{Renderer, RendererConfig};
 use winit::event::Event;
 
-use crate::state::{State, StateRenderer};
+use crate::{
+    state::{State, StateRenderer},
+    vpk::VPKDirectory,
+};
+const PATH: &str =
+    "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";
 
 pub struct StateImgui {
     imgui: imgui::Context,
@@ -12,7 +17,7 @@ pub struct StateImgui {
     last_frame: Instant,
     platform: imgui_winit_support::WinitPlatform,
     renderer: Renderer,
-    //puffin_ui : puffin_imgui::ProfilerUi,
+    tex_id: imgui::TextureId, //puffin_ui : puffin_imgui::ProfilerUi,
 }
 
 impl State for StateImgui {
@@ -55,6 +60,8 @@ impl State for StateImgui {
                             .get_rot()
                             .to_euler(glam::EulerRot::XYZ)
                     ));
+
+                    Image::new(self.tex_id, [64.0 * 8.0, 64.0 * 8.0]).build(ui);
                 });
 
             //self.puffin_ui.window(ui);
@@ -128,12 +135,24 @@ impl State for StateImgui {
             ..Default::default()
         };
 
-        let renderer = Renderer::new(
+        let mut imgui_renderer = Renderer::new(
             &mut imgui,
             renderer.device(),
             renderer.queue(),
             renderer_config,
         );
+
+        let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
+
+        let data = dir
+            .load_vtf("materials/models/police/barneyface.vtf")
+            .unwrap();
+
+        let tex = data
+            .upload_high_res(renderer.device(), renderer.queue())
+            .to_imgui(renderer.device(), &imgui_renderer);
+
+        let tex_id: imgui::TextureId = imgui_renderer.textures.insert(tex);
 
         let last_cursor = None;
 
@@ -142,7 +161,8 @@ impl State for StateImgui {
             last_cursor,
             last_frame: Instant::now(),
             platform,
-            renderer,
+            renderer: imgui_renderer,
+            tex_id,
         }
     }
 }
