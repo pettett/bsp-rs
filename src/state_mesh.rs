@@ -1,15 +1,21 @@
 use crate::{
     bsp::{
+        consts::LumpType,
         edges::{dedge_t, dsurfedge_t},
         face::dface_t,
         header::dheader_t,
     },
     vertex::Vertex,
 };
-use std::sync::{Arc, Mutex};
+use std::{
+    fs::File,
+    io::BufReader,
+    sync::{Arc, Mutex},
+};
 
 use glam::Vec3;
 use gltf::mesh::util::ReadIndices;
+use stream_unzip::ZipReader;
 use wgpu::util::DeviceExt;
 
 use crate::state::{State, StateInstance, StateRenderer};
@@ -107,7 +113,13 @@ impl StateMesh {
                         // Requires Features::CONSERVATIVE_RASTERIZATION
                         conservative: false,
                     },
-                    depth_stencil: None, // 1.
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: crate::texture::Texture::DEPTH_FORMAT,
+                        depth_write_enabled: true,
+                        depth_compare: wgpu::CompareFunction::Less, // 1.
+                        stencil: wgpu::StencilState::default(),     // 2.
+                        bias: wgpu::DepthBiasState::default(),
+                    }), // 1.
                     multisample: wgpu::MultisampleState {
                         count: 1,                         // 2.
                         mask: !0,                         // 3.
@@ -186,14 +198,14 @@ impl StateMesh {
         self.index_format = index_format;
     }
 
-    pub fn load_debug_edges(&mut self, instance: Arc<StateInstance>) {
-        let (header,mut buffer) = dheader_t::load(
-			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp").unwrap();
-
-        header.validate();
-
-        let edges = header.get_lump::<dedge_t>(&mut buffer);
-        let verts = header.get_lump::<Vec3>(&mut buffer);
+    pub fn load_debug_edges(
+        &mut self,
+        instance: Arc<StateInstance>,
+        header: &dheader_t,
+        buffer: &mut BufReader<File>,
+    ) {
+        let edges = header.get_lump::<dedge_t>(buffer);
+        let verts = header.get_lump::<Vec3>(buffer);
 
         self.vertex_buffer =
             instance
@@ -219,16 +231,34 @@ impl StateMesh {
         self.index_format = wgpu::IndexFormat::Uint16;
     }
 
-    pub fn load_debug_faces(&mut self, instance: Arc<StateInstance>) {
-        let (header,mut buffer) = dheader_t::load(
-			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp").unwrap();
+    pub fn load_debug_faces(
+        &mut self,
+        instance: Arc<StateInstance>,
+        header: &dheader_t,
+        buffer: &mut BufReader<File>,
+    ) {
+        let pakfile = header.get_lump_header(LumpType::PAKFILE);
 
-        header.validate();
+        let pakfile_data = pakfile.get_bytes(buffer).unwrap();
 
-        let faces = header.get_lump::<dface_t>(&mut buffer);
-        let surfedges = header.get_lump::<dsurfedge_t>(&mut buffer);
-        let edges = header.get_lump::<dedge_t>(&mut buffer);
-        let verts = header.get_lump::<Vec3>(&mut buffer);
+        let entries = {
+            let mut zip_reader = ZipReader::default();
+
+            zip_reader.update(pakfile_data.into());
+
+            // Or read the whole file and deal with the entries
+            // at the end.
+            zip_reader.finish();
+
+            zip_reader.drain_entries()
+        };
+
+        println!("{:?}", entries[0]);
+
+        let faces = header.get_lump::<dface_t>(buffer);
+        let surfedges = header.get_lump::<dsurfedge_t>(buffer);
+        let edges = header.get_lump::<dedge_t>(buffer);
+        let verts = header.get_lump::<Vec3>(buffer);
 
         let mut tris = Vec::<u16>::new();
 

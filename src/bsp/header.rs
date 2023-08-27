@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::bsp::consts::LumpType;
+use bytemuck::Zeroable;
 use num_traits::FromPrimitive;
 
 use super::{lump::lump_t, Lump};
@@ -48,9 +49,9 @@ impl dheader_t {
         let file = File::open(path)?;
         let mut buffer = BufReader::new(file);
 
-        let mut header: dheader_t = unsafe { mem::zeroed() };
+        let mut header = Self::zeroed();
 
-        let header_size = mem::size_of::<dheader_t>();
+        let header_size = mem::size_of::<Self>();
         unsafe {
             let header_slice =
                 slice::from_raw_parts_mut(&mut header as *mut _ as *mut u8, header_size);

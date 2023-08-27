@@ -5,6 +5,7 @@ use crate::camera::{Camera, CameraUniform};
 use crate::camera_controller::CameraController;
 use crate::state_imgui::StateImgui;
 use crate::state_mesh::StateMesh;
+use crate::texture::{self, Texture};
 use crate::vertex::Vertex;
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
@@ -42,6 +43,7 @@ pub struct StateRenderer {
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
     window: Window,
+    depth_texture: Texture,
     camera: Camera,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
@@ -86,6 +88,11 @@ impl StateApp {
             self.renderer.size = new_size;
             self.renderer.config.width = new_size.width;
             self.renderer.config.height = new_size.height;
+            self.renderer.depth_texture = texture::Texture::create_depth_texture(
+                self.renderer.device(),
+                self.renderer.config(),
+                "depth_texture",
+            );
             self.renderer
                 .instance
                 .surface
@@ -157,7 +164,14 @@ impl StateApp {
                             },
                         }),
                     ],
-                    depth_stencil_attachment: None,
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: &self.renderer.depth_texture.view(),
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0),
+                            store: true,
+                        }),
+                        stencil_ops: None,
+                    }),
                 });
             for mesh in meshes.iter() {
                 mesh.draw(&self.renderer, &mut render_pass, &output, &view);
@@ -291,6 +305,9 @@ impl StateRenderer {
 
         let camera_controller = CameraController::new(10.0);
 
+        let depth_texture =
+            texture::Texture::create_depth_texture(&device, &config, "depth_texture");
+
         puffin::set_scopes_on(true); // you may want to control this with a flag
                                      //let  puffin_ui = puffin_imgui::ProfilerUi::default();
 
@@ -305,6 +322,7 @@ impl StateRenderer {
             config,
             size,
             camera,
+            depth_texture,
             camera_controller,
             camera_uniform,
             camera_buffer,

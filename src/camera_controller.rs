@@ -17,6 +17,7 @@ pub struct CameraController {
     dragging: bool,
     last_mouse_pos: PhysicalPosition<f64>,
     mouse_delta: Vec2,
+    look: Vec2,
 }
 
 impl CameraController {
@@ -30,6 +31,7 @@ impl CameraController {
             is_up_pressed: false,
             is_down_pressed: false,
             dragging: false,
+            look: Default::default(),
             last_mouse_pos: Default::default(),
             mouse_delta: Default::default(),
         }
@@ -133,10 +135,10 @@ impl CameraController {
 
         // rotate camera
         if self.dragging {
-            let rot = camera.transform.get_rot_mut();
-            *rot = Quat::from_axis_angle(Vec3::Z, self.mouse_delta.x / 100.0) * *rot;
+            self.look += self.mouse_delta / 100.0;
 
-            *rot *= Quat::from_axis_angle(left.into(), -self.mouse_delta.y / 100.0);
+            let rot = camera.transform.get_rot_mut();
+            *rot = Quat::from_euler(glam::EulerRot::YXZ, self.look.y, 0.0, self.look.x);
         }
         self.mouse_delta = Vec2::ZERO;
     }

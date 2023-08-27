@@ -7,6 +7,7 @@ struct CameraUniform {
 var<uniform> camera: CameraUniform;
 
 struct VertexInput {
+	@builtin(vertex_index) vert : u32,
     @location(0) position: vec3<f32>, 
 };
 
@@ -21,9 +22,10 @@ fn vs_main(
     model: VertexInput,
 ) -> VertexOutput {
     var out: VertexOutput; 
-    out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0);;
-	out.color = model.position * 0.01 + vec3<f32>(0.5,0.5,0.5);
-    return out;
+    out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0);
+	var v = f32(model.vert) * 123.0;
+	out.color = vec3<f32>(v % 1.1, (v*17.0) % 1.1, (v*7.0) % 1.1);
+	return out;
 }
 // Fragment shader
 @fragment

@@ -43,7 +43,7 @@ impl Camera {
         let view = Mat4::look_to_rh(
             (*self.transform.get_pos()).into(),
             self.transform.forward().into(),
-            Vec3::Z,
+            self.transform.up().into(),
         );
 
         // 2.

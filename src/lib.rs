@@ -1,11 +1,14 @@
+pub mod binaries;
 pub mod bsp;
 pub mod camera;
 pub mod camera_controller;
 pub mod state;
 pub mod state_imgui;
 pub mod state_mesh;
+pub mod texture;
 pub mod transform;
 pub mod vertex;
+pub mod vpk;
 use std::thread;
 
 use state::{StateApp, StateRenderer};
