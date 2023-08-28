@@ -1,9 +1,15 @@
-use glam::Vec3;
+use std::{
+    fs::File,
+    io::{BufRead, BufReader, Seek},
+};
+
+use glam::{Vec3, Vec4};
 
 use crate::bsp::consts::MAX_MAP_TEXDATA_STRING_DATA;
 
 use super::{
     consts::{LumpType, MAX_MAP_TEXDATA, MAX_MAP_TEXINFO},
+    lump::lump_t,
     Lump,
 };
 
@@ -59,10 +65,14 @@ use super::{
 #[repr(C, packed)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct texinfo_t {
-    pub textureVecs: [[f32; 2]; 4],  // [s/t][xyz offset]
-    pub lightmapVecs: [[f32; 2]; 4], // [s/t][xyz offset] - length is in units of texels/area
-    pub flags: i32,                  // miptex flags overrides
-    pub texdata: i32,                // Pointer to texture name, size, etc.
+    /// [s/t][xyz offset]
+    pub tex_s: Vec4,
+    /// [s/t][xyz offset]
+    pub tex_t: Vec4,
+    pub lightmap_s: Vec4, // [s/t][xyz offset] - length is in units of texels/area
+    pub lightmap_t: Vec4, // [s/t][xyz offset] - length is in units of texels/area
+    pub flags: i32,       // miptex flags overrides
+    pub tex_data: i32,    // Pointer to texture name, size, etc.
 }
 impl Lump for texinfo_t {
     fn max() -> usize {
@@ -118,6 +128,32 @@ impl Lump for texdata_t {
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct texdatastringtable_t {
     pub index: i32,
+}
+impl texdatastringtable_t {
+    pub fn get_filename(
+        &self,
+        buffer: &mut BufReader<File>,
+        tex_data_string_data: &lump_t,
+    ) -> String {
+        let index = self.index;
+
+        let seek_index = index + tex_data_string_data.fileofs;
+
+        buffer
+            .seek(std::io::SeekFrom::Start(seek_index as u64))
+            .unwrap();
+
+        let mut string_buf = Vec::new();
+
+        buffer.read_until(0, &mut string_buf).unwrap();
+
+        // remove trailing \0
+        string_buf.pop();
+
+        let mut str = unsafe { String::from_utf8_unchecked(string_buf) };
+        str.make_ascii_lowercase();
+        str
+    }
 }
 impl Lump for texdatastringtable_t {
     fn max() -> usize {

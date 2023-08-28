@@ -1,15 +1,18 @@
-use std::{collections::HashMap, path::PathBuf, time::Instant};
+use std::{
+    collections::{HashMap, VecDeque},
+    path::PathBuf,
+    time::Instant,
+};
 
-use imgui::{Condition, FontSource, Image};
+use imgui::{Condition, FontSource, Image, Ui};
 use imgui_wgpu::{Renderer, RendererConfig};
+use wgpu::{Device, Queue};
 use winit::event::Event;
 
 use crate::{
     state::{State, StateRenderer},
-    vpk::VPKDirectory,
+    vpk::{VPKDirectory, VPKDirectoryTree},
 };
-const PATH: &str =
-    "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";
 
 pub struct StateImgui {
     imgui: imgui::Context,
@@ -17,7 +20,39 @@ pub struct StateImgui {
     last_frame: Instant,
     platform: imgui_winit_support::WinitPlatform,
     renderer: Renderer,
-    dir: VPKDirectory, //puffin_ui : puffin_imgui::ProfilerUi,
+    //puffin_ui : puffin_imgui::ProfilerUi,
+}
+
+fn draw_dir(
+    ui: &Ui,
+    renderer: &mut Renderer,
+    device: &Device,
+    queue: &Queue,
+    tree: &VPKDirectoryTree,
+    dir: &VPKDirectory,
+) {
+    match tree {
+        VPKDirectoryTree::Leaf(file) => {
+            let uncomp_data = dir.load_vtf(file).unwrap();
+
+            ui.text(file);
+
+            if let Some(node) = ui.tree_node("High res") {
+                Image::new(
+                    *uncomp_data.get_high_res_imgui(device, queue, renderer),
+                    [64.0 * 4.0, 64.0 * 4.0],
+                )
+                .build(ui);
+            }
+        }
+        VPKDirectoryTree::Node(dir_inner) => {
+            for file in dir_inner.keys() {
+                if let Some(node) = ui.tree_node(file) {
+                    draw_dir(ui, renderer, device, queue, &dir_inner[file], dir);
+                }
+            }
+        }
+    }
 }
 
 impl State for StateImgui {
@@ -61,25 +96,23 @@ impl State for StateImgui {
                             .to_euler(glam::EulerRot::XYZ)
                     ));
 
-                    for file in self.dir.get_file_names() {
-                        if let Some(node) = ui.tree_node(file) {
-                            let uncomp_data = self.dir.load_vtf(file).unwrap();
-
-                            if let Some(node) = ui.tree_node("High res") {
-                                Image::new(
-                                    *uncomp_data.get_high_res_imgui(
-                                        state.device(),
-                                        state.queue(),
-                                        &mut self.renderer,
-                                    ),
-                                    [64.0 * 4.0, 64.0 * 4.0],
-                                )
-                                .build(ui);
-                            }
-                        }
-                    }
+                    //end
                 });
-
+            let window = ui.window("Texture Pak");
+            window
+                .size([400.0, 200.0], Condition::FirstUseEver)
+                .position([0.0, 0.0], Condition::FirstUseEver)
+                .build(|| {
+                    draw_dir(
+                        ui,
+                        &mut self.renderer,
+                        state.device(),
+                        state.queue(),
+                        state.texture_dir().get_root(),
+                        state.texture_dir(),
+                    )
+                    //end
+                });
             //self.puffin_ui.window(ui);
         }
 
@@ -158,8 +191,6 @@ impl State for StateImgui {
             renderer_config,
         );
 
-        let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
-
         //let dx5_data = dir.load_vtf("materials/metal/metalfence001a.vtf").unwrap();
         //let dx1_data = dir.load_vtf("materials/metal/metalfloor001a.vtf").unwrap();
 
@@ -171,7 +202,6 @@ impl State for StateImgui {
             last_frame: Instant::now(),
             platform,
             renderer: imgui_renderer,
-            dir,
         }
     }
 }

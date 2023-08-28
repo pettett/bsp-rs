@@ -8,6 +8,7 @@ pub mod state_mesh;
 pub mod texture;
 pub mod transform;
 pub mod vertex;
+pub mod vmt;
 pub mod vpk;
 pub mod vtf;
 use std::thread;
@@ -22,7 +23,7 @@ use winit::{
 
 pub async fn run<F>(init: F)
 where
-    F: Fn(&mut StateApp) -> (),
+    F: FnOnce(&mut StateApp) -> (),
 {
     env_logger::init();
     let event_loop = EventLoop::new();

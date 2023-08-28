@@ -4,8 +4,10 @@ use crate::{
         edges::{dedge_t, dsurfedge_t},
         face::dface_t,
         header::dheader_t,
+        textures::{texdata_t, texinfo_t},
     },
-    vertex::Vertex,
+    texture,
+    vertex::{UVVertex, Vertex},
 };
 use std::{
     fs::File,
@@ -13,7 +15,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use glam::Vec3;
+use glam::{vec2, Vec3, Vec4};
 use gltf::mesh::util::ReadIndices;
 use stream_unzip::ZipReader;
 use wgpu::util::DeviceExt;
@@ -25,6 +27,8 @@ pub struct StateMesh {
     index_buffer: wgpu::Buffer,
     index_format: wgpu::IndexFormat,
     render_pipeline: wgpu::RenderPipeline,
+    texture_bind_group_layout: wgpu::BindGroupLayout,
+    texture_bind_group: Option<wgpu::BindGroup>,
     num_indices: u32,
     //puffin_ui : puffin_imgui::ProfilerUi,
 }
@@ -42,6 +46,11 @@ impl StateMesh {
         render_pass.set_pipeline(&self.render_pipeline);
 
         render_pass.set_bind_group(0, state.camera_bind_group(), &[]);
+        if let Some(tex) = &self.texture_bind_group {
+            render_pass.set_bind_group(1, tex, &[]);
+        } else {
+            panic!("No bind group!");
+        }
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
 
@@ -66,12 +75,43 @@ impl StateMesh {
                     contents: &[],
                     usage: wgpu::BufferUsages::INDEX,
                 });
+
+        let texture_bind_group_layout =
+            renderer
+                .device()
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                multisampled: false,
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            // This should match the filterable field of the
+                            // corresponding Texture entry above.
+                            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                            count: None,
+                        },
+                    ],
+                    label: Some("texture_bind_group_layout"),
+                });
+
         let render_pipeline_layout =
             renderer
                 .device()
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Render Pipeline Layout"),
-                    bind_group_layouts: &[&renderer.camera_bind_group_layout()],
+                    bind_group_layouts: &[
+                        &renderer.camera_bind_group_layout(),
+                        &texture_bind_group_layout,
+                    ],
                     push_constant_ranges: &[],
                 });
 
@@ -88,7 +128,7 @@ impl StateMesh {
                     vertex: wgpu::VertexState {
                         module: &shader,
                         entry_point: "vs_main", // 1.
-                        buffers: &[<[f32; 3]>::desc()],
+                        buffers: &[<UVVertex>::desc()],
                     },
                     fragment: Some(wgpu::FragmentState {
                         // 3.
@@ -133,6 +173,8 @@ impl StateMesh {
             index_buffer,
             num_indices: 0,
             render_pipeline,
+            texture_bind_group_layout,
+            texture_bind_group: None,
             index_format: wgpu::IndexFormat::Uint16,
         }
     }
@@ -207,12 +249,18 @@ impl StateMesh {
         let edges = header.get_lump::<dedge_t>(buffer);
         let verts = header.get_lump::<Vec3>(buffer);
 
+        let mut annotated_verts = bytemuck::zeroed_slice_box::<UVVertex>(verts.len());
+
+        for i in 0..verts.len() {
+            annotated_verts[i].position = verts[i];
+        }
+
         self.vertex_buffer =
             instance
                 .device()
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(&verts[..]),
+                    contents: bytemuck::cast_slice(&annotated_verts[..]),
                     usage: wgpu::BufferUsages::VERTEX,
                 });
 
@@ -231,54 +279,19 @@ impl StateMesh {
         self.index_format = wgpu::IndexFormat::Uint16;
     }
 
-    pub fn load_debug_faces(
+    pub fn from_verts_and_tris(
         &mut self,
         instance: Arc<StateInstance>,
-        header: &dheader_t,
-        buffer: &mut BufReader<File>,
+        verts: &[u8],
+        tris: &[u8],
+        num_indicies: u32,
     ) {
-        let pakfile = header.get_lump_header(LumpType::PAKFILE);
-
-        let pakfile_data = pakfile.get_bytes(buffer).unwrap();
-
-        let entries = {
-            let mut zip_reader = ZipReader::default();
-
-            zip_reader.update(pakfile_data.into());
-
-            // Or read the whole file and deal with the entries
-            // at the end.
-            zip_reader.finish();
-
-            zip_reader.drain_entries()
-        };
-
-        println!("{:?}", entries[0]);
-
-        let faces = header.get_lump::<dface_t>(buffer);
-        let surfedges = header.get_lump::<dsurfedge_t>(buffer);
-        let edges = header.get_lump::<dedge_t>(buffer);
-        let verts = header.get_lump::<Vec3>(buffer);
-
-        let mut tris = Vec::<u16>::new();
-
-        for face in faces.iter() {
-            let root_edge_index = face.first_edge as usize;
-            let root_edge = surfedges[root_edge_index].get_edge(&edges);
-
-            for i in 1..(face.num_edges as usize) {
-                let edge = surfedges[root_edge_index + i].get_edge(&edges);
-
-                tris.extend([edge.0, root_edge.0, edge.1])
-            }
-        }
-
         self.vertex_buffer =
             instance
                 .device()
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(&verts[..]),
+                    contents: verts,
                     usage: wgpu::BufferUsages::VERTEX,
                 });
 
@@ -287,13 +300,32 @@ impl StateMesh {
                 .device()
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(&tris[..]),
+                    contents: tris,
                     usage: wgpu::BufferUsages::INDEX,
                 });
 
         // Update the value stored in this mesh
 
-        self.num_indices = tris.len() as u32;
+        self.num_indices = num_indicies;
         self.index_format = wgpu::IndexFormat::Uint16;
+    }
+
+    pub fn load_tex(&mut self, instance: Arc<StateInstance>, texture: &texture::Texture) {
+        self.texture_bind_group = Some(instance.device().create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                layout: &self.texture_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(texture.view()),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(texture.sampler()),
+                    },
+                ],
+                label: Some("diffuse_bind_group"),
+            },
+        ))
     }
 }

@@ -1,6 +1,6 @@
 // // Valve Texture File
 
-use std::{cell::OnceCell, io::Read};
+use std::{cell::OnceCell, fmt, io::Read, mem};
 
 use bytemuck::Pod;
 use wgpu::{Device, Queue};
@@ -9,11 +9,11 @@ use crate::{binaries::BinaryData, texture::Texture};
 
 use self::consts::ImageFormat;
 
-#[derive(Debug)]
 pub struct VTF {
-    header: VTFHEADER,
-    low_res_data: Vec<u8>,
-    high_res_data: Vec<u8>,
+    header: VTFHeader,
+    header_7_3: Option<VTFHeader73>,
+    low_res_data: [Vec<u8>; 1],
+    high_res_data: Vec<Vec<u8>>,
     low_res: OnceCell<Texture>,
     high_res: OnceCell<Texture>,
 
@@ -21,7 +21,23 @@ pub struct VTF {
     high_res_imgui: OnceCell<imgui::TextureId>,
 }
 
+impl fmt::Debug for VTF {
+    // This trait requires `fmt` with this exact signature.
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Write strictly the first element into the supplied output
+        // stream: `f`. Returns `fmt::Result` which indicates whether the
+        // operation succeeded or failed. Note that `write!` uses syntax which
+        // is very similar to `println!`.
+        write!(f, ".vtf: {:?}", self.header)?;
+        write!(f, "7.3 data: {:?}", self.header_7_3)
+    }
+}
+
 impl VTF {
+    //TODO: Currently 7.3 data is not parsed
+    pub fn ready_for_use(&self) -> bool {
+        self.header_7_3.is_none()
+    }
     pub fn width(&self) -> u32 {
         self.header.width as u32
     }
@@ -77,7 +93,7 @@ impl VTF {
             self.width(),
             self.height(),
             self.header.high_res_image_format,
-            &self.high_res_data,
+            &self.high_res_data[..],
         )
     }
 
@@ -99,7 +115,7 @@ impl VTF {
         width: u32,
         height: u32,
         format: ImageFormat,
-        data: &Vec<u8>,
+        mipped_data: &[Vec<u8>],
     ) -> Texture {
         let size = wgpu::Extent3d {
             width,
@@ -112,7 +128,7 @@ impl VTF {
             // All textures are stored as 3D, we represent our 2D texture
             // by setting depth to 1.
             size,
-            mip_level_count: 1, // We'll talk about this a little later
+            mip_level_count: mipped_data.len() as u32, // We'll talk about this a little later
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             // Most images are stored using sRGB so we need to reflect that here.
@@ -130,26 +146,27 @@ impl VTF {
             // backend.
             view_formats: &[],
         });
-
-        queue.write_texture(
-            // Tells wgpu where to copy the pixel data
-            wgpu::ImageCopyTexture {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            // The actual pixel data
-            &data,
-            // The layout of the texture
-            format.layout(width, height),
-            size,
-        );
+        for i in 0..mipped_data.len() {
+            queue.write_texture(
+                // Tells wgpu where to copy the pixel data
+                wgpu::ImageCopyTexture {
+                    texture: &texture,
+                    mip_level: i as u32,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                // The actual pixel data
+                &mipped_data[i],
+                // The layout of the texture
+                format.layout(width, height),
+                size,
+            );
+        }
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: wgpu::FilterMode::Nearest,
@@ -162,19 +179,27 @@ impl VTF {
 
 impl BinaryData for VTF {
     fn read(buffer: &mut std::io::BufReader<std::fs::File>) -> std::io::Result<Self> {
-        let header = VTFHEADER::read(buffer)?;
+        let mut header_read = 0;
+
+        let header = VTFHeader::read(buffer)?;
+        let header_size = header.header_size as i64;
+        header_read += mem::size_of::<VTFHeader>() as i64;
+
+        //println!("Header size, {} used: {}", header_size, header_read);
 
         assert!(header.width < 4096);
         assert!(header.height < 4096);
 
         let mut low_res_data = Vec::new();
-        let mut high_res_data = Vec::new();
-
+        let mut high_res_data: Vec<Vec<u8>> = Vec::new();
+        let mut header_7_3 = None;
         if header.version[0] == 7 && header.version[1] == 3 {
-            let header_7_3 = VTFHEADER_7_3::read(buffer)?;
+            let h_7_3 = VTFHeader73::read(buffer)?;
+
+            header_7_3 = Some(h_7_3);
 
             //println!("Loading entries");
-            for i in 0..header_7_3.num_resources {
+            for i in 0..h_7_3.num_resources {
                 if let Ok(entry) = ResourceEntryInfo::read(buffer) {
                     match entry.tag {
                         [b'\x01', b'\0', b'\0'] => (), //  Low-res (thumbnail) image data
@@ -193,7 +218,7 @@ impl BinaryData for VTF {
                 }
             }
         } else {
-            println!("{:?}", header);
+            //println!("{:?}", header);
 
             let lowResImageFormat = header.low_res_image_format;
             let highResImageFormat = header.high_res_image_format;
@@ -206,15 +231,24 @@ impl BinaryData for VTF {
                 highResImageFormat.bytes_for_size(header.width as usize, header.height as usize);
 
             //TODO: There appears to be one byte of something
-            buffer.seek_relative(1)?;
-
+            let remaining_header = header_size - header_read;
+            if remaining_header > 0 {
+                log::warn!(
+                    "Not all header has been read, skipping {} bytes",
+                    remaining_header
+                );
+                buffer.seek_relative(remaining_header)?;
+            }
             low_res_data = vec![0; low_res_size];
-            high_res_data = vec![0; high_res_size];
+
+            let wanted_mips = 1;
+
+            high_res_data = vec![Vec::new(); wanted_mips];
             buffer.read_exact(&mut low_res_data[..])?;
 
-            // seek forward through mip maps
+            // seek forward through mip maps we don't want
             let mut offset = 0;
-            for mip_level in 1..header.mipmap_count {
+            for mip_level in wanted_mips..header.mipmap_count as usize {
                 offset += highResImageFormat.bytes_for_size(
                     (header.width as usize) >> mip_level,
                     (header.height as usize) >> mip_level,
@@ -222,22 +256,33 @@ impl BinaryData for VTF {
             }
             buffer.seek_relative(offset)?;
 
-            buffer.read_exact(&mut high_res_data[..])?;
+            for mip_level in 0..wanted_mips as usize {
+                high_res_data[mip_level] = vec![
+                    0;
+                    highResImageFormat.bytes_for_size(
+                        (header.width as usize) >> mip_level,
+                        (header.height as usize) >> mip_level,
+                    )
+                ];
 
-            // Do things like add empty alpha channels
-            high_res_data = image_format_convert_data(
-                highResImageFormat,
-                high_res_data,
-                header.width as usize,
-                header.height as usize,
-                header.frames as usize,
-            );
+                buffer.read_exact(&mut high_res_data[mip_level][..])?;
+
+                // Do things like add empty alpha channels
+                image_format_convert_data(
+                    highResImageFormat,
+                    &mut high_res_data[mip_level],
+                    header.width as usize,
+                    header.height as usize,
+                    header.frames as usize,
+                );
+            }
             //low res is always going to be dtx1
             assert_eq!(lowResImageFormat, ImageFormat::DXT1);
         }
         Ok(Self {
             header,
-            low_res_data,
+            header_7_3,
+            low_res_data: [low_res_data],
             high_res_data,
             low_res: OnceCell::new(),
             high_res: OnceCell::new(),
@@ -249,7 +294,7 @@ impl BinaryData for VTF {
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
-struct VTFHEADER {
+struct VTFHeader {
     signature: [i8; 4], // File signature ("VTF\0"). (or as little-endian integer, 0x00465456)
     version: [u32; 2],  // version[0].version[1] (currently 7.2).
     header_size: u32, // Size of the header struct  (16 byte aligned, currently 80 bytes) + size of the resources dictionary (7.3+).
@@ -271,7 +316,7 @@ struct VTFHEADER {
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
-struct VTFHEADER_7_3 {
+struct VTFHeader73 {
     // 7.2+
     depth: i16, // Depth of the largest mipmap in pixels. Must be a power of 2. Is 1 for a 2D texture.
 
@@ -282,8 +327,8 @@ struct VTFHEADER_7_3 {
     padding3: [u8; 8], // Necessary on certain compilers
 }
 
-impl BinaryData for VTFHEADER {}
-impl BinaryData for VTFHEADER_7_3 {}
+impl BinaryData for VTFHeader {}
+impl BinaryData for VTFHeader73 {}
 
 ///Tags
 ///    { '\x01', '\0', '\0' } - Low-res (thumbnail) image data.
@@ -361,11 +406,11 @@ mod vtf_tests {
 
 fn image_format_convert_data(
     fmt: ImageFormat,
-    data: Vec<u8>,
+    data: &mut Vec<u8>,
     width: usize,
     height: usize,
     depth: usize,
-) -> Vec<u8> {
+) {
     let n = width * height * depth * 4;
     if (fmt == ImageFormat::BGR888) {
         // BGR888 => RGBA8888
@@ -382,7 +427,7 @@ fn image_format_convert_data(
             dst[i + 3] = 255;
             p += 3;
         }
-        return dst;
+        *data = dst;
     } else if (fmt == ImageFormat::RGB888) {
         // RGB888 => RGBA8888
         let mut dst = vec![0; n];
@@ -394,7 +439,7 @@ fn image_format_convert_data(
             dst[i + 3] = 255;
             p += 3;
         }
-        return dst;
+        *data = dst;
     } else if (fmt == ImageFormat::ABGR8888) {
         // ABGR8888 => RGBA8888
         let mut dst = vec![0; n];
@@ -404,7 +449,7 @@ fn image_format_convert_data(
             dst[i + 2] = data[i + 1];
             dst[i + 3] = data[i + 0];
         }
-        return dst;
+        *data = dst;
     } else if (fmt == ImageFormat::BGRA8888) {
         // BGRA8888 => RGBA8888
         let mut dst = vec![0; n];
@@ -414,7 +459,7 @@ fn image_format_convert_data(
             dst[i + 2] = data[i + 0];
             dst[i + 3] = data[i + 3];
         }
-        return dst;
+        *data = dst;
     } else if (fmt == ImageFormat::BGRX8888) {
         // BGRX8888 => RGBA8888
         let mut dst = vec![0; n];
@@ -426,7 +471,7 @@ fn image_format_convert_data(
             dst[i + 3] = 0xFF;
             p += 3;
         }
-        return dst;
+        *data = dst;
     } else if (fmt == ImageFormat::I8) {
         // I8 => RGBA8888
         let mut dst = vec![0; n as usize];
@@ -437,9 +482,7 @@ fn image_format_convert_data(
             dst[i + 2] = m;
             dst[i + 3] = 0xFF;
         }
-        return dst;
-    } else {
-        return data;
+        *data = dst;
     }
 }
 

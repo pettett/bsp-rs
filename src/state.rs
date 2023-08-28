@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::camera::{Camera, CameraUniform};
@@ -7,10 +8,13 @@ use crate::state_imgui::StateImgui;
 use crate::state_mesh::StateMesh;
 use crate::texture::{self, Texture};
 use crate::vertex::Vertex;
+use crate::vpk::VPKDirectory;
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::event::*;
 use winit::window::Window;
+const PATH: &str =
+    "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";
 
 pub trait State {
     fn render_pass(
@@ -50,6 +54,7 @@ pub struct StateRenderer {
     camera_controller: CameraController,
     camera_bind_group_layout: wgpu::BindGroupLayout,
     camera_bind_group: wgpu::BindGroup,
+    texture_dir: VPKDirectory,
 }
 impl StateInstance {
     pub fn surface(&self) -> &wgpu::Surface {
@@ -308,6 +313,8 @@ impl StateRenderer {
         let depth_texture =
             texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
+        let texture_dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
+
         puffin::set_scopes_on(true); // you may want to control this with a flag
                                      //let  puffin_ui = puffin_imgui::ProfilerUi::default();
 
@@ -327,6 +334,7 @@ impl StateRenderer {
             camera_uniform,
             camera_buffer,
             camera_bind_group,
+            texture_dir,
         }
     }
 
@@ -347,6 +355,9 @@ impl StateRenderer {
     }
     pub fn camera_bind_group(&self) -> &wgpu::BindGroup {
         &self.camera_bind_group
+    }
+    pub fn texture_dir(&self) -> &VPKDirectory {
+        &self.texture_dir
     }
     pub fn camera_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         &self.camera_bind_group_layout

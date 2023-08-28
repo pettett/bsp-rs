@@ -55,7 +55,7 @@ mod bsp_tests {
         Lump,
     };
 
-    const PATH : &str = "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_01.bsp";
+    const PATH : &str = "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp";
 
     #[test]
     fn test_header() {
@@ -98,7 +98,7 @@ mod bsp_tests {
         let (header, mut buffer) = dheader_t::load(PATH).unwrap();
         let pakfile = header.get_lump_header(LumpType::PAKFILE);
 
-        let mut pakfile_data = pakfile.get_bytes(&mut buffer).unwrap();
+        let pakfile_data = pakfile.get_bytes(&mut buffer).unwrap();
 
         let mut zip_reader = ZipReader::default();
 
@@ -111,6 +111,9 @@ mod bsp_tests {
         for entry in entries {
             println!("entry: {:?}", entry.header().filename);
             // write to disk or whatever you need.
+            if entry.header().filename.contains(".vmt") {
+                println!("{}", std::str::from_utf8(entry.compressed_data()).unwrap());
+            }
         }
     }
 
@@ -143,26 +146,14 @@ mod bsp_tests {
 
         // test data relation
         for info in texinfo.iter() {
-            let data = texdata[info.texdata as usize];
+            let data = texdata[info.tex_data as usize];
         }
         // test data itself
         for data in texdata.iter() {
-            let string = texdatastringtable[data.nameStringTableID as usize];
-            let index = string.index;
+            let string = texdatastringtable[data.nameStringTableID as usize]
+                .get_filename(&mut buffer, texdatastringdata);
 
-            let seek_index = index + texdatastringdata.fileofs;
-
-            buffer
-                .seek(std::io::SeekFrom::Start(seek_index as u64))
-                .unwrap();
-
-            let mut string_buf = Vec::new();
-
-            buffer.read_until(0, &mut string_buf).unwrap();
-
-            let tex_name = unsafe { std::str::from_utf8_unchecked(&string_buf[..]) };
-
-            println!("{} {}", index, tex_name);
+            println!("{}", string);
         }
     }
 

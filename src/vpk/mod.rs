@@ -90,24 +90,65 @@ pub struct VPKFile {
     preload: Option<Vec<u8>>,
     vtf: OnceCell<VTF>,
 }
+#[derive(Debug)]
+pub enum VPKDirectoryTree {
+    Leaf(String),
+    Node(HashMap<String, VPKDirectoryTree>),
+}
 
 pub struct VPKDirectory {
     dir_path: PathBuf,
     header: VPKHeader_v2,
     maxPackFile: u16,
+    root: VPKDirectoryTree,
     files: HashMap<String, VPKFile>,
+}
+
+impl VPKDirectoryTree {
+    pub fn add_entry(&mut self, entry: &str) {
+        self.add_entry_inner(entry, entry);
+    }
+
+    fn add_entry_inner(&mut self, parsed_entry: &str, entry: &str) {
+        if parsed_entry.len() == 0 {
+            //most likely added a folder "etc/", don't add a "" leaf
+            return;
+        }
+        match self {
+            VPKDirectoryTree::Leaf(..) => {}
+            VPKDirectoryTree::Node(tree) => match parsed_entry.find('/') {
+                Some(pos) => match tree.get_mut(&parsed_entry[..pos]) {
+                    Some(subtree) => subtree.add_entry_inner(&parsed_entry[pos + 1..], entry),
+                    None => {
+                        let mut dir = VPKDirectoryTree::Node(HashMap::new());
+
+                        dir.add_entry_inner(&parsed_entry[pos + 1..], entry);
+
+                        tree.insert(parsed_entry[..pos].to_owned(), dir);
+                    }
+                },
+                None => {
+                    tree.insert(parsed_entry.to_owned(), Self::Leaf(entry.to_owned()));
+                }
+            },
+        };
+    }
 }
 
 impl VPKDirectory {
     pub fn get_file_names(&self) -> std::collections::hash_map::Keys<'_, String, VPKFile> {
         self.files.keys()
     }
+
+    pub fn get_root(&self) -> &VPKDirectoryTree {
+        &self.root
+    }
     pub fn load(dir_path: PathBuf) -> io::Result<Self> {
         let file = File::open(&dir_path)?;
         let mut buffer = BufReader::new(file);
 
         let header = VPKHeader_v2::read(&mut buffer)?;
-
+        let mut root = VPKDirectoryTree::Node(HashMap::new());
         let mut maxPackFile = 0;
         let mut files = HashMap::<String, VPKFile>::new();
 
@@ -153,6 +194,8 @@ impl VPKDirectory {
                         None
                     };
 
+                    root.add_entry(&path);
+
                     files.insert(
                         path,
                         VPKFile {
@@ -171,6 +214,7 @@ impl VPKDirectory {
             dir_path,
             header,
             maxPackFile,
+            root,
             files,
         })
     }
@@ -180,7 +224,7 @@ impl VPKDirectory {
     pub fn load_vtf(&self, vpk_path: &str) -> io::Result<&VTF> {
         let file_data = self.files.get(vpk_path).ok_or(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "File path not present",
+            format!("File path {} not present", vpk_path),
         ))?;
 
         if let Some(vtf) = file_data.vtf.get() {
@@ -255,6 +299,18 @@ mod vpk_tests {
                 println!("{}", file);
             }
         }
+    }
+
+    #[test]
+    fn test_tree() {
+        let mut root = VPKDirectoryTree::Node(HashMap::new());
+
+        root.add_entry("test/file/please/ignore.txt");
+        root.add_entry("test/file/please/receive.txt");
+        root.add_entry("test/folder/");
+        root.add_entry("test/folder/please/receive.txt");
+
+        println!("{:?}", root);
     }
 }
 

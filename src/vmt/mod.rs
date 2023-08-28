@@ -8,6 +8,22 @@
 // export type VKFPairUnit = string | number | VKFPair[];
 // export type VKFPair<T extends VKFPairUnit = VKFPairUnit> = [string, T];
 
+use std::collections::HashMap;
+
+pub enum VMTUnit {
+    String(String),
+    Number(f32),
+    Map(HashMap<String, VMTUnit>),
+}
+
+pub struct VMT {
+    data: HashMap<String, VMTUnit>,
+}
+
+impl VMT {
+    pub fn from_str(data: &str) {}
+}
+
 // export interface VMT {
 //     _Root: string;
 //     _Filename: string;
