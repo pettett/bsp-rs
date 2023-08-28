@@ -36,7 +36,10 @@ pub enum ImageFormat {
     UVLX8888,
 }
 impl ImageFormat {
-    pub fn bytes_for_size(&self, width: usize, height: usize) -> usize {
+    pub fn bytes_for_size(&self, width: usize, height: usize, mip_level: usize) -> usize {
+        let width = width >> mip_level;
+        let height = height >> mip_level;
+
         let block_width = width.max(4);
         let block_height = height.max(4);
         let block_count = block_width * block_height / 16;
@@ -124,7 +127,7 @@ impl ImageFormat {
     //     throw "whoops";
     // }
 
-    pub fn layout(&self, width: u32, height: u32) -> wgpu::ImageDataLayout {
+    pub fn layout(&self, size: wgpu::Extent3d) -> wgpu::ImageDataLayout {
         match self {
             ImageFormat::NONE => wgpu::ImageDataLayout {
                 offset: 0,
@@ -141,7 +144,7 @@ impl ImageFormat {
             | ImageFormat::RGB888
             | ImageFormat::BGR888 => wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * width),
+                bytes_per_row: Some(4 * size.width),
                 rows_per_image: None,
             },
             ImageFormat::RGB565 => todo!(),
@@ -151,17 +154,17 @@ impl ImageFormat {
             ImageFormat::A8 => todo!(),
             ImageFormat::DXT1 => wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(16 * width / 8),
+                bytes_per_row: Some(16 * size.width / 8),
                 rows_per_image: None,
             },
             ImageFormat::DXT3 => wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(16 * width / 4),
+                bytes_per_row: Some(16 * size.width / 4),
                 rows_per_image: None,
             },
             ImageFormat::DXT5 => wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(16 * width / 4),
+                bytes_per_row: Some(16 * size.width / 4),
                 rows_per_image: None,
             },
             ImageFormat::BGRX8888 => todo!(),

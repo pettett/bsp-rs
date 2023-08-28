@@ -117,18 +117,18 @@ impl VTF {
         format: ImageFormat,
         mipped_data: &[Vec<u8>],
     ) -> Texture {
+        let wgpu_format = format.try_into().unwrap();
+        println!("{:?} {:?}", format, wgpu_format);
         let size = wgpu::Extent3d {
             width,
             height,
             depth_or_array_layers: 1,
         };
-        let wgpu_format = format.try_into().unwrap();
-        println!("{:?} {:?}", format, wgpu_format);
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             // All textures are stored as 3D, we represent our 2D texture
             // by setting depth to 1.
             size,
-            mip_level_count: mipped_data.len() as u32, // We'll talk about this a little later
+            mip_level_count: mipped_data.len() as u32,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             // Most images are stored using sRGB so we need to reflect that here.
@@ -146,20 +146,26 @@ impl VTF {
             // backend.
             view_formats: &[],
         });
-        for i in 0..mipped_data.len() {
+        for mip_level in 0..mipped_data.len() {
+            let mip_size = wgpu::Extent3d {
+                width: width >> mip_level,
+                height: height >> mip_level,
+                depth_or_array_layers: 1,
+            };
+
             queue.write_texture(
                 // Tells wgpu where to copy the pixel data
                 wgpu::ImageCopyTexture {
                     texture: &texture,
-                    mip_level: i as u32,
+                    mip_level: mip_level as u32,
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
                 },
                 // The actual pixel data
-                &mipped_data[i],
+                &mipped_data[mip_level],
                 // The layout of the texture
-                format.layout(width, height),
-                size,
+                format.layout(mip_size),
+                mip_size,
             );
         }
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -226,9 +232,8 @@ impl BinaryData for VTF {
             let low_res_size = lowResImageFormat.bytes_for_size(
                 header.low_res_image_width as usize,
                 header.low_res_image_height as usize,
+                0,
             );
-            let high_res_size =
-                highResImageFormat.bytes_for_size(header.width as usize, header.height as usize);
 
             //TODO: There appears to be one byte of something
             let remaining_header = header_size - header_read;
@@ -241,7 +246,7 @@ impl BinaryData for VTF {
             }
             low_res_data = vec![0; low_res_size];
 
-            let wanted_mips = 1;
+            let wanted_mips = (header.mipmap_count as usize).max(7) - 6;
 
             high_res_data = vec![Vec::new(); wanted_mips];
             buffer.read_exact(&mut low_res_data[..])?;
@@ -250,29 +255,37 @@ impl BinaryData for VTF {
             let mut offset = 0;
             for mip_level in wanted_mips..header.mipmap_count as usize {
                 offset += highResImageFormat.bytes_for_size(
-                    (header.width as usize) >> mip_level,
-                    (header.height as usize) >> mip_level,
+                    (header.width as usize),
+                    (header.height as usize),
+                    mip_level,
                 ) as i64;
             }
             buffer.seek_relative(offset)?;
-
-            for mip_level in 0..wanted_mips as usize {
+            // have to operate in reverse to load correct data
+            for mip_level in (0..wanted_mips as usize).rev() {
                 high_res_data[mip_level] = vec![
                     0;
                     highResImageFormat.bytes_for_size(
-                        (header.width as usize) >> mip_level,
-                        (header.height as usize) >> mip_level,
+                        (header.width as usize),
+                        (header.height as usize),
+                        mip_level,
                     )
                 ];
 
                 buffer.read_exact(&mut high_res_data[mip_level][..])?;
 
+                println!(
+                    "loaded mipmap level {} {}",
+                    mip_level,
+                    high_res_data[mip_level].len()
+                );
+
                 // Do things like add empty alpha channels
                 image_format_convert_data(
                     highResImageFormat,
                     &mut high_res_data[mip_level],
-                    header.width as usize,
-                    header.height as usize,
+                    header.width as usize >> mip_level,
+                    header.height as usize >> mip_level,
                     header.frames as usize,
                 );
             }
