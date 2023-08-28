@@ -1,6 +1,6 @@
 // // Valve Texture File
 
-use std::io::Read;
+use std::{cell::OnceCell, io::Read};
 
 use bytemuck::Pod;
 use wgpu::{Device, Queue};
@@ -12,34 +12,87 @@ use self::consts::ImageFormat;
 #[derive(Debug)]
 pub struct VTF {
     header: VTFHEADER,
-    low_res: Vec<u8>,
-    high_res: Vec<u8>,
+    low_res_data: Vec<u8>,
+    high_res_data: Vec<u8>,
+    low_res: OnceCell<Texture>,
+    high_res: OnceCell<Texture>,
+
+    low_res_imgui: OnceCell<imgui::TextureId>,
+    high_res_imgui: OnceCell<imgui::TextureId>,
 }
 
 impl VTF {
-    pub fn upload_high_res(&self, device: &Device, queue: &Queue) -> Texture {
+    pub fn width(&self) -> u32 {
+        self.header.width as u32
+    }
+    pub fn height(&self) -> u32 {
+        self.header.height as u32
+    }
+
+    pub fn low_res_width(&self) -> u32 {
+        self.header.low_res_image_width as u32
+    }
+    pub fn low_res_height(&self) -> u32 {
+        self.header.low_res_image_height as u32
+    }
+
+    pub fn get_high_res(&self, device: &Device, queue: &Queue) -> &Texture {
+        self.high_res
+            .get_or_init(|| self.upload_high_res(device, queue))
+    }
+
+    pub fn get_low_res(&self, device: &Device, queue: &Queue) -> &Texture {
+        self.low_res
+            .get_or_init(|| self.upload_low_res(device, queue))
+    }
+    pub fn get_high_res_imgui(
+        &self,
+        device: &Device,
+        queue: &Queue,
+        renderer: &mut imgui_wgpu::Renderer,
+    ) -> &imgui::TextureId {
+        self.high_res_imgui.get_or_init(|| {
+            renderer
+                .textures
+                .insert(self.get_high_res(device, queue).to_imgui(device, renderer))
+        })
+    }
+    pub fn get_low_res_imgui(
+        &self,
+        device: &Device,
+        queue: &Queue,
+        renderer: &mut imgui_wgpu::Renderer,
+    ) -> &imgui::TextureId {
+        self.low_res_imgui.get_or_init(|| {
+            renderer
+                .textures
+                .insert(self.get_low_res(device, queue).to_imgui(device, renderer))
+        })
+    }
+
+    fn upload_high_res(&self, device: &Device, queue: &Queue) -> Texture {
         self.upload(
             device,
             queue,
-            self.header.width as u32,
-            self.header.height as u32,
-            self.header.highResImageFormat,
-            &self.high_res,
+            self.width(),
+            self.height(),
+            self.header.high_res_image_format,
+            &self.high_res_data,
         )
     }
 
-    pub fn upload_low_res(&self, device: &Device, queue: &Queue) -> Texture {
+    fn upload_low_res(&self, device: &Device, queue: &Queue) -> Texture {
         self.upload(
             device,
             queue,
-            self.header.lowResImageWidth as u32,
-            self.header.lowResImageHeight as u32,
-            self.header.lowResImageFormat,
-            &self.low_res,
+            self.low_res_width(),
+            self.low_res_height(),
+            self.header.low_res_image_format,
+            &self.low_res_data,
         )
     }
 
-    pub fn upload(
+    fn upload(
         &self,
         device: &Device,
         queue: &Queue,
@@ -114,14 +167,14 @@ impl BinaryData for VTF {
         assert!(header.width < 4096);
         assert!(header.height < 4096);
 
-        let mut low_res = Vec::new();
-        let mut high_res = Vec::new();
+        let mut low_res_data = Vec::new();
+        let mut high_res_data = Vec::new();
 
         if header.version[0] == 7 && header.version[1] == 3 {
             let header_7_3 = VTFHEADER_7_3::read(buffer)?;
 
             //println!("Loading entries");
-            for i in 0..header_7_3.numResources {
+            for i in 0..header_7_3.num_resources {
                 if let Ok(entry) = ResourceEntryInfo::read(buffer) {
                     match entry.tag {
                         [b'\x01', b'\0', b'\0'] => (), //  Low-res (thumbnail) image data
@@ -142,25 +195,26 @@ impl BinaryData for VTF {
         } else {
             println!("{:?}", header);
 
-            let lowResImageFormat = header.lowResImageFormat;
-            let highResImageFormat = header.highResImageFormat;
+            let lowResImageFormat = header.low_res_image_format;
+            let highResImageFormat = header.high_res_image_format;
             // load data
             let low_res_size = lowResImageFormat.bytes_for_size(
-                header.lowResImageWidth as usize,
-                header.lowResImageHeight as usize,
+                header.low_res_image_width as usize,
+                header.low_res_image_height as usize,
             );
             let high_res_size =
                 highResImageFormat.bytes_for_size(header.width as usize, header.height as usize);
-            //println!("{:?}", header);
-            //println!("{:?}", highResImageFormat);
-            //println!("{}", high_res_size);
-            low_res = vec![0; low_res_size];
-            high_res = vec![0; high_res_size];
-            buffer.read_exact(&mut low_res[..])?;
+
+            //TODO: There appears to be one byte of something
+            buffer.seek_relative(1)?;
+
+            low_res_data = vec![0; low_res_size];
+            high_res_data = vec![0; high_res_size];
+            buffer.read_exact(&mut low_res_data[..])?;
 
             // seek forward through mip maps
             let mut offset = 0;
-            for mip_level in 1..header.mipmapCount {
+            for mip_level in 1..header.mipmap_count {
                 offset += highResImageFormat.bytes_for_size(
                     (header.width as usize) >> mip_level,
                     (header.height as usize) >> mip_level,
@@ -168,21 +222,27 @@ impl BinaryData for VTF {
             }
             buffer.seek_relative(offset)?;
 
-            buffer.read_exact(&mut high_res[..])?;
+            buffer.read_exact(&mut high_res_data[..])?;
 
             // Do things like add empty alpha channels
-            high_res = image_format_convert_data(
+            high_res_data = image_format_convert_data(
                 highResImageFormat,
-                high_res,
+                high_res_data,
                 header.width as usize,
                 header.height as usize,
                 header.frames as usize,
-            )
+            );
+            //low res is always going to be dtx1
+            assert_eq!(lowResImageFormat, ImageFormat::DXT1);
         }
         Ok(Self {
             header,
-            low_res,
-            high_res,
+            low_res_data,
+            high_res_data,
+            low_res: OnceCell::new(),
+            high_res: OnceCell::new(),
+            low_res_imgui: OnceCell::new(),
+            high_res_imgui: OnceCell::new(),
         })
     }
 }
@@ -192,21 +252,21 @@ impl BinaryData for VTF {
 struct VTFHEADER {
     signature: [i8; 4], // File signature ("VTF\0"). (or as little-endian integer, 0x00465456)
     version: [u32; 2],  // version[0].version[1] (currently 7.2).
-    headerSize: u32, // Size of the header struct  (16 byte aligned, currently 80 bytes) + size of the resources dictionary (7.3+).
-    width: u16,      // Width of the largest mipmap in pixels. Must be a power of 2.
-    height: u16,     // Height of the largest mipmap in pixels. Must be a power of 2.
-    flags: u32,      // VTF flags.
-    frames: u16,     // Number of frames, if animated (1 for no animation).
-    firstFrame: u16, // First frame in animation (0 based). Can be -1 in environment maps older than 7.5, meaning there are 7 faces, not 6.
+    header_size: u32, // Size of the header struct  (16 byte aligned, currently 80 bytes) + size of the resources dictionary (7.3+).
+    width: u16,       // Width of the largest mipmap in pixels. Must be a power of 2.
+    height: u16,      // Height of the largest mipmap in pixels. Must be a power of 2.
+    flags: u32,       // VTF flags.
+    frames: u16,      // Number of frames, if animated (1 for no animation).
+    first_frame: u16, // First frame in animation (0 based). Can be -1 in environment maps older than 7.5, meaning there are 7 faces, not 6.
     padding0: [u8; 4], // reflectivity padding (16 byte alignment).
     reflectivity: [f32; 3], // reflectivity vector.
     padding1: [u8; 4], // reflectivity padding (8 byte packing).
-    bumpmapScale: f32, // Bumpmap scale.
-    highResImageFormat: ImageFormat, // High resolution image format.
-    mipmapCount: u8, // Number of mipmaps.
-    lowResImageFormat: ImageFormat, // Low resolution image format (always DXT1).
-    lowResImageWidth: u8, // Low resolution image width.
-    lowResImageHeight: u8, // Low resolution image height.
+    bumpmap_scale: f32, // Bumpmap scale.
+    high_res_image_format: ImageFormat, // High resolution image format.
+    mipmap_count: u8, // Number of mipmaps.
+    low_res_image_format: ImageFormat, // Low resolution image format (always DXT1).
+    low_res_image_width: u8, // Low resolution image width.
+    low_res_image_height: u8, // Low resolution image height.
 }
 
 #[repr(C, packed)]
@@ -216,8 +276,8 @@ struct VTFHEADER_7_3 {
     depth: i16, // Depth of the largest mipmap in pixels. Must be a power of 2. Is 1 for a 2D texture.
 
     // 7.3+
-    padding2: [u8; 3], // depth padding (4 byte alignment).
-    numResources: u32, // Number of resources this vtf has. The max appears to be 32.
+    padding2: [u8; 3],  // depth padding (4 byte alignment).
+    num_resources: u32, // Number of resources this vtf has. The max appears to be 32.
 
     padding3: [u8; 8], // Necessary on certain compilers
 }
@@ -259,8 +319,8 @@ mod vtf_tests {
         for file in dir.get_file_names() {
             if file.contains(".vtf") {
                 let data = dir.load_vtf(file).unwrap();
-                let lr = data.header.lowResImageFormat;
-                let hr = data.header.highResImageFormat;
+                let lr = data.header.low_res_image_format;
+                let hr = data.header.high_res_image_format;
                 if hr != ImageFormat::DXT5 && hr != ImageFormat::DXT1 {
                     println!("{} {:?}", file, hr);
                 }
@@ -316,9 +376,9 @@ fn image_format_convert_data(
         assert!(data.len() * 4 >= n * 3);
 
         for i in (0..n).step_by(4) {
-            dst[i + 0] = data[p + 0]; //red
-            dst[i + 1] = data[p + 2]; //green
-            dst[i + 2] = data[p + 1]; //blue
+            dst[i + 0] = data[p + 2]; //red
+            dst[i + 1] = data[p + 1]; //green
+            dst[i + 2] = data[p + 0]; //blue
             dst[i + 3] = 255;
             p += 3;
         }

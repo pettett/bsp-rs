@@ -37,6 +37,10 @@ pub enum ImageFormat {
 }
 impl ImageFormat {
     pub fn bytes_for_size(&self, width: usize, height: usize) -> usize {
+        let block_width = width.max(4);
+        let block_height = height.max(4);
+        let block_count = block_width * block_height / 16;
+
         match self {
             ImageFormat::NONE => 0,
             ImageFormat::UVLX8888
@@ -51,9 +55,9 @@ impl ImageFormat {
             | ImageFormat::RGB888
             | ImageFormat::BGR888 => width * height * 3,
             ImageFormat::I8 | ImageFormat::P8 | ImageFormat::A8 => width * height,
-            ImageFormat::DXT1 => width * height / 2, // should be 1/2?
-            ImageFormat::DXT3 => width * height,
-            ImageFormat::DXT5 => width * height,
+            ImageFormat::DXT1 => block_count * 8, // should be 1/2?
+            // 4x4 block has 64bits of color and 64 bits of alpha
+            ImageFormat::DXT3 | ImageFormat::DXT5 => block_count * 16,
             ImageFormat::IA88
             | ImageFormat::RGB565
             | ImageFormat::UV88
@@ -147,7 +151,7 @@ impl ImageFormat {
             ImageFormat::A8 => todo!(),
             ImageFormat::DXT1 => wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(16 * width / 4),
+                bytes_per_row: Some(16 * width / 8),
                 rows_per_image: None,
             },
             ImageFormat::DXT3 => wgpu::ImageDataLayout {
@@ -213,23 +217,23 @@ impl TryFrom<ImageFormat> for wgpu::TextureFormat {
     fn try_from(value: ImageFormat) -> Result<Self, Self::Error> {
         match value {
             ImageFormat::NONE => Err(()),
-            ImageFormat::RGBA8888 => Ok(wgpu::TextureFormat::Rgba8UnormSrgb),
-            ImageFormat::ABGR8888 => Ok(wgpu::TextureFormat::Rgba8UnormSrgb),
-            ImageFormat::RGB888 => Ok(wgpu::TextureFormat::Rgba8UnormSrgb),
-            ImageFormat::BGR888 => Ok(wgpu::TextureFormat::Rgba8UnormSrgb),
+            ImageFormat::RGBA8888
+            | ImageFormat::ABGR8888
+            | ImageFormat::RGB888
+            | ImageFormat::ARGB8888
+            | ImageFormat::BGRA8888
+            | ImageFormat::RGB888_BLUESCREEN
+            | ImageFormat::BGR888_BLUESCREEN
+            | ImageFormat::BGRX8888
+            | ImageFormat::BGR888 => Ok(wgpu::TextureFormat::Rgba8UnormSrgb),
             ImageFormat::RGB565 => todo!(),
             ImageFormat::I8 => Ok(wgpu::TextureFormat::R8Unorm),
             ImageFormat::IA88 => todo!(),
             ImageFormat::P8 => todo!(),
             ImageFormat::A8 => todo!(),
-            ImageFormat::RGB888_BLUESCREEN => todo!(),
-            ImageFormat::BGR888_BLUESCREEN => todo!(),
-            ImageFormat::ARGB8888 => todo!(),
-            ImageFormat::BGRA8888 => todo!(),
             ImageFormat::DXT1 => Ok(wgpu::TextureFormat::Bc1RgbaUnormSrgb),
             ImageFormat::DXT3 => Ok(wgpu::TextureFormat::Bc2RgbaUnormSrgb),
             ImageFormat::DXT5 => Ok(wgpu::TextureFormat::Bc3RgbaUnorm),
-            ImageFormat::BGRX8888 => Ok(wgpu::TextureFormat::Rgba8UnormSrgb),
             ImageFormat::BGR565 => todo!(),
             ImageFormat::BGRX5551 => todo!(),
             ImageFormat::BGRA4444 => todo!(),

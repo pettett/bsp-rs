@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Instant};
+use std::{collections::HashMap, path::PathBuf, time::Instant};
 
 use imgui::{Condition, FontSource, Image};
 use imgui_wgpu::{Renderer, RendererConfig};
@@ -17,7 +17,7 @@ pub struct StateImgui {
     last_frame: Instant,
     platform: imgui_winit_support::WinitPlatform,
     renderer: Renderer,
-    tex_id: imgui::TextureId, //puffin_ui : puffin_imgui::ProfilerUi,
+    dir: VPKDirectory, //puffin_ui : puffin_imgui::ProfilerUi,
 }
 
 impl State for StateImgui {
@@ -61,7 +61,23 @@ impl State for StateImgui {
                             .to_euler(glam::EulerRot::XYZ)
                     ));
 
-                    Image::new(self.tex_id, [64.0 * 16.0, 64.0 * 8.0]).build(ui);
+                    for file in self.dir.get_file_names() {
+                        if let Some(node) = ui.tree_node(file) {
+                            let uncomp_data = self.dir.load_vtf(file).unwrap();
+
+                            if let Some(node) = ui.tree_node("High res") {
+                                Image::new(
+                                    *uncomp_data.get_high_res_imgui(
+                                        state.device(),
+                                        state.queue(),
+                                        &mut self.renderer,
+                                    ),
+                                    [64.0 * 4.0, 64.0 * 4.0],
+                                )
+                                .build(ui);
+                            }
+                        }
+                    }
                 });
 
             //self.puffin_ui.window(ui);
@@ -144,15 +160,8 @@ impl State for StateImgui {
 
         let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
 
-        let data = dir
-            .load_vtf("materials/models/police/barneyface.vtf")
-            .unwrap();
-
-        let tex = data
-            .upload_high_res(renderer.device(), renderer.queue())
-            .to_imgui(renderer.device(), &imgui_renderer);
-
-        let tex_id: imgui::TextureId = imgui_renderer.textures.insert(tex);
+        //let dx5_data = dir.load_vtf("materials/metal/metalfence001a.vtf").unwrap();
+        //let dx1_data = dir.load_vtf("materials/metal/metalfloor001a.vtf").unwrap();
 
         let last_cursor = None;
 
@@ -162,7 +171,7 @@ impl State for StateImgui {
             last_frame: Instant::now(),
             platform,
             renderer: imgui_renderer,
-            tex_id,
+            dir,
         }
     }
 }

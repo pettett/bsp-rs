@@ -1,16 +1,26 @@
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
+#[derive(Debug)]
 pub struct Texture {
-    texture: wgpu::Texture,
-    view: wgpu::TextureView,
+    texture: Arc<wgpu::Texture>,
+    view: Arc<wgpu::TextureView>,
     sampler: wgpu::Sampler,
 }
+
+//impl fmt::Debug for Texture {
+//    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//        f.debug_struct("Texture")
+//            .field("width", &self.texture.width())
+//            .field("height", &self.texture.height())
+//            .finish()
+//    }
+//}
 
 impl Texture {
     pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float; // 1.
 
     pub fn to_imgui(
-        self,
+        &self,
         device: &wgpu::Device,
         renderer: &imgui_wgpu::Renderer,
     ) -> imgui_wgpu::Texture {
@@ -18,8 +28,8 @@ impl Texture {
         imgui_wgpu::Texture::from_raw_parts(
             device,
             renderer,
-            Arc::new(self.texture),
-            Arc::new(self.view),
+            self.texture.clone(),
+            self.view.clone(),
             None,
             Some(&imgui_wgpu::RawTextureConfig {
                 label: Some("Test"),
@@ -31,8 +41,8 @@ impl Texture {
 
     pub fn new(texture: wgpu::Texture, view: wgpu::TextureView, sampler: wgpu::Sampler) -> Self {
         Self {
-            texture,
-            view,
+            texture: Arc::new(texture),
+            view: Arc::new(view),
             sampler,
         }
     }
@@ -80,10 +90,6 @@ impl Texture {
             ..Default::default()
         });
 
-        Self {
-            texture,
-            view,
-            sampler,
-        }
+        Self::new(texture, view, sampler)
     }
 }
