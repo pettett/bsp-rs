@@ -131,17 +131,13 @@ impl ImageFormat {
             ImageFormat::ARGB8888
             | ImageFormat::BGRA8888
             | ImageFormat::RGBA8888
-            | ImageFormat::ABGR8888 => wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(16 * width),
-                rows_per_image: None,
-            },
-            ImageFormat::RGB888_BLUESCREEN
+            | ImageFormat::ABGR8888
+            | ImageFormat::RGB888_BLUESCREEN
             | ImageFormat::BGR888_BLUESCREEN
             | ImageFormat::RGB888
             | ImageFormat::BGR888 => wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(12 * width),
+                bytes_per_row: Some(4 * width),
                 rows_per_image: None,
             },
             ImageFormat::RGB565 => todo!(),
@@ -217,10 +213,10 @@ impl TryFrom<ImageFormat> for wgpu::TextureFormat {
     fn try_from(value: ImageFormat) -> Result<Self, Self::Error> {
         match value {
             ImageFormat::NONE => Err(()),
-            ImageFormat::RGBA8888 => Ok(wgpu::TextureFormat::Rgba8Unorm),
-            ImageFormat::ABGR8888 => Ok(wgpu::TextureFormat::Rgba8Unorm),
-            ImageFormat::RGB888 => Ok(wgpu::TextureFormat::Rgba8Unorm),
-            ImageFormat::BGR888 => Ok(wgpu::TextureFormat::Rgba8Unorm),
+            ImageFormat::RGBA8888 => Ok(wgpu::TextureFormat::Rgba8UnormSrgb),
+            ImageFormat::ABGR8888 => Ok(wgpu::TextureFormat::Rgba8UnormSrgb),
+            ImageFormat::RGB888 => Ok(wgpu::TextureFormat::Rgba8UnormSrgb),
+            ImageFormat::BGR888 => Ok(wgpu::TextureFormat::Rgba8UnormSrgb),
             ImageFormat::RGB565 => todo!(),
             ImageFormat::I8 => Ok(wgpu::TextureFormat::R8Unorm),
             ImageFormat::IA88 => todo!(),

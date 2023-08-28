@@ -61,7 +61,7 @@ impl State for StateImgui {
                             .to_euler(glam::EulerRot::XYZ)
                     ));
 
-                    Image::new(self.tex_id, [64.0 * 8.0, 64.0 * 8.0]).build(ui);
+                    Image::new(self.tex_id, [64.0 * 16.0, 64.0 * 8.0]).build(ui);
                 });
 
             //self.puffin_ui.window(ui);

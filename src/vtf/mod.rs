@@ -149,9 +149,8 @@ impl BinaryData for VTF {
                 header.lowResImageWidth as usize,
                 header.lowResImageHeight as usize,
             );
-            let high_res_size = highResImageFormat
-                .bytes_for_size(header.width as usize, header.height as usize)
-                * 12;
+            let high_res_size =
+                highResImageFormat.bytes_for_size(header.width as usize, header.height as usize);
             //println!("{:?}", header);
             //println!("{:?}", highResImageFormat);
             //println!("{}", high_res_size);
@@ -160,11 +159,14 @@ impl BinaryData for VTF {
             buffer.read_exact(&mut low_res[..])?;
 
             // seek forward through mip maps
-            //buffer.seek_relative(
-            //    highResImageFormat
-            //        .bytes_for_size(header.width as usize / 2, header.height as usize / 2)
-            //        as i64,
-            //)?;
+            let mut offset = 0;
+            for mip_level in 1..header.mipmapCount {
+                offset += highResImageFormat.bytes_for_size(
+                    (header.width as usize) >> mip_level,
+                    (header.height as usize) >> mip_level,
+                ) as i64;
+            }
+            buffer.seek_relative(offset)?;
 
             buffer.read_exact(&mut high_res[..])?;
 
@@ -172,8 +174,8 @@ impl BinaryData for VTF {
             high_res = image_format_convert_data(
                 highResImageFormat,
                 high_res,
-                header.width as usize * 2,
-                header.height as usize * 2,
+                header.width as usize,
+                header.height as usize,
                 header.frames as usize,
             )
         }
@@ -304,25 +306,28 @@ fn image_format_convert_data(
     height: usize,
     depth: usize,
 ) -> Vec<u8> {
+    let n = width * height * depth * 4;
     if (fmt == ImageFormat::BGR888) {
         // BGR888 => RGBA8888
-        let n = width * height * depth * 4;
         let mut dst = vec![0; n];
         let mut p = 0;
-        for i in (0..(n - 4)).step_by(4) {
-            dst[i + 0] = data[p + 0];
-            dst[i + 1] = data[p + 1];
-            dst[i + 2] = data[p + 2];
+
+        //ensure there is enough data: 4 to 3 ratio
+        assert!(data.len() * 4 >= n * 3);
+
+        for i in (0..n).step_by(4) {
+            dst[i + 0] = data[p + 0]; //red
+            dst[i + 1] = data[p + 2]; //green
+            dst[i + 2] = data[p + 1]; //blue
             dst[i + 3] = 255;
             p += 3;
         }
         return dst;
     } else if (fmt == ImageFormat::RGB888) {
         // RGB888 => RGBA8888
-        let n = width * height * depth * 4;
         let mut dst = vec![0; n];
         let mut p = 0;
-        for i in (0..(n - 4)).step_by(4) {
+        for i in (0..n).step_by(4) {
             dst[i + 0] = data[p + 0];
             dst[i + 1] = data[p + 1];
             dst[i + 2] = data[p + 2];
@@ -332,9 +337,8 @@ fn image_format_convert_data(
         return dst;
     } else if (fmt == ImageFormat::ABGR8888) {
         // ABGR8888 => RGBA8888
-        let n = width * height * depth * 4;
         let mut dst = vec![0; n];
-        for i in (0..(n - 4)).step_by(4) {
+        for i in (0..n).step_by(4) {
             dst[i + 0] = data[i + 3];
             dst[i + 1] = data[i + 2];
             dst[i + 2] = data[i + 1];
@@ -343,9 +347,8 @@ fn image_format_convert_data(
         return dst;
     } else if (fmt == ImageFormat::BGRA8888) {
         // BGRA8888 => RGBA8888
-        let n = width * height * depth * 4;
         let mut dst = vec![0; n];
-        for i in (0..(n - 4)).step_by(4) {
+        for i in (0..n).step_by(4) {
             dst[i + 0] = data[i + 2];
             dst[i + 1] = data[i + 1];
             dst[i + 2] = data[i + 0];
@@ -354,10 +357,9 @@ fn image_format_convert_data(
         return dst;
     } else if (fmt == ImageFormat::BGRX8888) {
         // BGRX8888 => RGBA8888
-        let n = width * height * depth * 4;
         let mut dst = vec![0; n];
         let mut p = 0;
-        for i in (0..(n - 4)).step_by(4) {
+        for i in (0..n).step_by(4) {
             dst[i + 0] = data[p + 2];
             dst[i + 1] = data[p + 1];
             dst[i + 2] = data[p + 0];
@@ -367,9 +369,8 @@ fn image_format_convert_data(
         return dst;
     } else if (fmt == ImageFormat::I8) {
         // I8 => RGBA8888
-        let n = width * height * depth * 4;
         let mut dst = vec![0; n as usize];
-        for i in (0..(n - 4)).step_by(4) {
+        for i in (0..n).step_by(4) {
             let m = data[i / 4];
             dst[i + 0] = m;
             dst[i + 1] = m;
