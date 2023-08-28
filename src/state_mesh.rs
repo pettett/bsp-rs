@@ -1,18 +1,11 @@
 use crate::{
-    bsp::{
-        edges::{dedge_t},
-        header::dheader_t,
-    },
+    bsp::{edges::BSPEdge, header::BSPHeader},
     texture,
     vertex::{UVVertex, Vertex},
 };
-use std::{
-    fs::File,
-    io::BufReader,
-    sync::{Arc},
-};
+use std::{fs::File, io::BufReader, sync::Arc};
 
-use glam::{Vec3};
+use glam::Vec3;
 use gltf::mesh::util::ReadIndices;
 
 use wgpu::util::DeviceExt;
@@ -240,10 +233,10 @@ impl StateMesh {
     pub fn load_debug_edges(
         &mut self,
         instance: Arc<StateInstance>,
-        header: &dheader_t,
+        header: &BSPHeader,
         buffer: &mut BufReader<File>,
     ) {
-        let edges = header.get_lump::<dedge_t>(buffer);
+        let edges = header.get_lump::<BSPEdge>(buffer);
         let verts = header.get_lump::<Vec3>(buffer);
 
         let mut annotated_verts = bytemuck::zeroed_slice_box::<UVVertex>(verts.len());

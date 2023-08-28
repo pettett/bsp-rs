@@ -9,42 +9,41 @@ use std::{
 use crate::bsp::consts::LumpType;
 use bytemuck::Zeroable;
 
-
-use super::{lump::lump_t, Lump};
+use super::lump::{BSPLump, Lump};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct dheader_t {
-    pub ident: [u8; 4],                // BSP file identifier
-    pub version: i32,                  // BSP file version
-    pub lumps: [lump_t; HEADER_LUMPS], // lump directory array
-    pub mapRevision: i32,              // the map's revision (iteration, version) number
+pub struct BSPHeader {
+    pub ident: [u8; 4],                 // BSP file identifier
+    pub version: i32,                   // BSP file version
+    pub lumps: [BSPLump; HEADER_LUMPS], // lump directory array
+    pub map_revision: i32,              // the map's revision (iteration, version) number
 }
 
-impl Default for dheader_t {
+impl Default for BSPHeader {
     fn default() -> Self {
         Self {
             ident: Default::default(),
             version: Default::default(),
-            lumps: [lump_t::default(); 64],
-            mapRevision: Default::default(),
+            lumps: [BSPLump::default(); 64],
+            map_revision: Default::default(),
         }
     }
 }
 
-impl fmt::Debug for dheader_t {
+impl fmt::Debug for BSPHeader {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let version = self.version;
-        let mapRevision = self.mapRevision;
+        let map_revision = self.map_revision;
         f.debug_struct("dheader_t")
             .field("ident", &self.ident)
             .field("version", &version)
-            .field("mapRevision", &mapRevision)
+            .field("mapRevision", &map_revision)
             .finish()
     }
 }
 
-impl dheader_t {
+impl BSPHeader {
     pub fn load(path: &str) -> io::Result<(Self, BufReader<File>)> {
         let file = File::open(path)?;
         let mut buffer = BufReader::new(file);
@@ -62,7 +61,7 @@ impl dheader_t {
         Ok((header, buffer))
     }
 
-    pub fn get_lump_header(&self, lump: LumpType) -> &lump_t {
+    pub fn get_lump_header(&self, lump: LumpType) -> &BSPLump {
         &self.lumps[lump as usize]
     }
     pub fn get_lump<T: Lump>(&self, buffer: &mut BufReader<File>) -> Box<[T]> {

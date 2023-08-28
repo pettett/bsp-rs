@@ -9,11 +9,11 @@ use super::consts::{LumpType, MAX_MAP_SURFEDGES};
 ///As for vertices, edges can be shared between adjacent faces. There is a limit of 256000 edges in a map (`MAX_MAP_EDGES`).
 #[repr(C, packed)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct dedge_t {
+pub struct BSPEdge {
     v0: u16, // vertex indices
     v1: u16, // vertex indices
 }
-impl Lump for dedge_t {
+impl Lump for BSPEdge {
     fn max() -> usize {
         MAX_MAP_EDGES
     }
@@ -38,11 +38,11 @@ impl Lump for dedge_t {
 ///There is a limit of 512000 (MAX_MAP_SURFEDGES) surfedges per map. Note that the number of surfedges is not necessarily the same as the number of edges in the map.
 #[repr(C, packed)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct dsurfedge_t {
+pub struct BSPSurfEdge {
     index: i32,
 }
 
-impl Lump for dsurfedge_t {
+impl Lump for BSPSurfEdge {
     fn max() -> usize {
         MAX_MAP_SURFEDGES
     }
@@ -59,8 +59,8 @@ impl Lump for dsurfedge_t {
     }
 }
 
-impl dsurfedge_t {
-    pub fn get_edge(&self, edges: &Box<[dedge_t]>) -> (u16, u16) {
+impl BSPSurfEdge {
+    pub fn get_edge(&self, edges: &Box<[BSPEdge]>) -> (u16, u16) {
         let id = self.index.abs() as usize;
         let rev = self.index.signum();
         let edge = edges[id];

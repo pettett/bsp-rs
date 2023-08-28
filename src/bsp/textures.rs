@@ -5,12 +5,9 @@ use std::{
 
 use glam::{Vec3, Vec4};
 
-
-
 use super::{
     consts::{LumpType, MAX_MAP_TEXDATA, MAX_MAP_TEXINFO},
-    lump::lump_t,
-    Lump,
+    lump::{BSPLump, Lump},
 };
 
 // Texinfo
@@ -64,7 +61,7 @@ use super::{
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct texinfo_t {
+pub struct BSPTexInfo {
     /// [s/t][xyz offset]
     pub tex_s: Vec4,
     /// [s/t][xyz offset]
@@ -74,7 +71,7 @@ pub struct texinfo_t {
     pub flags: i32,       // miptex flags overrides
     pub tex_data: i32,    // Pointer to texture name, size, etc.
 }
-impl Lump for texinfo_t {
+impl Lump for BSPTexInfo {
     fn max() -> usize {
         MAX_MAP_TEXINFO
     }
@@ -99,17 +96,17 @@ impl Lump for texinfo_t {
 /// TexdataStringData and TexdataStringTable
 ///
 #[repr(C, packed)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct texdata_t {
-    pub reflectivity: Vec3,     // RGB reflectivity
-    pub nameStringTableID: i32, // index into TexdataStringTable
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct BSPTexData {
+    pub reflectivity: Vec3,        // RGB reflectivity
+    pub name_string_table_id: i32, // index into TexdataStringTable
     pub width: i32,
     pub height: i32, // source image
     pub view_width: i32,
     pub view_height: i32,
 }
 
-impl Lump for texdata_t {
+impl Lump for BSPTexData {
     fn max() -> usize {
         MAX_MAP_TEXDATA
     }
@@ -126,18 +123,18 @@ impl Lump for texdata_t {
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct texdatastringtable_t {
+pub struct BSPTexDataStringTable {
     pub index: i32,
 }
-impl texdatastringtable_t {
+impl BSPTexDataStringTable {
     pub fn get_filename(
         &self,
         buffer: &mut BufReader<File>,
-        tex_data_string_data: &lump_t,
+        tex_data_string_data: &BSPLump,
     ) -> String {
         let index = self.index;
 
-        let seek_index = index + tex_data_string_data.fileofs;
+        let seek_index = index + tex_data_string_data.file_ofs;
 
         buffer
             .seek(std::io::SeekFrom::Start(seek_index as u64))
@@ -155,7 +152,7 @@ impl texdatastringtable_t {
         str
     }
 }
-impl Lump for texdatastringtable_t {
+impl Lump for BSPTexDataStringTable {
     fn max() -> usize {
         0
     }

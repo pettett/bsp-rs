@@ -25,13 +25,13 @@ use super::{consts::MAX_MAP_PLANES, Lump};
 /// There can be up to 65536 planes in a map (`MAX_MAP_PLANES`).
 #[repr(C, packed)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct dplane_t {
+pub struct BSPPlane {
     pub normal: Vec3, // normal vector
     pub dist: f32,    // distance from origin
     pub axis: i32,    // plane axis identifier
 }
 
-impl Lump for dplane_t {
+impl Lump for BSPPlane {
     fn max() -> usize {
         MAX_MAP_PLANES
     }

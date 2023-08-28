@@ -2,7 +2,6 @@
 
 use std::{cell::OnceCell, fmt, io::Read, mem};
 
-
 use wgpu::{Device, Queue};
 
 use crate::{binaries::BinaryData, texture::Texture};
@@ -226,10 +225,10 @@ impl BinaryData for VTF {
         } else {
             //println!("{:?}", header);
 
-            let lowResImageFormat = header.low_res_image_format;
-            let highResImageFormat = header.high_res_image_format;
+            let low_res_image_format = header.low_res_image_format;
+            let high_res_image_format = header.high_res_image_format;
             // load data
-            let low_res_size = lowResImageFormat.bytes_for_size(
+            let low_res_size = low_res_image_format.bytes_for_size(
                 header.low_res_image_width as usize,
                 header.low_res_image_height as usize,
                 0,
@@ -254,7 +253,7 @@ impl BinaryData for VTF {
             // seek forward through mip maps we don't want
             let mut offset = 0;
             for mip_level in wanted_mips..header.mipmap_count as usize {
-                offset += highResImageFormat.bytes_for_size(
+                offset += high_res_image_format.bytes_for_size(
                     header.width as usize,
                     header.height as usize,
                     mip_level,
@@ -265,7 +264,7 @@ impl BinaryData for VTF {
             for mip_level in (0..wanted_mips as usize).rev() {
                 high_res_data[mip_level] = vec![
                     0;
-                    highResImageFormat.bytes_for_size(
+                    high_res_image_format.bytes_for_size(
                         header.width as usize,
                         header.height as usize,
                         mip_level,
@@ -282,15 +281,14 @@ impl BinaryData for VTF {
 
                 // Do things like add empty alpha channels
                 image_format_convert_data(
-                    highResImageFormat,
+                    high_res_image_format,
                     &mut high_res_data[mip_level],
                     header.width as usize >> mip_level,
                     header.height as usize >> mip_level,
                     header.frames as usize,
                 );
             }
-            //low res is always going to be dtx1
-            assert_eq!(lowResImageFormat, ImageFormat::DXT1);
+            //low res is always going to be dtx1 or none
         }
         Ok(Self {
             header,
@@ -362,11 +360,11 @@ struct ResourceEntryInfo {
 impl BinaryData for ResourceEntryInfo {}
 
 mod vtf_tests {
-    
+    use std::path::PathBuf;
 
-    
+    use crate::vpk::VPKDirectory;
 
-    
+    use super::consts::ImageFormat;
 
     const PATH: &str =
         "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";

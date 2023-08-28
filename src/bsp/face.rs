@@ -13,7 +13,7 @@ use super::{
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct dface_t {
+pub struct BSPFace {
     ///The first member plane_num is the plane number, i.e., the index into the plane array that corresponds to
     /// the plane that is aligned with this face in the world.
     ///
@@ -62,7 +62,7 @@ pub struct dface_t {
     pub smoothing_groups: u32,
 }
 
-impl Lump for dface_t {
+impl Lump for BSPFace {
     fn max() -> usize {
         MAX_MAP_FACES
     }

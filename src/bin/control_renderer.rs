@@ -1,10 +1,10 @@
 use bsp_explorer::{
     bsp::{
         consts::LumpType,
-        edges::{dedge_t, dsurfedge_t},
-        face::dface_t,
-        header::dheader_t,
-        textures::{texdata_t, texdatastringtable_t, texinfo_t},
+        edges::{BSPEdge, BSPSurfEdge},
+        face::BSPFace,
+        header::BSPHeader,
+        textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
     state::State,
     vertex::UVVertex,
@@ -19,7 +19,7 @@ pub fn main() {
     pollster::block_on(run(|state| {
         let instance = state.renderer().instance();
 
-        let (header,mut buffer) = dheader_t::load(
+        let (header,mut buffer) = BSPHeader::load(
 			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp").unwrap();
 
         header.validate();
@@ -32,12 +32,12 @@ pub fn main() {
         //mesh.load_debug_edges(instance.clone(), &header, &mut buffer);
         //state.add_mesh(mesh);
 
-        let faces = header.get_lump::<dface_t>(&mut buffer);
-        let surfedges = header.get_lump::<dsurfedge_t>(&mut buffer);
-        let edges = header.get_lump::<dedge_t>(&mut buffer);
+        let faces = header.get_lump::<BSPFace>(&mut buffer);
+        let surfedges = header.get_lump::<BSPSurfEdge>(&mut buffer);
+        let edges = header.get_lump::<BSPEdge>(&mut buffer);
         let verts = header.get_lump::<Vec3>(&mut buffer);
-        let tex_info = header.get_lump::<texinfo_t>(&mut buffer);
-        let tex_data = header.get_lump::<texdata_t>(&mut buffer);
+        let tex_info = header.get_lump::<BSPTexInfo>(&mut buffer);
+        let tex_data = header.get_lump::<BSPTexData>(&mut buffer);
 
         let mut annotated_verts = bytemuck::zeroed_slice_box::<UVVertex>(verts.len());
 
@@ -130,14 +130,14 @@ pub fn main() {
             }
         }
 
-        let tex_data_string_table = header.get_lump::<texdatastringtable_t>(&mut buffer);
+        let tex_data_string_table = header.get_lump::<BSPTexDataStringTable>(&mut buffer);
         let tex_data_string_data = header.get_lump_header(LumpType::TEXDATA_STRING_DATA);
 
         for (tex, tris) in &textured_tris {
             // turn surfaces into meshes
             let filename_mat = format!(
                 "materials/{}.vmt",
-                tex_data_string_table[tex_data[*tex as usize].nameStringTableID as usize]
+                tex_data_string_table[tex_data[*tex as usize].name_string_table_id as usize]
                     .get_filename(&mut buffer, tex_data_string_data)
             );
 
@@ -149,7 +149,7 @@ pub fn main() {
             } else {
                 format!(
                     "materials/{}.vtf",
-                    tex_data_string_table[tex_data[*tex as usize].nameStringTableID as usize]
+                    tex_data_string_table[tex_data[*tex as usize].name_string_table_id as usize]
                         .get_filename(&mut buffer, tex_data_string_data)
                 )
             };

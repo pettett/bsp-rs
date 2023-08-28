@@ -25,14 +25,12 @@
 // }
 
 use std::{
-    cell::{OnceCell},
+    cell::OnceCell,
     collections::HashMap,
     fs::File,
     io::{self, BufRead, BufReader, Read},
-    path::{PathBuf},
+    path::PathBuf,
 };
-
-
 
 use crate::{binaries::BinaryData, vtf::VTF};
 
@@ -97,7 +95,7 @@ pub enum VPKDirectoryTree {
 pub struct VPKDirectory {
     dir_path: PathBuf,
     header: VPKHeader_v2,
-    maxPackFile: u16,
+    max_pack_file: u16,
     root: VPKDirectoryTree,
     files: HashMap<String, VPKFile>,
 }
@@ -147,7 +145,7 @@ impl VPKDirectory {
 
         let header = VPKHeader_v2::read(&mut buffer)?;
         let mut root = VPKDirectoryTree::Node(HashMap::new());
-        let mut maxPackFile = 0;
+        let mut max_pack_file = 0;
         let mut files = HashMap::<String, VPKFile>::new();
 
         loop {
@@ -166,12 +164,12 @@ impl VPKDirectory {
                     if filename.len() == 0 {
                         break;
                     }
-                    let dirPrefix = if dir == "" || dir == " " {
+                    let dir_prefix = if dir == "" || dir == " " {
                         "".to_owned()
                     } else {
                         format!("{dir}/")
                     };
-                    let path = format!("{dirPrefix}{filename}.{ext}");
+                    let path = format!("{dir_prefix}{filename}.{ext}");
 
                     let entry = VPKDirectoryEntry::read(&mut buffer).unwrap();
                     let terminator = entry.Terminator;
@@ -180,7 +178,7 @@ impl VPKDirectory {
 
                     if entry.ArchiveIndex != 0x7fff {
                         // 0x7fff means contained in this same file
-                        maxPackFile = u16::max(entry.ArchiveIndex, maxPackFile);
+                        max_pack_file = u16::max(entry.ArchiveIndex, max_pack_file);
                     }
 
                     // Read metadata.
@@ -211,7 +209,7 @@ impl VPKDirectory {
         Ok(Self {
             dir_path,
             header,
-            maxPackFile,
+            max_pack_file,
             root,
             files,
         })
