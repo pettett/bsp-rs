@@ -11,10 +11,10 @@ pub mod vertex;
 pub mod vmt;
 pub mod vpk;
 pub mod vtf;
-use std::thread;
+
 
 use state::{StateApp, StateRenderer};
-use state_mesh::StateMesh;
+
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},

@@ -21,7 +21,7 @@ pub struct VMT {
 }
 
 impl VMT {
-    pub fn from_str(data: &str) {}
+    pub fn from_str(_data: &str) {}
 }
 
 // export interface VMT {

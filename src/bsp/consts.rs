@@ -1,4 +1,4 @@
-use flagset::{flags, FlagSet};
+use flagset::{flags};
 use num_derive::FromPrimitive;
 
 pub const HEADER_LUMPS: usize = 64;

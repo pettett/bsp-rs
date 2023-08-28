@@ -1,6 +1,6 @@
 use super::{consts::MAX_MAP_EDGES, Lump};
 
-use super::consts::{LumpType, MAX_MAP_PLANES, MAX_MAP_SURFEDGES};
+use super::consts::{LumpType, MAX_MAP_SURFEDGES};
 ///Edge
 ///
 ///The edge lump (Lump 12) is an array of dedge_t structures:

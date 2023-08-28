@@ -5,7 +5,7 @@ use std::{
 
 use glam::{Vec3, Vec4};
 
-use crate::bsp::consts::MAX_MAP_TEXDATA_STRING_DATA;
+
 
 use super::{
     consts::{LumpType, MAX_MAP_TEXDATA, MAX_MAP_TEXINFO},
@@ -162,7 +162,7 @@ impl Lump for texdatastringtable_t {
     fn lump_type() -> LumpType {
         LumpType::TEXDATA_STRING_TABLE
     }
-    fn validate(lump: &Box<[Self]>) {
+    fn validate(_lump: &Box<[Self]>) {
         println!("Validated dtexdatastringdata_t lump!")
     }
 }

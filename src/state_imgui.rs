@@ -1,6 +1,4 @@
 use std::{
-    collections::{HashMap, VecDeque},
-    path::PathBuf,
     time::Instant,
 };
 
@@ -37,7 +35,7 @@ fn draw_dir(
 
             ui.text(file);
 
-            if let Some(node) = ui.tree_node("High res") {
+            if let Some(_node) = ui.tree_node("High res") {
                 Image::new(
                     *uncomp_data.get_high_res_imgui(device, queue, renderer),
                     [64.0 * 4.0, 64.0 * 4.0],
@@ -47,7 +45,7 @@ fn draw_dir(
         }
         VPKDirectoryTree::Node(dir_inner) => {
             for file in dir_inner.keys() {
-                if let Some(node) = ui.tree_node(file) {
+                if let Some(_node) = ui.tree_node(file) {
                     draw_dir(ui, renderer, device, queue, &dir_inner[file], dir);
                 }
             }
@@ -60,7 +58,7 @@ impl State for StateImgui {
         &mut self,
         state: &StateRenderer,
         encoder: &mut wgpu::CommandEncoder,
-        output: &wgpu::SurfaceTexture,
+        _output: &wgpu::SurfaceTexture,
         view: &wgpu::TextureView,
     ) {
         let delta_s = self.last_frame.elapsed();
@@ -184,7 +182,7 @@ impl State for StateImgui {
             ..Default::default()
         };
 
-        let mut imgui_renderer = Renderer::new(
+        let imgui_renderer = Renderer::new(
             &mut imgui,
             renderer.device(),
             renderer.queue(),

@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use flagset::flags;
-use num_derive::{FromPrimitive, Zero};
-use wgpu::TextureFormat;
+use num_derive::{FromPrimitive};
+
 
 #[derive(Copy, Clone, FromPrimitive, Debug, PartialEq)]
 #[repr(i32)]

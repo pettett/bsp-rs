@@ -8,7 +8,7 @@ use std::{
 
 use crate::bsp::consts::LumpType;
 use bytemuck::Zeroable;
-use num_traits::FromPrimitive;
+
 
 use super::{lump::lump_t, Lump};
 

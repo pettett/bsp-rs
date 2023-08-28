@@ -1,4 +1,4 @@
-use glam::{Quat, Vec2, Vec3, Vec3A};
+use glam::{Quat, Vec2};
 use winit::{
     dpi::PhysicalPosition,
     event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -78,7 +78,7 @@ impl CameraController {
                 }
             }
             WindowEvent::MouseInput {
-                device_id,
+                
                 state,
                 button,
                 ..

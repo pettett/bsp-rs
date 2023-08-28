@@ -1,10 +1,7 @@
 use crate::{
     bsp::{
-        consts::LumpType,
-        edges::{dedge_t, dsurfedge_t},
-        face::dface_t,
+        edges::{dedge_t},
         header::dheader_t,
-        textures::{texdata_t, texinfo_t},
     },
     texture,
     vertex::{UVVertex, Vertex},
@@ -12,15 +9,15 @@ use crate::{
 use std::{
     fs::File,
     io::BufReader,
-    sync::{Arc, Mutex},
+    sync::{Arc},
 };
 
-use glam::{vec2, Vec3, Vec4};
+use glam::{Vec3};
 use gltf::mesh::util::ReadIndices;
-use stream_unzip::ZipReader;
+
 use wgpu::util::DeviceExt;
 
-use crate::state::{State, StateInstance, StateRenderer};
+use crate::state::{StateInstance, StateRenderer};
 
 pub struct StateMesh {
     vertex_buffer: wgpu::Buffer,
@@ -38,8 +35,8 @@ impl StateMesh {
         &'a self,
         state: &'a StateRenderer,
         render_pass: &mut wgpu::RenderPass<'a>,
-        output: &wgpu::SurfaceTexture,
-        view: &wgpu::TextureView,
+        _output: &wgpu::SurfaceTexture,
+        _view: &wgpu::TextureView,
     ) {
         // 1.
 
@@ -180,7 +177,7 @@ impl StateMesh {
     }
 
     pub fn load_glb_mesh(&mut self, instance: Arc<StateInstance>) {
-        let (document, buffers, images) =
+        let (document, buffers, _images) =
             gltf::import("assets/dragon_high.glb").expect("Torus import should work");
 
         let mesh = document.meshes().next().unwrap();

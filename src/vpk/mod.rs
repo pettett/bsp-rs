@@ -25,16 +25,14 @@
 // }
 
 use std::{
-    cell::{OnceCell, RefCell},
+    cell::{OnceCell},
     collections::HashMap,
     fs::File,
     io::{self, BufRead, BufReader, Read},
-    mem,
-    path::{Path, PathBuf},
-    slice,
+    path::{PathBuf},
 };
 
-use bytemuck::Zeroable;
+
 
 use crate::{binaries::BinaryData, vtf::VTF};
 
@@ -168,7 +166,7 @@ impl VPKDirectory {
                     if filename.len() == 0 {
                         break;
                     }
-                    let dirPrefix = if (dir == "" || dir == " ") {
+                    let dirPrefix = if dir == "" || dir == " " {
                         "".to_owned()
                     } else {
                         format!("{dir}/")
@@ -180,7 +178,7 @@ impl VPKDirectory {
 
                     assert_eq!(terminator, 0xffff);
 
-                    if (entry.ArchiveIndex != 0x7fff) {
+                    if entry.ArchiveIndex != 0x7fff {
                         // 0x7fff means contained in this same file
                         maxPackFile = u16::max(entry.ArchiveIndex, maxPackFile);
                     }

@@ -2,7 +2,7 @@
 
 use std::{cell::OnceCell, fmt, io::Read, mem};
 
-use bytemuck::Pod;
+
 use wgpu::{Device, Queue};
 
 use crate::{binaries::BinaryData, texture::Texture};
@@ -205,7 +205,7 @@ impl BinaryData for VTF {
             header_7_3 = Some(h_7_3);
 
             //println!("Loading entries");
-            for i in 0..h_7_3.num_resources {
+            for _i in 0..h_7_3.num_resources {
                 if let Ok(entry) = ResourceEntryInfo::read(buffer) {
                     match entry.tag {
                         [b'\x01', b'\0', b'\0'] => (), //  Low-res (thumbnail) image data
@@ -255,8 +255,8 @@ impl BinaryData for VTF {
             let mut offset = 0;
             for mip_level in wanted_mips..header.mipmap_count as usize {
                 offset += highResImageFormat.bytes_for_size(
-                    (header.width as usize),
-                    (header.height as usize),
+                    header.width as usize,
+                    header.height as usize,
                     mip_level,
                 ) as i64;
             }
@@ -266,8 +266,8 @@ impl BinaryData for VTF {
                 high_res_data[mip_level] = vec![
                     0;
                     highResImageFormat.bytes_for_size(
-                        (header.width as usize),
-                        (header.height as usize),
+                        header.width as usize,
+                        header.height as usize,
                         mip_level,
                     )
                 ];
@@ -362,11 +362,11 @@ struct ResourceEntryInfo {
 impl BinaryData for ResourceEntryInfo {}
 
 mod vtf_tests {
-    use std::path::PathBuf;
+    
 
-    use crate::vpk::VPKDirectory;
+    
 
-    use super::*;
+    
 
     const PATH: &str =
         "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";
@@ -425,7 +425,7 @@ fn image_format_convert_data(
     depth: usize,
 ) {
     let n = width * height * depth * 4;
-    if (fmt == ImageFormat::BGR888) {
+    if fmt == ImageFormat::BGR888 {
         // BGR888 => RGBA8888
         let mut dst = vec![0; n];
         let mut p = 0;
@@ -441,7 +441,7 @@ fn image_format_convert_data(
             p += 3;
         }
         *data = dst;
-    } else if (fmt == ImageFormat::RGB888) {
+    } else if fmt == ImageFormat::RGB888 {
         // RGB888 => RGBA8888
         let mut dst = vec![0; n];
         let mut p = 0;
@@ -453,7 +453,7 @@ fn image_format_convert_data(
             p += 3;
         }
         *data = dst;
-    } else if (fmt == ImageFormat::ABGR8888) {
+    } else if fmt == ImageFormat::ABGR8888 {
         // ABGR8888 => RGBA8888
         let mut dst = vec![0; n];
         for i in (0..n).step_by(4) {
@@ -463,7 +463,7 @@ fn image_format_convert_data(
             dst[i + 3] = data[i + 0];
         }
         *data = dst;
-    } else if (fmt == ImageFormat::BGRA8888) {
+    } else if fmt == ImageFormat::BGRA8888 {
         // BGRA8888 => RGBA8888
         let mut dst = vec![0; n];
         for i in (0..n).step_by(4) {
@@ -473,7 +473,7 @@ fn image_format_convert_data(
             dst[i + 3] = data[i + 3];
         }
         *data = dst;
-    } else if (fmt == ImageFormat::BGRX8888) {
+    } else if fmt == ImageFormat::BGRX8888 {
         // BGRX8888 => RGBA8888
         let mut dst = vec![0; n];
         let mut p = 0;
@@ -485,7 +485,7 @@ fn image_format_convert_data(
             p += 3;
         }
         *data = dst;
-    } else if (fmt == ImageFormat::I8) {
+    } else if fmt == ImageFormat::I8 {
         // I8 => RGBA8888
         let mut dst = vec![0; n as usize];
         for i in (0..n).step_by(4) {

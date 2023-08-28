@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -7,7 +7,7 @@ use crate::camera_controller::CameraController;
 use crate::state_imgui::StateImgui;
 use crate::state_mesh::StateMesh;
 use crate::texture::{self, Texture};
-use crate::vertex::Vertex;
+
 use crate::vpk::VPKDirectory;
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
