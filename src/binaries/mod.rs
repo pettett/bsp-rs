@@ -5,7 +5,7 @@ use std::{
 };
 
 pub trait BinaryData {
-    fn read(buffer: &mut BufReader<File>) -> io::Result<Self>
+    fn read(buffer: &mut BufReader<File>, max_size: Option<usize>) -> io::Result<Self>
     where
         Self: Sized,
     {

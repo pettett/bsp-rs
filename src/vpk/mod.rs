@@ -30,6 +30,7 @@ use std::{
     fs::File,
     io::{self, BufRead, BufReader, Read},
     path::PathBuf,
+    sync::{Once, OnceLock},
 };
 
 use crate::{binaries::BinaryData, vtf::VTF};
@@ -84,7 +85,7 @@ impl BinaryData for VPKDirectoryEntry {}
 pub struct VPKFile {
     entry: VPKDirectoryEntry,
     preload: Option<Vec<u8>>,
-    vtf: OnceCell<VTF>,
+    vtf: OnceLock<Option<VTF>>,
 }
 #[derive(Debug)]
 pub enum VPKDirectoryTree {
@@ -143,7 +144,7 @@ impl VPKDirectory {
         let file = File::open(&dir_path)?;
         let mut buffer = BufReader::new(file);
 
-        let header = VPKHeader_v2::read(&mut buffer)?;
+        let header = VPKHeader_v2::read(&mut buffer, None)?;
         let mut root = VPKDirectoryTree::Node(HashMap::new());
         let mut max_pack_file = 0;
         let mut files = HashMap::<String, VPKFile>::new();
@@ -171,7 +172,7 @@ impl VPKDirectory {
                     };
                     let path = format!("{dir_prefix}{filename}.{ext}");
 
-                    let entry = VPKDirectoryEntry::read(&mut buffer).unwrap();
+                    let entry = VPKDirectoryEntry::read(&mut buffer, None).unwrap();
                     let terminator = entry.Terminator;
 
                     assert_eq!(terminator, 0xffff);
@@ -197,7 +198,7 @@ impl VPKDirectory {
                         VPKFile {
                             entry,
                             preload,
-                            vtf: OnceCell::new(),
+                            vtf: OnceLock::new(),
                         },
                     );
 
@@ -217,33 +218,40 @@ impl VPKDirectory {
 }
 
 impl VPKDirectory {
-    pub fn load_vtf(&self, vpk_path: &str) -> io::Result<&VTF> {
+    pub fn load_vtf(&self, vpk_path: &str) -> io::Result<Option<&VTF>> {
         let file_data = self.files.get(vpk_path).ok_or(io::Error::new(
             io::ErrorKind::InvalidInput,
             format!("File path {} not present", vpk_path),
         ))?;
 
-        if let Some(vtf) = file_data.vtf.get() {
-            return Ok(vtf);
-        } else {
-            // Attempt to load
+        Ok(file_data
+            .vtf
+            .get_or_init(|| {
+                // Attempt to load
 
-            let index = file_data.entry.ArchiveIndex;
-            // replace dir with number
-            let mut header_pak_path = self.dir_path.to_path_buf();
-            let dir_file = self.dir_path.file_name().unwrap().to_string_lossy();
-            header_pak_path.set_file_name(dir_file.replace("_dir", &format!("_{index:0>3}")));
+                let index = file_data.entry.ArchiveIndex;
+                // replace dir with number
+                let mut header_pak_path = self.dir_path.to_path_buf();
+                let dir_file = self.dir_path.file_name().unwrap().to_string_lossy();
+                header_pak_path.set_file_name(dir_file.replace("_dir", &format!("_{index:0>3}")));
 
-            // open file
-            let file = File::open(header_pak_path).unwrap();
-            let mut buffer = BufReader::new(file);
-            // seek and load
-            buffer.seek_relative(file_data.entry.EntryOffset as i64)?;
-
-            file_data.vtf.set(VTF::read(&mut buffer)?).unwrap();
-
-            return Ok(file_data.vtf.get().unwrap());
-        }
+                // open file
+                let file = File::open(header_pak_path).unwrap();
+                let mut buffer = BufReader::new(file);
+                // seek and load
+                if buffer
+                    .seek_relative(file_data.entry.EntryOffset as i64)
+                    .is_ok()
+                {
+                    match VTF::read(&mut buffer, None) {
+                        Ok(vtf) => Some(vtf),
+                        Err(_) => None,
+                    }
+                } else {
+                    None
+                }
+            })
+            .as_ref())
     }
 }
 
@@ -281,7 +289,7 @@ mod vpk_tests {
         let file = File::open(PATH).unwrap();
         let mut buffer = BufReader::new(file);
 
-        let header = VPKHeader_v2::read(&mut buffer).unwrap();
+        let header = VPKHeader_v2::read(&mut buffer, None).unwrap();
 
         println!("{:?}", header);
     }

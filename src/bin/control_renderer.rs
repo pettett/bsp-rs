@@ -4,13 +4,15 @@ use bsp_explorer::{
         edges::{BSPEdge, BSPSurfEdge},
         face::BSPFace,
         header::BSPHeader,
+        pak::BSPPak,
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
     state::State,
     vertex::UVVertex,
 };
 use glam::{vec2, Vec3, Vec4};
-use std::{collections::HashMap, thread};
+use rayon::prelude::*;
+use std::{collections::HashMap, hash::Hash, thread};
 use stream_unzip::ZipReader;
 
 use bsp_explorer::{run, state_mesh::StateMesh};
@@ -20,7 +22,7 @@ pub fn main() {
         let instance = state.renderer().instance();
 
         let (header,mut buffer) = BSPHeader::load(
-			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp").unwrap();
+			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_01.bsp").unwrap();
 
         header.validate();
 
@@ -95,72 +97,91 @@ pub fn main() {
             }
         }
 
-        let pakfile = header.get_lump_header(LumpType::PAKFILE);
+        let pak_header = header.get_lump_header(LumpType::PAKFILE);
 
-        let pakfile_data = pakfile.get_bytes(&mut buffer).unwrap();
+        let pak: BSPPak = pak_header.read_binary(&mut buffer).unwrap();
 
-        let mut zip_reader = ZipReader::default();
+        let map: HashMap<&str, &str> = pak
+            .entries
+            .par_iter()
+            .filter_map(|entry| {
+                if entry.filename.contains(".vmt") {
+                    let data = std::str::from_utf8(&entry.bytes[..]).unwrap();
+                    if let Some(include) = data.find("\"include\"") {
+                        // Get this value
+                        let data = &data[include + 9..];
 
-        zip_reader.update(pakfile_data.into());
+                        if let Some(open) = data.find('"') {
+                            let data = &data[open + 1..];
 
-        // Or read the whole file and deal with the entries
-        // at the end.
-        zip_reader.finish();
-        let mut map = HashMap::<&str, &str>::new();
-        let entries = zip_reader.drain_entries();
-        for entry in &entries {
-            // write to disk or whatever you need.
-            if entry.header().filename.contains(".vmt") {
-                let data = std::str::from_utf8(entry.compressed_data()).unwrap();
-                if let Some(include) = data.find("\"include\"") {
-                    // Get this value
-                    let data = &data[include + 9..];
+                            if let Some(close) = data.find('"') {
+                                //map.insert();
 
-                    if let Some(open) = data.find('"') {
-                        let data = &data[open + 1..];
-
-                        if let Some(close) = data.find('"') {
-                            map.insert(&entry.header().filename, &data[..close]);
-
-                            //println!("{}", data);
-                            println!("{} {}", entry.header().filename, &data[..close]);
+                                //println!("{}", data);
+                                //println!("{} {}", entry.header().filename, &data[..close])
+                                Some((entry.filename.as_str(), &data[..close]))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
                         }
+                    } else {
+                        None
                     }
+                } else {
+                    None
                 }
-            }
-        }
+            })
+            .collect();
 
         let tex_data_string_table = header.get_lump::<BSPTexDataStringTable>(&mut buffer);
         let tex_data_string_data = header.get_lump_header(LumpType::TEXDATA_STRING_DATA);
 
-        for (tex, tris) in &textured_tris {
-            // turn surfaces into meshes
-            let filename_mat = format!(
-                "materials/{}.vmt",
-                tex_data_string_table[tex_data[*tex as usize].name_string_table_id as usize]
-                    .get_filename(&mut buffer, tex_data_string_data)
-            );
-
-            let filename_tex = if let Some(mapped_file) = map.get(filename_mat.as_str()) {
-                println!("Mapped {} to {}", filename_mat, mapped_file);
-                let mut s = (*mapped_file).to_owned();
-                s.make_ascii_lowercase();
-                s.replace(".vmt", ".vtf")
-            } else {
-                format!(
-                    "materials/{}.vtf",
+        let tex_name_map: HashMap<i32, String> = textured_tris
+            .iter()
+            .map(|(tex, tris)| {
+                (
+                    *tex,
                     tex_data_string_table[tex_data[*tex as usize].name_string_table_id as usize]
-                        .get_filename(&mut buffer, tex_data_string_data)
+                        .get_filename(&mut buffer, tex_data_string_data),
                 )
-            };
+            })
+            .collect();
 
-            if let Ok(tex) = state.renderer().texture_dir().load_vtf(&filename_tex) {
+        let textures: HashMap<i32, String> = textured_tris
+            .par_iter()
+            .map(|(tex, tris)| {
+                // turn surfaces into meshes
+                let filename_mat = format!("materials/{}.vmt", tex_name_map[tex]);
+
+                if let Some(mapped_file) = map.get(filename_mat.as_str()) {
+                    //println!("Mapped {} to {}", filename_mat, mapped_file);
+                    let mut s = (*mapped_file).to_owned();
+                    s.make_ascii_lowercase();
+                    (*tex, s.replace(".vmt", ".vtf"))
+                } else {
+                    (*tex, format!("materials/{}.vtf", tex_name_map[tex]))
+                }
+            })
+            .collect();
+
+        let r = state.renderer();
+
+        //preload all textures in parallel
+        textures.par_iter().for_each(|(tex, name)| {
+            if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[tex]) {
+                tex.get_high_res(r.device(), r.queue());
+            }
+        });
+
+        for (tex, tris) in &textured_tris {
+            if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[tex]) {
                 if !tex.ready_for_use() {
-                    continue;
+                    return;
                 }
 
-                let mut mesh =
-                    StateMesh::new(state.renderer(), wgpu::PrimitiveTopology::TriangleList);
+                let mut mesh = StateMesh::new(r, wgpu::PrimitiveTopology::TriangleList);
 
                 mesh.from_verts_and_tris(
                     instance.clone(),
@@ -169,13 +190,10 @@ pub fn main() {
                     tris.len() as u32,
                 );
 
-                mesh.load_tex(
-                    instance.clone(),
-                    &tex.get_high_res(state.renderer().device(), state.renderer().queue()),
-                );
+                mesh.load_tex(instance.clone(), &tex.get_high_res(r.device(), r.queue()));
                 state.add_mesh(mesh);
             } else {
-                println!("Could not find texture for {}", filename_tex)
+                println!("Could not find texture for {}", textures[tex])
             }
         }
     }));

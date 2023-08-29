@@ -1,6 +1,12 @@
 // // Valve Texture File
 
-use std::{cell::OnceCell, fmt, io::Read, mem};
+use std::{
+    cell::OnceCell,
+    fmt,
+    io::{Error, Read},
+    mem,
+    sync::OnceLock,
+};
 
 use wgpu::{Device, Queue};
 
@@ -13,11 +19,11 @@ pub struct VTF {
     header_7_3: Option<VTFHeader73>,
     low_res_data: [Vec<u8>; 1],
     high_res_data: Vec<Vec<u8>>,
-    low_res: OnceCell<Texture>,
-    high_res: OnceCell<Texture>,
+    low_res: OnceLock<Texture>,
+    high_res: OnceLock<Texture>,
 
-    low_res_imgui: OnceCell<imgui::TextureId>,
-    high_res_imgui: OnceCell<imgui::TextureId>,
+    low_res_imgui: OnceLock<imgui::TextureId>,
+    high_res_imgui: OnceLock<imgui::TextureId>,
 }
 
 impl fmt::Debug for VTF {
@@ -86,6 +92,7 @@ impl VTF {
     }
 
     fn upload_high_res(&self, device: &Device, queue: &Queue) -> Texture {
+        assert!(self.high_res_data.len() > 0);
         self.upload(
             device,
             queue,
@@ -117,7 +124,7 @@ impl VTF {
         mipped_data: &[Vec<u8>],
     ) -> Texture {
         let wgpu_format = format.try_into().unwrap();
-        println!("{:?} {:?}", format, wgpu_format);
+        //println!("{:?} {:?}", format, wgpu_format);
         let size = wgpu::Extent3d {
             width,
             height,
@@ -183,10 +190,13 @@ impl VTF {
 }
 
 impl BinaryData for VTF {
-    fn read(buffer: &mut std::io::BufReader<std::fs::File>) -> std::io::Result<Self> {
+    fn read(
+        buffer: &mut std::io::BufReader<std::fs::File>,
+        max_size: Option<usize>,
+    ) -> std::io::Result<Self> {
         let mut header_read = 0;
 
-        let header = VTFHeader::read(buffer)?;
+        let header = VTFHeader::read(buffer, None)?;
         let header_size = header.header_size as i64;
         header_read += mem::size_of::<VTFHeader>() as i64;
 
@@ -198,14 +208,17 @@ impl BinaryData for VTF {
         let mut low_res_data = Vec::new();
         let mut high_res_data: Vec<Vec<u8>> = Vec::new();
         let mut header_7_3 = None;
+
+        println!("New tex");
+
         if header.version[0] == 7 && header.version[1] == 3 {
-            let h_7_3 = VTFHeader73::read(buffer)?;
+            let h_7_3 = VTFHeader73::read(buffer, None)?;
 
             header_7_3 = Some(h_7_3);
 
             //println!("Loading entries");
             for _i in 0..h_7_3.num_resources {
-                if let Ok(entry) = ResourceEntryInfo::read(buffer) {
+                if let Ok(entry) = ResourceEntryInfo::read(buffer, None) {
                     match entry.tag {
                         [b'\x01', b'\0', b'\0'] => (), //  Low-res (thumbnail) image data
                         [b'\x30', b'\0', b'\0'] => (), //- High-res image data.
@@ -222,6 +235,11 @@ impl BinaryData for VTF {
                     break;
                 }
             }
+
+            return Err(Error::new(
+                std::io::ErrorKind::Other,
+                "Too modern a texture",
+            ));
         } else {
             //println!("{:?}", header);
 
@@ -295,10 +313,10 @@ impl BinaryData for VTF {
             header_7_3,
             low_res_data: [low_res_data],
             high_res_data,
-            low_res: OnceCell::new(),
-            high_res: OnceCell::new(),
-            low_res_imgui: OnceCell::new(),
-            high_res_imgui: OnceCell::new(),
+            low_res: OnceLock::new(),
+            high_res: OnceLock::new(),
+            low_res_imgui: OnceLock::new(),
+            high_res_imgui: OnceLock::new(),
         })
     }
 }
@@ -374,7 +392,7 @@ mod vtf_tests {
         let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
         for file in dir.get_file_names() {
             if file.contains(".vtf") {
-                let data = dir.load_vtf(file).unwrap();
+                let data = dir.load_vtf(file).unwrap().unwrap();
                 let lr = data.header.low_res_image_format;
                 let hr = data.header.high_res_image_format;
                 if hr != ImageFormat::DXT5 && hr != ImageFormat::DXT1 {
@@ -387,7 +405,10 @@ mod vtf_tests {
     fn test_load_materials_metal_metalfence001a() {
         let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
 
-        let data = dir.load_vtf("materials/metal/metalfence001a.vtf").unwrap();
+        let data = dir
+            .load_vtf("materials/metal/metalfence001a.vtf")
+            .unwrap()
+            .unwrap();
         println!("{:?}", data.header);
     }
 }

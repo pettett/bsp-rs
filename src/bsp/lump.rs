@@ -6,11 +6,13 @@ use std::{
 
 use bytemuck::Zeroable;
 
+use crate::binaries::BinaryData;
+
 use super::consts::LumpType;
 
 pub trait Lump
 where
-    Self: Sized + Zeroable + Clone,
+    Self: Sized,
 {
     fn max() -> usize;
     fn lump_type() -> LumpType;
@@ -27,7 +29,7 @@ pub struct BSPLump {
     pub four_cc: [u8; 4], // lump ident code
 }
 impl BSPLump {
-    pub fn decode<T: Clone + bytemuck::Zeroable>(
+    pub fn decode<T: bytemuck::Zeroable>(
         &self,
         buffer: &mut BufReader<File>,
     ) -> io::Result<Box<[T]>> {
@@ -49,7 +51,13 @@ impl BSPLump {
 
         Ok(table)
     }
-    pub fn get_bytes(&self, buffer: &mut BufReader<File>) -> io::Result<Box<[u8]>> {
+
+    pub fn read_binary<T: BinaryData>(&self, buffer: &mut BufReader<File>) -> io::Result<T> {
+        buffer.seek(std::io::SeekFrom::Start(self.file_ofs as u64))?;
+        Ok(T::read(buffer, Some(self.file_len as usize))?)
+    }
+
+    pub fn read_bytes(&self, buffer: &mut BufReader<File>) -> io::Result<Box<[u8]>> {
         buffer.seek(std::io::SeekFrom::Start(self.file_ofs as u64))?;
         let mut bytes = bytemuck::zeroed_slice_box(self.file_len as usize);
         buffer.read_exact(&mut bytes)?;

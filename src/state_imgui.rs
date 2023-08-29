@@ -1,6 +1,4 @@
-use std::{
-    time::Instant,
-};
+use std::time::Instant;
 
 use imgui::{Condition, FontSource, Image, Ui};
 use imgui_wgpu::{Renderer, RendererConfig};
@@ -34,13 +32,14 @@ fn draw_dir(
             let uncomp_data = dir.load_vtf(file).unwrap();
 
             ui.text(file);
-
-            if let Some(_node) = ui.tree_node("High res") {
-                Image::new(
-                    *uncomp_data.get_high_res_imgui(device, queue, renderer),
-                    [64.0 * 4.0, 64.0 * 4.0],
-                )
-                .build(ui);
+            if let Some(tex) = uncomp_data {
+                if let Some(_node) = ui.tree_node("High res") {
+                    Image::new(
+                        *tex.get_high_res_imgui(device, queue, renderer),
+                        [64.0 * 4.0, 64.0 * 4.0],
+                    )
+                    .build(ui);
+                }
             }
         }
         VPKDirectoryTree::Node(dir_inner) => {

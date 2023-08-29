@@ -5,6 +5,7 @@ pub mod face;
 pub mod header;
 pub mod lump;
 pub mod model;
+pub mod pak;
 pub mod plane;
 pub mod textures;
 pub mod vert;
@@ -107,7 +108,7 @@ mod bsp_tests {
         let (header, mut buffer) = BSPHeader::load(PATH).unwrap();
         let pakfile = header.get_lump_header(LumpType::PAKFILE);
 
-        let pakfile_data = pakfile.get_bytes(&mut buffer).unwrap();
+        let pakfile_data = pakfile.read_bytes(&mut buffer).unwrap();
 
         let mut zip_reader = ZipReader::default();
 
@@ -137,7 +138,7 @@ mod bsp_tests {
 
         assert!(tex_data_string_data.file_len <= MAX_MAP_TEXDATA_STRING_DATA);
 
-        let strings = tex_data_string_data.get_bytes(&mut buffer).unwrap();
+        let strings = tex_data_string_data.read_bytes(&mut buffer).unwrap();
 
         // ensure it's utf8
         let all_textures = std::str::from_utf8(&strings).unwrap();
