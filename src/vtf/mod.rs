@@ -209,8 +209,6 @@ impl BinaryData for VTF {
         let mut high_res_data: Vec<Vec<u8>> = Vec::new();
         let mut header_7_3 = None;
 
-        println!("New tex");
-
         if header.version[0] == 7 && header.version[1] == 3 {
             let h_7_3 = VTFHeader73::read(buffer, None)?;
 
@@ -290,12 +288,6 @@ impl BinaryData for VTF {
                 ];
 
                 buffer.read_exact(&mut high_res_data[mip_level][..])?;
-
-                println!(
-                    "loaded mipmap level {} {}",
-                    mip_level,
-                    high_res_data[mip_level].len()
-                );
 
                 // Do things like add empty alpha channels
                 image_format_convert_data(
