@@ -49,6 +49,23 @@ impl MeshBuilder {
             self.tris.push(tri[i]);
         }
     }
+
+    pub fn tris_to_lines(&self) -> Vec<u16> {
+        let mut lines: Vec<u16> = Default::default();
+
+        for i in (0..self.tris.len()).step_by(3) {
+            lines.push(self.tris[i]);
+            lines.push(self.tris[i + 1]);
+
+            lines.push(self.tris[i + 1]);
+            lines.push(self.tris[i + 2]);
+
+            lines.push(self.tris[i + 2]);
+            lines.push(self.tris[i + 3]);
+        }
+
+        lines
+    }
 }
 
 pub fn main() {
@@ -56,7 +73,7 @@ pub fn main() {
         let instance = state.renderer().instance();
 
         let (header,mut buffer) = BSPHeader::load(
-			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_06.bsp").unwrap();
+			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp").unwrap();
 
         header.validate();
 
@@ -211,15 +228,6 @@ pub fn main() {
             }
         }
 
-        let default_tex = {
-            let tex = tex_info[0 as usize];
-            let texdata = tex.tex_data;
-            r.texture_dir()
-                .load_vtf(&textures[&texdata])
-                .unwrap()
-                .unwrap()
-        };
-
         // Load displacement data
 
         let infos = header.get_lump::<BSPDispInfo>(&mut buffer);
@@ -230,11 +238,13 @@ pub fn main() {
 
             let face = faces[info.map_face as usize];
 
+            let face_verts = face.get_verts(&edges, &surfedges);
+
             let mut corners = [Vec3::ZERO; 4];
             for i in 0..4 {
-                corners[i] =
-                    verts[surfedges[face.first_edge as usize + i].get_edge(&edges).0 as usize];
+                corners[i] = verts[face_verts[i]];
             }
+
             // TODO: better way to get tex/uv info from faces
             let tex = tex_info[face.tex_info as usize];
             let texdata = tex.tex_data;
@@ -243,91 +253,67 @@ pub fn main() {
             let s = tex.tex_s / data.width as f32;
             let t = tex.tex_t / data.height as f32;
 
-            //if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[&texdata]) {
-            //    if !tex.ready_for_use() {
-            //        return;
-            //    }
-
-            let mut builder = MeshBuilder::default();
-
-            let c = info.start_position;
-
-            let disp_side_len = (1 << (info.power)) + 1;
-
-            println!("Got everything we need for a displacement at {c}");
-
-            let get_i = |x: usize, y: usize| -> usize { x + disp_side_len * y };
-
-            for y in 0..disp_side_len {
-                let dy = y as f32 / (disp_side_len as f32 - 1.0);
-
-                let v0 = Vec3::lerp(corners[0], corners[1], dy);
-                let v1 = Vec3::lerp(corners[2], corners[3], dy);
-
-                for x in 0..disp_side_len {
-                    let dx = x as f32 / (disp_side_len as f32 - 1.0);
-
-                    let i = get_i(x, y);
-
-                    let vert = disp_verts[i + info.disp_vert_start as usize];
-
-                    let pos = vert.vec + Vec3::lerp(v0, v1, dx);
-
-                    builder.add_vert(i as u16, pos, s, t);
-
-                    println!(
-                        "Vert {} ({} {}) : {:?}",
-                        i + info.disp_vert_start as usize,
-                        dx,
-                        dy,
-                        pos
-                    );
+            if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[&texdata]) {
+                if !tex.ready_for_use() {
+                    return;
                 }
-            }
-            let disp_side_len = disp_side_len as u16;
 
-            // Build grid index buffer.
-            let mut indexData = vec![0u16; (((disp_side_len - 1).pow(2)) * 6) as usize];
-            let mut indexCount = 0;
-            for y in 0..(disp_side_len - 1) {
-                for x in 0..(disp_side_len - 1) {
-                    let base = y * disp_side_len + x;
-                    indexData[indexCount + 0] = base;
-                    indexData[indexCount + 1] = base + disp_side_len;
-                    indexData[indexCount + 2] = base + disp_side_len + 1;
-                    indexData[indexCount + 3] = base;
-                    indexData[indexCount + 4] = base + disp_side_len + 1;
-                    indexData[indexCount + 5] = base + 1;
-                    indexCount += 6;
+                let mut builder = MeshBuilder::default();
+
+                let c = info.start_position;
+
+                let disp_side_len = (1 << (info.power)) + 1;
+
+                let get_i = |x: usize, y: usize| -> usize { x + disp_side_len * y };
+
+                for y in 0..disp_side_len {
+                    let dy = y as f32 / (disp_side_len as f32 - 1.0);
+
+                    let v0 = Vec3::lerp(corners[0], corners[3], dy);
+                    let v1 = Vec3::lerp(corners[1], corners[2], dy);
+
+                    for x in 0..disp_side_len {
+                        let dx = x as f32 / (disp_side_len as f32 - 1.0);
+
+                        let i = get_i(x, y);
+
+                        let vert = disp_verts[i + info.disp_vert_start as usize];
+
+                        let pos = vert.vec + Vec3::lerp(v0, v1, dx);
+
+                        builder.add_vert(i as u16, pos, s, t);
+                    }
                 }
+                let disp_side_len = disp_side_len as u16;
+
+                // Build grid index buffer.
+                for y in 0..(disp_side_len - 1) {
+                    for x in 0..(disp_side_len - 1) {
+                        let base = y * disp_side_len + x;
+                        builder.add_tri([base, base + disp_side_len, base + disp_side_len + 1]);
+                        builder.add_tri([base, base + disp_side_len + 1, base + 1]);
+                    }
+                }
+
+                assert_eq!(builder.tris.len() as u16, ((disp_side_len - 1).pow(2)) * 6);
+
+                let mut mesh = StateMesh::new_empty(r, wgpu::PrimitiveTopology::TriangleList);
+
+                mesh.from_verts_and_tris(
+                    instance.clone(),
+                    bytemuck::cast_slice(&builder.verts),
+                    bytemuck::cast_slice(&builder.tris),
+                    builder.tris.len() as u32,
+                );
+
+                mesh.load_tex(instance.clone(), &tex.get_high_res(r.device(), r.queue()));
+
+                state.add_mesh(mesh);
+            } else {
+                println!("Missing data for a displacement");
             }
-
-            assert_eq!(indexCount as u16, ((disp_side_len - 1).pow(2)) * 6);
-
-            let mut mesh = StateMesh::new_empty(r, wgpu::PrimitiveTopology::TriangleList);
-
-            mesh.from_verts_and_tris(
-                instance.clone(),
-                bytemuck::cast_slice(&builder.verts),
-                bytemuck::cast_slice(&indexData),
-                indexData.len() as u32,
-            );
-
-            mesh.load_tex(
-                instance.clone(),
-                &default_tex.get_high_res(r.device(), r.queue()),
-            );
-
-            state.add_mesh(mesh);
-            //} else {
-            //    println!("Missing data for a displacement");
-            //}
         }
         let mut b = StateMesh::new_box(r, vec3(0., 0., 0.), vec3(1000., 1000., 1000.));
-        b.load_tex(
-            instance.clone(),
-            default_tex.get_high_res(r.device(), r.queue()),
-        );
         state.add_mesh(b);
     }));
 }

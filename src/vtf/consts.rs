@@ -1,7 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use flagset::flags;
-use num_derive::{FromPrimitive};
-
+use num_derive::FromPrimitive;
 
 #[derive(Copy, Clone, FromPrimitive, Debug, PartialEq)]
 #[repr(i32)]
@@ -242,7 +241,7 @@ impl TryFrom<ImageFormat> for wgpu::TextureFormat {
             ImageFormat::BGRA4444 => todo!(),
             ImageFormat::DXT1_ONEBITALPHA => todo!(),
             ImageFormat::BGRA5551 => todo!(),
-            ImageFormat::UV88 => todo!(),
+            ImageFormat::UV88 => Ok(wgpu::TextureFormat::Rg8Unorm),
             ImageFormat::UVWQ8888 => todo!(),
             ImageFormat::RGBA16161616F => todo!(),
             ImageFormat::RGBA16161616 => todo!(),
