@@ -7,7 +7,7 @@ use std::{
     cell::OnceCell,
     fmt,
     fs::File,
-    io::{self, BufReader, Error, Read},
+    io::{self, BufReader, Error, Read, Seek},
     mem,
     sync::OnceLock,
 };
@@ -47,10 +47,6 @@ impl fmt::Debug for VTF {
 }
 
 impl VTF {
-    //TODO: Currently 7.3 data is not parsed
-    pub fn ready_for_use(&self) -> bool {
-        self.header_7_3.is_none()
-    }
     pub fn width(&self) -> u32 {
         self.header.width as u32
     }
@@ -198,8 +194,8 @@ impl VTF {
 }
 
 impl BinaryData for VTF {
-    fn read(
-        buffer: &mut std::io::BufReader<std::fs::File>,
+    fn read<R: Read + Seek>(
+        buffer: &mut std::io::BufReader<R>,
         max_size: Option<usize>,
     ) -> std::io::Result<Self> {
         let mut data_read = 0;
@@ -455,7 +451,10 @@ fn image_format_convert_data(
     }
 }
 
-fn read_low_res(header: &VTFHeader, buffer: &mut BufReader<File>) -> io::Result<Vec<u8>> {
+fn read_low_res<R: Read + Seek>(
+    header: &VTFHeader,
+    buffer: &mut BufReader<R>,
+) -> io::Result<Vec<u8>> {
     let low_res_image_format = header.low_res_image_format;
     // load data
     let low_res_size = low_res_image_format.bytes_for_size(
@@ -470,7 +469,10 @@ fn read_low_res(header: &VTFHeader, buffer: &mut BufReader<File>) -> io::Result<
     Ok(low_res_data)
 }
 
-fn read_high_res(header: &VTFHeader, buffer: &mut BufReader<File>) -> io::Result<Vec<Vec<u8>>> {
+fn read_high_res<R: Read + Seek>(
+    header: &VTFHeader,
+    buffer: &mut BufReader<R>,
+) -> io::Result<Vec<Vec<u8>>> {
     let smallest_size = header.width.min(header.height);
 
     // smallest texture is a 4x4

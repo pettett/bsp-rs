@@ -105,7 +105,7 @@ impl State for StateImgui {
                 });
             let window = ui.window("Texture Pak");
             window
-                .size([400.0, 200.0], Condition::FirstUseEver)
+                .size([300.0, 600.0], Condition::FirstUseEver)
                 .position([0.0, 0.0], Condition::FirstUseEver)
                 .build(|| {
                     draw_dir(
@@ -118,6 +118,36 @@ impl State for StateImgui {
                     )
                     //end
                 });
+
+            if let Some(pak) = &state.pak {
+                let window = ui.window("Map Pak");
+                window
+                    .size([300.0, 200.0], Condition::FirstUseEver)
+                    .position([400.0, 0.0], Condition::FirstUseEver)
+                    .build(|| {
+                        for e in &pak.entries {
+                            if let Some(_node) = ui.tree_node(&e.filename) {
+                                if let Some(tex) = e.get_vtf() {
+                                    Image::new(
+                                        *tex.get_high_res_imgui(
+                                            state.device(),
+                                            state.queue(),
+                                            &mut self.renderer,
+                                        ),
+                                        [64.0 * 4.0, 64.0 * 4.0],
+                                    )
+                                    .build(ui);
+                                }
+
+                                if let Some(mat) = e.get_vmt() {
+                                    ui.text_wrapped(format!("{:#?}", mat))
+                                }
+                            }
+                        }
+                        //end
+                    });
+            }
+
             //self.puffin_ui.window(ui);
         }
 
@@ -212,8 +242,10 @@ impl State for StateImgui {
 }
 
 impl StateImgui {
-    pub fn handle_event<T>(&mut self, state: &StateRenderer, event: &Event<T>) {
+    pub fn handle_event<T>(&mut self, state: &StateRenderer, event: &Event<T>) -> bool {
         self.platform
             .handle_event(self.imgui.io_mut(), state.window(), event);
+
+        self.imgui.io().want_capture_mouse
     }
 }

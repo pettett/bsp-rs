@@ -8,22 +8,38 @@
 // export type VKFPairUnit = string | number | VKFPair[];
 // export type VKFPair<T extends VKFPairUnit = VKFPairUnit> = [string, T];
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    io::{Read, Seek},
+};
 
+use crate::binaries::BinaryData;
+
+#[derive(Debug)]
 pub enum VMTUnit {
     String(String),
     Number(f32),
     Map(HashMap<String, VMTUnit>),
 }
-
+#[derive(Debug, Default)]
 pub struct VMT {
     data: HashMap<String, VMTUnit>,
 }
 
-impl VMT {
-    pub fn from_str(_data: &str) {}
-}
+impl BinaryData for VMT {
+    fn read<R: Read + Seek>(
+        buffer: &mut std::io::BufReader<R>,
+        max_size: Option<usize>,
+    ) -> std::io::Result<Self> {
+        let mut data = String::new();
 
+        buffer.read_to_string(&mut data)?;
+
+        println!("{}", data);
+
+        Ok(Self::default())
+    }
+}
 // export interface VMT {
 //     _Root: string;
 //     _Filename: string;

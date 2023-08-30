@@ -2,6 +2,7 @@ pub mod binaries;
 pub mod bsp;
 pub mod camera;
 pub mod camera_controller;
+pub mod shader;
 pub mod state;
 pub mod state_imgui;
 pub mod state_mesh;
@@ -47,7 +48,7 @@ where
     //});
 
     event_loop.run(move |event, _, control_flow| {
-        state.handle_event(&event);
+        let mouse_capture = state.handle_event(&event);
 
         match event {
             Event::WindowEvent {
@@ -73,7 +74,7 @@ where
                 }
 
                 event => {
-                    state.input(event);
+                    state.input(event, !mouse_capture);
                 }
             },
             Event::RedrawRequested(window_id) if window_id == state.renderer().window().id() => {

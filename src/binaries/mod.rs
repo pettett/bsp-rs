@@ -1,11 +1,11 @@
 use std::{
     fs::File,
-    io::{self, BufReader, Read},
+    io::{self, BufReader, Read, Seek},
     mem, slice,
 };
 
 pub trait BinaryData {
-    fn read(buffer: &mut BufReader<File>, max_size: Option<usize>) -> io::Result<Self>
+    fn read<R: Read + Seek>(buffer: &mut BufReader<R>, max_size: Option<usize>) -> io::Result<Self>
     where
         Self: Sized,
     {

@@ -8,13 +8,14 @@ use bsp_explorer::{
         pak::BSPPak,
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
+    shader::Shader,
     state::State,
     vertex::UVVertex,
 };
 use glam::{vec2, vec3, Vec3, Vec4};
 use gltf::Mesh;
 use rayon::prelude::*;
-use std::{collections::HashMap, hash::Hash, thread};
+use std::{collections::HashMap, hash::Hash, sync::Arc, thread};
 use stream_unzip::ZipReader;
 
 use bsp_explorer::{run, state_mesh::StateMesh};
@@ -137,6 +138,10 @@ pub fn main() {
 
         let pak: BSPPak = pak_header.read_binary(&mut buffer).unwrap();
 
+        for e in &pak.entries {
+            println!("{}", e.filename);
+        }
+
         let map: HashMap<&str, &str> = pak
             .entries
             .par_iter()
@@ -206,13 +211,12 @@ pub fn main() {
             }
         });
 
+        let shader_lines = Arc::new(Shader::new_white_lines::<Vec3>(state.renderer()));
+        let shader_tex = Arc::new(Shader::new_textured(state.renderer()));
+
         for (tex, builder) in &textured_tris {
             if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[tex]) {
-                if !tex.ready_for_use() {
-                    return;
-                }
-
-                let mut mesh = StateMesh::new_empty(r, wgpu::PrimitiveTopology::TriangleList);
+                let mut mesh = StateMesh::new_empty(r, shader_tex.clone());
 
                 mesh.from_verts_and_tris(
                     instance.clone(),
@@ -254,10 +258,6 @@ pub fn main() {
             let t = tex.tex_t / data.height as f32;
 
             if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[&texdata]) {
-                if !tex.ready_for_use() {
-                    return;
-                }
-
                 let mut builder = MeshBuilder::default();
 
                 let c = info.start_position;
@@ -297,7 +297,7 @@ pub fn main() {
 
                 assert_eq!(builder.tris.len() as u16, ((disp_side_len - 1).pow(2)) * 6);
 
-                let mut mesh = StateMesh::new_empty(r, wgpu::PrimitiveTopology::TriangleList);
+                let mut mesh = StateMesh::new_empty(r, shader_tex.clone());
 
                 mesh.from_verts_and_tris(
                     instance.clone(),
@@ -313,7 +313,13 @@ pub fn main() {
                 println!("Missing data for a displacement - {}", &textures[&texdata]);
             }
         }
-        let mut b = StateMesh::new_box(r, vec3(0., 0., 0.), vec3(1000., 1000., 1000.));
-        state.add_mesh(b);
+        state.add_mesh(StateMesh::new_box(
+            r,
+            vec3(0., 0., 0.),
+            vec3(1000., 1000., 1000.),
+            shader_lines,
+        ));
+
+        state.renderer_mut().pak = Some(pak);
     }));
 }

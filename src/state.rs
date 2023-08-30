@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use crate::bsp::pak::BSPPak;
 use crate::camera::{Camera, CameraUniform};
 use crate::camera_controller::CameraController;
 use crate::state_imgui::StateImgui;
@@ -54,6 +55,7 @@ pub struct StateRenderer {
     camera_bind_group_layout: wgpu::BindGroupLayout,
     camera_bind_group: wgpu::BindGroup,
     texture_dir: VPKDirectory,
+    pub pak: Option<BSPPak>,
 }
 impl StateInstance {
     pub fn surface(&self) -> &wgpu::Surface {
@@ -86,6 +88,9 @@ impl StateApp {
     pub fn renderer(&self) -> &StateRenderer {
         &self.renderer
     }
+    pub fn renderer_mut(&mut self) -> &mut StateRenderer {
+        &mut self.renderer
+    }
     // impl State
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
@@ -109,12 +114,14 @@ impl StateApp {
         self.renderer.size
     }
 
-    pub fn handle_event<T>(&mut self, event: &Event<T>) {
-        self.imgui.handle_event(&self.renderer, event);
+    pub fn handle_event<T>(&mut self, event: &Event<T>) -> bool {
+        self.imgui.handle_event(&self.renderer, event)
     }
 
-    pub fn input(&mut self, event: &WindowEvent) -> bool {
-        self.renderer.camera_controller.process_events(event)
+    pub fn input(&mut self, event: &WindowEvent, can_use_mouse: bool) -> bool {
+        self.renderer
+            .camera_controller
+            .process_events(event, can_use_mouse)
     }
 
     pub fn update(&mut self) {}
@@ -335,6 +342,7 @@ impl StateRenderer {
             camera_buffer,
             camera_bind_group,
             texture_dir,
+            pak: None,
         }
     }
 

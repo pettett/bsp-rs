@@ -1,5 +1,6 @@
 use crate::{
     bsp::{edges::BSPEdge, header::BSPHeader},
+    shader::Shader,
     texture,
     vertex::{UVVertex, Vertex},
 };
@@ -16,9 +17,8 @@ pub struct StateMesh {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     index_format: wgpu::IndexFormat,
-    render_pipeline: wgpu::RenderPipeline,
-    texture_bind_group_layout: wgpu::BindGroupLayout,
     texture_bind_group: Option<wgpu::BindGroup>,
+    shader: Arc<Shader>,
     num_indices: u32,
     //puffin_ui : puffin_imgui::ProfilerUi,
 }
@@ -33,7 +33,7 @@ impl StateMesh {
     ) {
         // 1.
 
-        render_pass.set_pipeline(&self.render_pipeline);
+        self.shader.draw(state, render_pass, _output, _view);
 
         render_pass.set_bind_group(0, state.camera_bind_group(), &[]);
         if let Some(tex) = &self.texture_bind_group {
@@ -41,17 +41,14 @@ impl StateMesh {
         } else {
             //panic!("No bind group!");
         }
+
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
 
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
     }
 
-    pub fn new_box(renderer: &StateRenderer, min: Vec3, max: Vec3) -> Self {
-        let shader = renderer
-            .device()
-            .create_shader_module(wgpu::include_wgsl!("solid_white.wgsl"));
-
+    pub fn new_box(renderer: &StateRenderer, min: Vec3, max: Vec3, shader: Arc<Shader>) -> Self {
         Self::new(
             renderer,
             &[
@@ -68,22 +65,16 @@ impl StateMesh {
                 0u16, 1, 1, 3, 3, 2, 2, 0, 4, 5, 5, 7, 7, 6, 6, 4, 0, 4, 1, 5, 2, 6, 3, 7,
             ],
             shader,
-            wgpu::PrimitiveTopology::LineList,
         )
     }
-    pub fn new_empty(renderer: &StateRenderer, topology: wgpu::PrimitiveTopology) -> Self {
-        let shader = renderer
-            .device()
-            .create_shader_module(wgpu::include_wgsl!("textured_shader.wgsl"));
-
-        Self::new::<UVVertex>(renderer, &[], &[], shader, topology)
+    pub fn new_empty(renderer: &StateRenderer, shader: Arc<Shader>) -> Self {
+        Self::new::<UVVertex>(renderer, &[], &[], shader)
     }
     pub fn new<V: Vertex + bytemuck::Pod>(
         renderer: &StateRenderer,
         verts_data: &[V],
         indices_data: &[u16],
-        shader: wgpu::ShaderModule,
-        topology: wgpu::PrimitiveTopology,
+        shader: Arc<Shader>,
     ) -> Self {
         let vertex_buffer =
             renderer
@@ -103,101 +94,12 @@ impl StateMesh {
                     usage: wgpu::BufferUsages::INDEX,
                 });
 
-        let texture_bind_group_layout =
-            renderer
-                .device()
-                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    entries: &[
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Texture {
-                                multisampled: false,
-                                view_dimension: wgpu::TextureViewDimension::D2,
-                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                            },
-                            count: None,
-                        },
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 1,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            // This should match the filterable field of the
-                            // corresponding Texture entry above.
-                            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                            count: None,
-                        },
-                    ],
-                    label: Some("texture_bind_group_layout"),
-                });
-
-        let render_pipeline_layout =
-            renderer
-                .device()
-                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("Render Pipeline Layout"),
-                    bind_group_layouts: &[
-                        &renderer.camera_bind_group_layout(),
-                        &texture_bind_group_layout,
-                    ],
-                    push_constant_ranges: &[],
-                });
-
-        let render_pipeline =
-            renderer
-                .device()
-                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("Render Pipeline"),
-                    layout: Some(&render_pipeline_layout),
-                    vertex: wgpu::VertexState {
-                        module: &shader,
-                        entry_point: "vs_main", // 1.
-                        buffers: &[<V>::desc()],
-                    },
-                    fragment: Some(wgpu::FragmentState {
-                        // 3.
-                        module: &shader,
-                        entry_point: "fs_main",
-                        targets: &[Some(wgpu::ColorTargetState {
-                            // 4.
-                            format: renderer.config().format,
-                            blend: Some(wgpu::BlendState::REPLACE),
-                            write_mask: wgpu::ColorWrites::ALL,
-                        })],
-                    }),
-                    primitive: wgpu::PrimitiveState {
-                        topology, // 1.
-                        strip_index_format: None,
-                        front_face: wgpu::FrontFace::Ccw, // 2.
-                        cull_mode: Some(wgpu::Face::Back),
-                        // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
-                        polygon_mode: wgpu::PolygonMode::Fill,
-                        // Requires Features::DEPTH_CLIP_CONTROL
-                        unclipped_depth: false,
-                        // Requires Features::CONSERVATIVE_RASTERIZATION
-                        conservative: false,
-                    },
-                    depth_stencil: Some(wgpu::DepthStencilState {
-                        format: crate::texture::Texture::DEPTH_FORMAT,
-                        depth_write_enabled: true,
-                        depth_compare: wgpu::CompareFunction::Less, // 1.
-                        stencil: wgpu::StencilState::default(),     // 2.
-                        bias: wgpu::DepthBiasState::default(),
-                    }), // 1.
-                    multisample: wgpu::MultisampleState {
-                        count: 1,                         // 2.
-                        mask: !0,                         // 3.
-                        alpha_to_coverage_enabled: false, // 4.
-                    },
-                    multiview: None, // 5.
-                });
-
         StateMesh {
             vertex_buffer,
             index_buffer,
             num_indices: indices_data.len() as u32,
-            render_pipeline,
-            texture_bind_group_layout,
             texture_bind_group: None,
+            shader,
             index_format: wgpu::IndexFormat::Uint16,
         }
     }
@@ -336,7 +238,7 @@ impl StateMesh {
     pub fn load_tex(&mut self, instance: Arc<StateInstance>, texture: &texture::Texture) {
         self.texture_bind_group = Some(instance.device().create_bind_group(
             &wgpu::BindGroupDescriptor {
-                layout: &self.texture_bind_group_layout,
+                layout: &self.shader.texture_bind_group_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,

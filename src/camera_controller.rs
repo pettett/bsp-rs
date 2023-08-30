@@ -37,7 +37,7 @@ impl CameraController {
         }
     }
 
-    pub fn process_events(&mut self, event: &WindowEvent) -> bool {
+    pub fn process_events(&mut self, event: &WindowEvent, can_use_mouse: bool) -> bool {
         match event {
             WindowEvent::KeyboardInput {
                 input:
@@ -77,21 +77,32 @@ impl CameraController {
                     _ => false,
                 }
             }
-            WindowEvent::MouseInput { state, button, .. } => match button {
-                winit::event::MouseButton::Left => {
-                    self.dragging = match state {
-                        ElementState::Pressed => true,
-                        ElementState::Released => false,
-                    };
-                    true
+            WindowEvent::MouseInput { state, button, .. } => {
+                if can_use_mouse {
+                    match button {
+                        winit::event::MouseButton::Left => {
+                            self.dragging = match state {
+                                ElementState::Pressed => true,
+                                ElementState::Released => false,
+                            };
+                            true
+                        }
+                        _ => false,
+                    }
+                } else {
+                    false
                 }
-                _ => false,
-            },
+            }
+
             WindowEvent::CursorMoved { position, .. } => {
-                self.mouse_delta.x = (self.last_mouse_pos.x - position.x) as f32;
-                self.mouse_delta.y = (self.last_mouse_pos.y - position.y) as f32;
-                self.last_mouse_pos = *position;
-                true
+                if can_use_mouse {
+                    self.mouse_delta.x = (self.last_mouse_pos.x - position.x) as f32;
+                    self.mouse_delta.y = (self.last_mouse_pos.y - position.y) as f32;
+                    self.last_mouse_pos = *position;
+                    true
+                } else {
+                    false
+                }
             }
 
             _ => false,
