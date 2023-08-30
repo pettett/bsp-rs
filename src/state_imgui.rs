@@ -33,6 +33,12 @@ fn draw_dir(
 
             ui.text(file);
             if let Some(tex) = uncomp_data {
+                Image::new(
+                    *tex.get_low_res_imgui(device, queue, renderer),
+                    [32.0, 32.0],
+                )
+                .build(ui);
+
                 if let Some(_node) = ui.tree_node("High res") {
                     Image::new(
                         *tex.get_high_res_imgui(device, queue, renderer),
@@ -43,7 +49,9 @@ fn draw_dir(
             }
         }
         VPKDirectoryTree::Node(dir_inner) => {
-            for file in dir_inner.keys() {
+            let mut keys: Vec<&String> = dir_inner.keys().collect();
+            keys.sort();
+            for file in keys {
                 if let Some(_node) = ui.tree_node(file) {
                     draw_dir(ui, renderer, device, queue, &dir_inner[file], dir);
                 }

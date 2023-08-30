@@ -1,4 +1,4 @@
-use glam::{Quat, Vec2};
+use glam::{Quat, Vec2, Vec3};
 use winit::{
     dpi::PhysicalPosition,
     event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -77,12 +77,7 @@ impl CameraController {
                     _ => false,
                 }
             }
-            WindowEvent::MouseInput {
-                
-                state,
-                button,
-                ..
-            } => match button {
+            WindowEvent::MouseInput { state, button, .. } => match button {
                 winit::event::MouseButton::Left => {
                     self.dragging = match state {
                         ElementState::Pressed => true,
@@ -137,8 +132,10 @@ impl CameraController {
         if self.dragging {
             self.look += self.mouse_delta / 100.0;
 
-            let rot = camera.transform.get_rot_mut();
-            *rot = Quat::from_euler(glam::EulerRot::YXZ, self.look.y, 0.0, self.look.x);
+            let rot = Quat::from_axis_angle(Vec3::Z, self.look.x)
+                * Quat::from_axis_angle(Vec3::Y, -self.look.y);
+
+            *camera.transform.get_rot_mut() = rot;
         }
         self.mouse_delta = Vec2::ZERO;
     }

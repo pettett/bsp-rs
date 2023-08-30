@@ -41,12 +41,14 @@ impl BSPLump {
 
         let mut table = bytemuck::zeroed_slice_box(len);
 
-        unsafe {
-            let header_slice =
-                slice::from_raw_parts_mut(&mut table[0] as *mut _ as *mut u8, len * item_size);
-            buffer.seek(io::SeekFrom::Start(self.file_ofs as u64))?;
-            // `read_exact()` comes from `Read` impl for `&[u8]`
-            buffer.read_exact(header_slice)?;
+        if len > 0 {
+            unsafe {
+                let header_slice =
+                    slice::from_raw_parts_mut(&mut table[0] as *mut _ as *mut u8, len * item_size);
+                buffer.seek(io::SeekFrom::Start(self.file_ofs as u64))?;
+                // `read_exact()` comes from `Read` impl for `&[u8]`
+                buffer.read_exact(header_slice)?;
+            }
         }
 
         Ok(table)

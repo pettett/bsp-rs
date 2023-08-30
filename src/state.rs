@@ -1,4 +1,3 @@
-
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -91,6 +90,7 @@ impl StateApp {
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.renderer.size = new_size;
+            self.renderer.camera.aspect = new_size.width as f32 / new_size.height as f32;
             self.renderer.config.width = new_size.width;
             self.renderer.config.height = new_size.height;
             self.renderer.depth_texture = texture::Texture::create_depth_texture(

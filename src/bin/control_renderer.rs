@@ -73,7 +73,7 @@ pub fn main() {
         let instance = state.renderer().instance();
 
         let (header,mut buffer) = BSPHeader::load(
-			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp").unwrap();
+			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_06.bsp").unwrap();
 
         header.validate();
 
@@ -200,7 +200,7 @@ pub fn main() {
         let r = state.renderer();
 
         //preload all textures in parallel
-        textures.par_iter().for_each(|(tex, name)| {
+        textures.iter().for_each(|(tex, name)| {
             if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[tex]) {
                 tex.get_high_res(r.device(), r.queue());
             }

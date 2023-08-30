@@ -1,5 +1,8 @@
 // // Valve Texture File
 
+pub mod consts;
+mod header;
+
 use std::{
     cell::OnceCell,
     fmt,
@@ -11,10 +14,14 @@ use std::{
 
 use wgpu::{Device, Queue};
 
-use crate::{binaries::BinaryData, texture::Texture};
+use crate::{
+    binaries::BinaryData,
+    texture::Texture,
+    vtf::header::{ResourceEntryInfo, VTFHeader, VTFHeader73},
+};
 
 use self::consts::ImageFormat;
-
+/// Thread safe VTF file with associated texture data
 pub struct VTF {
     header: VTFHeader,
     header_7_3: Option<VTFHeader73>,
@@ -195,11 +202,11 @@ impl BinaryData for VTF {
         buffer: &mut std::io::BufReader<std::fs::File>,
         max_size: Option<usize>,
     ) -> std::io::Result<Self> {
-        let mut header_read = 0;
+        let mut data_read = 0;
 
         let header = VTFHeader::read(buffer, None)?;
         let header_size = header.header_size as i64;
-        header_read += mem::size_of::<VTFHeader>() as i64;
+        data_read += mem::size_of::<VTFHeader>() as i64;
 
         //println!("Header size, {} used: {}", header_size, header_read);
 
@@ -208,24 +215,25 @@ impl BinaryData for VTF {
 
         if header.version[0] == 7 && header.version[1] == 3 {
             let h_7_3 = VTFHeader73::read(buffer, None)?;
-            header_read += mem::size_of::<VTFHeader73>() as i64;
+            data_read += mem::size_of::<VTFHeader73>() as i64;
 
             let mut entries = Vec::<ResourceEntryInfo>::new();
             entries.reserve(h_7_3.num_resources as usize);
 
             for _ in 0..h_7_3.num_resources as usize {
                 entries.push(ResourceEntryInfo::read(buffer, None)?);
-                header_read += mem::size_of::<ResourceEntryInfo>() as i64;
+                data_read += mem::size_of::<ResourceEntryInfo>() as i64;
             }
 
             //println!("{:?}", entries);
-            let remaining_header = header_size - header_read;
+            let remaining_header = header_size - data_read;
             if remaining_header > 0 {
                 log::warn!(
                     "Not all header has been read, skipping {} bytes",
                     remaining_header
                 );
                 buffer.seek_relative(remaining_header)?;
+                data_read += remaining_header;
             }
 
             println!("{}", remaining_header);
@@ -243,20 +251,28 @@ impl BinaryData for VTF {
 
             assert_eq!(header_size as u32, entries[0].offset);
 
-            //println!("Loading entries");
+            println!("Loading entries");
             for entry in entries {
+                if entry.flags & 2 > 0 {
+                    //no data
+                    continue;
+                }
+
+                let dist = entry.offset as i64 - data_read;
+                buffer.seek_relative(dist)?;
+
                 match entry.tag {
-                    [b'\x01', b'\0', b'\0'] => tex.low_res_data = [read_low_res(&header, buffer)?], //  Low-res (thumbnail) image data
+                    [b'\x01', b'\0', b'\0'] => {
+                        //  Low-res (thumbnail) image data
+                        tex.low_res_data = [read_low_res(&header, buffer)?];
+                        data_read += tex.low_res_data[0].len() as i64;
+                    }
                     [b'\x30', b'\0', b'\0'] => {
-                        //TODO: More robust system
+                        //- High-res image data.
                         // For some reason there is a pretty big gap here on some textures
-                        let dist =
-                            header_size + tex.low_res_data.len() as i64 - entry.offset as i64;
-
-                        buffer.seek_relative(dist)?;
-
                         tex.high_res_data = read_high_res(&header, buffer)?
-                    } //- High-res image data.
+                        // In theory we dont need to record data read, as this is last block
+                    }
                     [b'\x10', b'\0', b'\0'] => (), //- Animated particle sheet data.
                     [b'C', b'R', b'C'] => (),      //- CRC data.
                     [b'L', b'O', b'D'] => (),      //- Texture LOD control information.
@@ -273,7 +289,7 @@ impl BinaryData for VTF {
             // load data
 
             //TODO: There appears to be one byte of something
-            let remaining_header = header_size - header_read;
+            let remaining_header = header_size - data_read;
             if remaining_header > 0 {
                 log::warn!(
                     "Not all header has been read, skipping {} bytes",
@@ -297,62 +313,6 @@ impl BinaryData for VTF {
         }
     }
 }
-
-#[repr(C, packed)]
-#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
-struct VTFHeader {
-    signature: [i8; 4], // File signature ("VTF\0"). (or as little-endian integer, 0x00465456)
-    version: [u32; 2],  // version[0].version[1] (currently 7.2).
-    header_size: u32, // Size of the header struct  (16 byte aligned, currently 80 bytes) + size of the resources dictionary (7.3+).
-    width: u16,       // Width of the largest mipmap in pixels. Must be a power of 2.
-    height: u16,      // Height of the largest mipmap in pixels. Must be a power of 2.
-    flags: u32,       // VTF flags.
-    frames: u16,      // Number of frames, if animated (1 for no animation).
-    first_frame: u16, // First frame in animation (0 based). Can be -1 in environment maps older than 7.5, meaning there are 7 faces, not 6.
-    padding0: [u8; 4], // reflectivity padding (16 byte alignment).
-    reflectivity: [f32; 3], // reflectivity vector.
-    padding1: [u8; 4], // reflectivity padding (8 byte packing).
-    bumpmap_scale: f32, // Bumpmap scale.
-    high_res_image_format: ImageFormat, // High resolution image format.
-    mipmap_count: u8, // Number of mipmaps.
-    low_res_image_format: ImageFormat, // Low resolution image format (always DXT1).
-    low_res_image_width: u8, // Low resolution image width.
-    low_res_image_height: u8, // Low resolution image height.
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
-struct VTFHeader73 {
-    // 7.2+
-    depth: i16, // Depth of the largest mipmap in pixels. Must be a power of 2. Is 1 for a 2D texture.
-
-    // 7.3+
-    padding2: [u8; 3],  // depth padding (4 byte alignment).
-    num_resources: u32, // Number of resources this vtf has. The max appears to be 32.
-
-    padding3: [u8; 8], // Necessary on certain compilers
-}
-
-impl BinaryData for VTFHeader {}
-impl BinaryData for VTFHeader73 {}
-
-///Tags
-///    { '\x01', '\0', '\0' } - Low-res (thumbnail) image data.
-///    { '\x30', '\0', '\0' } - High-res image data.
-///    { '\x10', '\0', '\0' } - Animated particle sheet data.
-///    { 'C', 'R', 'C' } - CRC data.
-///    { 'L', 'O', 'D' } - Texture LOD control information.
-///    { 'T', 'S', 'O' } - Game-defined "extended" VTF flags.
-///    { 'K', 'V', 'D' } - Arbitrary KeyValues data.
-#[repr(C)]
-#[derive(Copy, Clone, Default, Debug, bytemuck::Zeroable)]
-struct ResourceEntryInfo {
-    tag: [u8; 3], // A three-byte "tag" that identifies what this resource is.
-    flags: u8, // Resource entry flags. The only known flag is 0x2, which indicates that no data chunk corresponds to this resource.
-    offset: u32, // The offset of this resource's data in the file.
-}
-
-impl BinaryData for ResourceEntryInfo {}
 
 mod vtf_tests {
     use std::path::PathBuf;
@@ -766,4 +726,3 @@ fn read_high_res(header: &VTFHeader, buffer: &mut BufReader<File>) -> io::Result
 //         this.gfxTextures.length = 0;
 //     }
 // }
-pub mod consts;

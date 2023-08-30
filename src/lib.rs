@@ -12,7 +12,6 @@ pub mod vmt;
 pub mod vpk;
 pub mod vtf;
 
-
 use state::{StateApp, StateRenderer};
 
 use winit::{
