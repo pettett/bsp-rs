@@ -1,6 +1,7 @@
 use bsp_explorer::{
     bsp::{
-        consts::LumpType,
+        consts::{LumpType, NUM_DISP_POWER_VERTS},
+        displacement::{BSPDispInfo, BSPDispVert},
         edges::{BSPEdge, BSPSurfEdge},
         face::BSPFace,
         header::BSPHeader,
@@ -10,7 +11,8 @@ use bsp_explorer::{
     state::State,
     vertex::UVVertex,
 };
-use glam::{vec2, Vec3, Vec4};
+use glam::{vec2, vec3, Vec3, Vec4};
+use gltf::Mesh;
 use rayon::prelude::*;
 use std::{collections::HashMap, hash::Hash, thread};
 use stream_unzip::ZipReader;
@@ -42,6 +44,11 @@ impl MeshBuilder {
             self.tris.push(self.verts.len() as u16 + i - 3);
         }
     }
+    pub fn add_tri(&mut self, tri: [u16; 3]) {
+        for i in 0..3 {
+            self.tris.push(tri[i]);
+        }
+    }
 }
 
 pub fn main() {
@@ -49,7 +56,7 @@ pub fn main() {
         let instance = state.renderer().instance();
 
         let (header,mut buffer) = BSPHeader::load(
-			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp").unwrap();
+			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_06.bsp").unwrap();
 
         header.validate();
 
@@ -127,10 +134,6 @@ pub fn main() {
                             let data = &data[open + 1..];
 
                             if let Some(close) = data.find('"') {
-                                //map.insert();
-
-                                //println!("{}", data);
-                                //println!("{} {}", entry.header().filename, &data[..close])
                                 Some((entry.filename.as_str(), &data[..close]))
                             } else {
                                 None
@@ -168,7 +171,6 @@ pub fn main() {
                 let filename_mat = format!("materials/{}.vmt", tex_name_map[tex]);
 
                 if let Some(mapped_file) = map.get(filename_mat.as_str()) {
-                    //println!("Mapped {} to {}", filename_mat, mapped_file);
                     let mut s = (*mapped_file).to_owned();
                     s.make_ascii_lowercase();
                     (*tex, s.replace(".vmt", ".vtf"))
@@ -193,7 +195,7 @@ pub fn main() {
                     return;
                 }
 
-                let mut mesh = StateMesh::new(r, wgpu::PrimitiveTopology::TriangleList);
+                let mut mesh = StateMesh::new_empty(r, wgpu::PrimitiveTopology::TriangleList);
 
                 mesh.from_verts_and_tris(
                     instance.clone(),
@@ -208,5 +210,124 @@ pub fn main() {
                 println!("Could not find texture for {}", textures[tex])
             }
         }
+
+        let default_tex = {
+            let tex = tex_info[0 as usize];
+            let texdata = tex.tex_data;
+            r.texture_dir()
+                .load_vtf(&textures[&texdata])
+                .unwrap()
+                .unwrap()
+        };
+
+        // Load displacement data
+
+        let infos = header.get_lump::<BSPDispInfo>(&mut buffer);
+        let disp_verts = header.get_lump::<BSPDispVert>(&mut buffer);
+
+        for info in infos.iter() {
+            // Build a mesh for the vertex
+
+            let face = faces[info.map_face as usize];
+
+            let mut corners = [Vec3::ZERO; 4];
+            for i in 0..4 {
+                corners[i] =
+                    verts[surfedges[face.first_edge as usize + i].get_edge(&edges).0 as usize];
+            }
+            // TODO: better way to get tex/uv info from faces
+            let tex = tex_info[face.tex_info as usize];
+            let texdata = tex.tex_data;
+            let data = tex_data[texdata as usize];
+
+            let s = tex.tex_s / data.width as f32;
+            let t = tex.tex_t / data.height as f32;
+
+            //if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[&texdata]) {
+            //    if !tex.ready_for_use() {
+            //        return;
+            //    }
+
+            let mut builder = MeshBuilder::default();
+
+            let c = info.start_position;
+
+            let disp_side_len = (1 << (info.power)) + 1;
+
+            println!("Got everything we need for a displacement at {c}");
+
+            let get_i = |x: usize, y: usize| -> usize { x + disp_side_len * y };
+
+            for y in 0..disp_side_len {
+                let dy = y as f32 / (disp_side_len as f32 - 1.0);
+
+                let v0 = Vec3::lerp(corners[0], corners[1], dy);
+                let v1 = Vec3::lerp(corners[2], corners[3], dy);
+
+                for x in 0..disp_side_len {
+                    let dx = x as f32 / (disp_side_len as f32 - 1.0);
+
+                    let i = get_i(x, y);
+
+                    let vert = disp_verts[i + info.disp_vert_start as usize];
+
+                    let pos = vert.vec + Vec3::lerp(v0, v1, dx);
+
+                    builder.add_vert(i as u16, pos, s, t);
+
+                    println!(
+                        "Vert {} ({} {}) : {:?}",
+                        i + info.disp_vert_start as usize,
+                        dx,
+                        dy,
+                        pos
+                    );
+                }
+            }
+            let disp_side_len = disp_side_len as u16;
+
+            // Build grid index buffer.
+            let mut indexData = vec![0u16; (((disp_side_len - 1).pow(2)) * 6) as usize];
+            let mut indexCount = 0;
+            for y in 0..(disp_side_len - 1) {
+                for x in 0..(disp_side_len - 1) {
+                    let base = y * disp_side_len + x;
+                    indexData[indexCount + 0] = base;
+                    indexData[indexCount + 1] = base + disp_side_len;
+                    indexData[indexCount + 2] = base + disp_side_len + 1;
+                    indexData[indexCount + 3] = base;
+                    indexData[indexCount + 4] = base + disp_side_len + 1;
+                    indexData[indexCount + 5] = base + 1;
+                    indexCount += 6;
+                }
+            }
+
+            assert_eq!(indexCount as u16, ((disp_side_len - 1).pow(2)) * 6);
+
+            let mut mesh = StateMesh::new_empty(r, wgpu::PrimitiveTopology::TriangleList);
+
+            mesh.from_verts_and_tris(
+                instance.clone(),
+                bytemuck::cast_slice(&builder.verts),
+                bytemuck::cast_slice(&indexData),
+                indexData.len() as u32,
+            );
+
+            mesh.load_tex(
+                instance.clone(),
+                &default_tex.get_high_res(r.device(), r.queue()),
+            );
+
+            state.add_mesh(mesh);
+            //} else {
+            //    println!("Missing data for a displacement");
+            //}
+        }
+        let mut b = StateMesh::new_box(r, vec3(0., 0., 0.), vec3(1000., 1000., 1000.));
+        b.load_tex(
+            instance.clone(),
+            default_tex.get_high_res(r.device(), r.queue()),
+        );
+        state.add_mesh(b);
     }));
 }

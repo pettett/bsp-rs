@@ -5,7 +5,7 @@ use crate::{
 };
 use std::{fs::File, io::BufReader, sync::Arc};
 
-use glam::Vec3;
+use glam::{vec3, Vec3};
 use gltf::mesh::util::ReadIndices;
 
 use wgpu::util::DeviceExt;
@@ -39,7 +39,7 @@ impl StateMesh {
         if let Some(tex) = &self.texture_bind_group {
             render_pass.set_bind_group(1, tex, &[]);
         } else {
-            panic!("No bind group!");
+            //panic!("No bind group!");
         }
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
@@ -47,13 +47,50 @@ impl StateMesh {
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
     }
 
-    pub fn new(renderer: &StateRenderer, topology: wgpu::PrimitiveTopology) -> Self {
+    pub fn new_box(renderer: &StateRenderer, min: Vec3, max: Vec3) -> Self {
+        let shader = renderer
+            .device()
+            .create_shader_module(wgpu::include_wgsl!("solid_white.wgsl"));
+
+        Self::new(
+            renderer,
+            &[
+                vec3(min.x, min.y, min.z),
+                vec3(max.x, min.y, min.z),
+                vec3(min.x, max.y, min.z),
+                vec3(max.x, max.y, min.z),
+                vec3(min.x, min.y, max.z),
+                vec3(max.x, min.y, max.z),
+                vec3(min.x, max.y, max.z),
+                vec3(max.x, max.y, max.z),
+            ],
+            &[
+                0u16, 1, 1, 3, 3, 2, 2, 0, 4, 5, 5, 7, 7, 6, 6, 4, 0, 4, 1, 5, 2, 6, 3, 7,
+            ],
+            shader,
+            wgpu::PrimitiveTopology::LineList,
+        )
+    }
+    pub fn new_empty(renderer: &StateRenderer, topology: wgpu::PrimitiveTopology) -> Self {
+        let shader = renderer
+            .device()
+            .create_shader_module(wgpu::include_wgsl!("textured_shader.wgsl"));
+
+        Self::new::<UVVertex>(renderer, &[], &[], shader, topology)
+    }
+    pub fn new<V: Vertex + bytemuck::Pod>(
+        renderer: &StateRenderer,
+        verts_data: &[V],
+        indices_data: &[u16],
+        shader: wgpu::ShaderModule,
+        topology: wgpu::PrimitiveTopology,
+    ) -> Self {
         let vertex_buffer =
             renderer
                 .device()
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Vertex Buffer"),
-                    contents: &[],
+                    contents: bytemuck::cast_slice(verts_data),
                     usage: wgpu::BufferUsages::VERTEX,
                 });
 
@@ -62,7 +99,7 @@ impl StateMesh {
                 .device()
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Index Buffer"),
-                    contents: &[],
+                    contents: bytemuck::cast_slice(indices_data),
                     usage: wgpu::BufferUsages::INDEX,
                 });
 
@@ -105,10 +142,6 @@ impl StateMesh {
                     push_constant_ranges: &[],
                 });
 
-        let shader = renderer
-            .device()
-            .create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
-
         let render_pipeline =
             renderer
                 .device()
@@ -118,7 +151,7 @@ impl StateMesh {
                     vertex: wgpu::VertexState {
                         module: &shader,
                         entry_point: "vs_main", // 1.
-                        buffers: &[<UVVertex>::desc()],
+                        buffers: &[<V>::desc()],
                     },
                     fragment: Some(wgpu::FragmentState {
                         // 3.
@@ -161,7 +194,7 @@ impl StateMesh {
         StateMesh {
             vertex_buffer,
             index_buffer,
-            num_indices: 0,
+            num_indices: indices_data.len() as u32,
             render_pipeline,
             texture_bind_group_layout,
             texture_bind_group: None,

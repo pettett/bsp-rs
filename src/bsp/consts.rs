@@ -10,11 +10,11 @@ pub const MAX_MAP_DISP_POWER: usize = 4;
 // Max # of neighboring displacement touching a displacement's corner.
 pub const MAX_DISP_CORNER_NEIGHBORS: usize = 4;
 
-const fn NUM_DISP_POWER_VERTS(power: usize) -> usize {
-    (((1 << (power)) + 1) * ((1 << (power)) + 1))
+pub const fn NUM_DISP_POWER_VERTS(power: usize) -> usize {
+    ((1 << (power)) + 1) * ((1 << (power)) + 1)
 }
-const fn NUM_DISP_POWER_TRIS(power: usize) -> usize {
-    ((1 << (power)) * (1 << (power)) * 2)
+pub const fn NUM_DISP_POWER_TRIS(power: usize) -> usize {
+    (1 << (power)) * (1 << (power)) * 2
 }
 
 pub const MAX_MAP_MODELS: usize = 1024;

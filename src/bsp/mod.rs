@@ -42,15 +42,17 @@ pub use lump::Lump;
 
 #[cfg(test)]
 mod bsp_tests {
+    use num_traits::Pow;
     use stream_unzip::ZipReader;
 
     use bytemuck::Zeroable;
     use glam::Vec3;
 
-    use crate::bsp::consts::MAX_MAP_TEXDATA_STRING_DATA;
+    use crate::bsp::consts::{MAX_MAP_TEXDATA_STRING_DATA, NUM_DISP_POWER_VERTS};
 
     use super::{
         consts::LumpType,
+        displacement::{BSPDispInfo, BSPDispVert},
         edges::{BSPEdge, BSPSurfEdge},
         face::BSPFace,
         header::BSPHeader,
@@ -101,6 +103,45 @@ mod bsp_tests {
     #[test]
     fn models() {
         test_lump::<BSPModel>();
+    }
+
+    #[test]
+    fn displacements() {
+        let (header, mut buffer) = BSPHeader::load(PATH).unwrap();
+        let infos = header.get_lump::<BSPDispInfo>(&mut buffer);
+        let verts = header.get_lump::<BSPDispVert>(&mut buffer);
+        let faces = header.get_lump::<BSPFace>(&mut buffer);
+
+        //ensure every vertex is accounted for
+        let mut vert_marks = vec![0; verts.len()];
+
+        for i in 0..infos.len() {
+            let info = infos[i];
+            println!("{:#?}", info);
+            let disp_vert_count = NUM_DISP_POWER_VERTS(info.power as usize);
+            assert_eq!(
+                disp_vert_count,
+                (2u32.pow(info.power) + 1u32).pow(2) as usize
+            );
+
+            let face = faces[info.map_face as usize];
+
+            let disp_info = face.disp_info;
+            assert_eq!(disp_info, i as i16);
+
+            for n in &info.edge_neighbours {
+                for sn in n.sub_neighbours.iter() {
+                    if sn.i_neighbour != 0xFFFF {
+                        assert!((sn.i_neighbour as usize) < verts.len())
+                    }
+                }
+            }
+            //ensure every vertex has been mapped to
+            for i in 0..disp_vert_count {
+                vert_marks[(i + info.disp_vert_start as usize).min(verts.len() - 1)] += 1;
+            }
+        }
+        assert!(vert_marks.iter().all(|&x| x == 1));
     }
 
     #[test]
