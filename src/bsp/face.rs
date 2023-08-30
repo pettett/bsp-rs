@@ -1,5 +1,6 @@
 use super::{
     consts::{LumpType, MAX_MAP_FACES},
+    edges::{BSPEdge, BSPSurfEdge},
     Lump,
 };
 
@@ -60,6 +61,18 @@ pub struct BSPFace {
     pub first_prim_id: u16,
     /// lightmap smoothing group
     pub smoothing_groups: u32,
+}
+
+impl BSPFace {
+    pub fn get_verts(&self, edges: &Box<[BSPEdge]>, surfedges: &Box<[BSPSurfEdge]>) -> Vec<usize> {
+        (0..self.num_edges)
+            .map(|i| {
+                surfedges[self.first_edge as usize + i as usize]
+                    .get_edge(&edges)
+                    .0 as usize
+            })
+            .collect()
+    }
 }
 
 impl Lump for BSPFace {
