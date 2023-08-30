@@ -310,7 +310,7 @@ pub fn main() {
 
                 state.add_mesh(mesh);
             } else {
-                println!("Missing data for a displacement");
+                println!("Missing data for a displacement - {}", &textures[&texdata]);
             }
         }
         let mut b = StateMesh::new_box(r, vec3(0., 0., 0.), vec3(1000., 1000., 1000.));

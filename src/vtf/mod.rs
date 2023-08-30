@@ -4,7 +4,7 @@ use std::{
     cell::OnceCell,
     fmt,
     fs::File,
-    io::{self, BufReader, Error, Read, Seek},
+    io::{self, BufReader, Error, Read},
     mem,
     sync::OnceLock,
 };
@@ -190,62 +190,6 @@ impl VTF {
     }
 }
 
-fn read_low_res(header: &VTFHeader, buffer: &mut BufReader<File>) -> io::Result<Vec<u8>> {
-    let low_res_image_format = header.low_res_image_format;
-    // load data
-    let low_res_size = low_res_image_format.bytes_for_size(
-        header.low_res_image_width as usize,
-        header.low_res_image_height as usize,
-        0,
-    );
-
-    let mut low_res_data = vec![0; low_res_size];
-
-    buffer.read_exact(&mut low_res_data[..])?;
-    Ok(low_res_data)
-}
-
-fn read_high_res(header: &VTFHeader, buffer: &mut BufReader<File>) -> io::Result<Vec<Vec<u8>>> {
-    let wanted_mips = (header.mipmap_count as usize).max(7) - 6;
-
-    let high_res_image_format = header.high_res_image_format;
-    let mut high_res_data = vec![Vec::new(); wanted_mips];
-
-    // seek forward through mip maps we don't want
-    let mut offset = 0;
-    for mip_level in wanted_mips..header.mipmap_count as usize {
-        offset += high_res_image_format.bytes_for_size(
-            header.width as usize,
-            header.height as usize,
-            mip_level,
-        ) as i64;
-    }
-    buffer.seek_relative(offset)?;
-    // have to operate in reverse to load correct data
-    for mip_level in (0..wanted_mips as usize).rev() {
-        high_res_data[mip_level] = vec![
-            0;
-            high_res_image_format.bytes_for_size(
-                header.width as usize,
-                header.height as usize,
-                mip_level,
-            )
-        ];
-
-        buffer.read_exact(&mut high_res_data[mip_level][..])?;
-
-        // Do things like add empty alpha channels
-        image_format_convert_data(
-            high_res_image_format,
-            &mut high_res_data[mip_level],
-            header.width as usize >> mip_level,
-            header.height as usize >> mip_level,
-            header.frames as usize,
-        );
-    }
-    Ok(high_res_data)
-}
-
 impl BinaryData for VTF {
     fn read(
         buffer: &mut std::io::BufReader<std::fs::File>,
@@ -262,17 +206,9 @@ impl BinaryData for VTF {
         assert!(header.width < 4096);
         assert!(header.height < 4096);
 
-        let mut low_res_data = Vec::new();
-        let mut high_res_data: Vec<Vec<u8>> = Vec::new();
-        let mut header_7_3 = None;
-
         if header.version[0] == 7 && header.version[1] == 3 {
             let h_7_3 = VTFHeader73::read(buffer, None)?;
             header_read += mem::size_of::<VTFHeader73>() as i64;
-
-            header_7_3 = Some(h_7_3);
-
-            //println!("Loading entries");
 
             let mut entries = Vec::<ResourceEntryInfo>::new();
             entries.reserve(h_7_3.num_resources as usize);
@@ -292,31 +228,49 @@ impl BinaryData for VTF {
                 buffer.seek_relative(remaining_header)?;
             }
 
-            for entry in &entries {
-                // flag 2 means no data
-                if entry.flags & 2 > 0 {
-                    continue;
-                }
+            println!("{}", remaining_header);
 
+            let mut tex = Self {
+                header,
+                header_7_3: None,
+                low_res_data: [vec![0; 0]],
+                high_res_data: vec![vec![0; 0]; 0],
+                low_res: OnceLock::new(),
+                high_res: OnceLock::new(),
+                low_res_imgui: OnceLock::new(),
+                high_res_imgui: OnceLock::new(),
+            };
+
+            assert_eq!(header_size as u32, entries[0].offset);
+
+            //println!("Loading entries");
+            for entry in entries {
                 match entry.tag {
-                    [b'\x01', b'\0', b'\0'] => {
-                        low_res_data = read_low_res(&header, buffer)?;
-                    } //  Low-res (thumbnail) image data
+                    [b'\x01', b'\0', b'\0'] => tex.low_res_data = [read_low_res(&header, buffer)?], //  Low-res (thumbnail) image data
                     [b'\x30', b'\0', b'\0'] => {
-                        high_res_data = read_high_res(&header, buffer)?;
+                        //TODO: More robust system
+                        // For some reason there is a pretty big gap here on some textures
+                        let dist =
+                            header_size + tex.low_res_data.len() as i64 - entry.offset as i64;
+
+                        buffer.seek_relative(dist)?;
+
+                        tex.high_res_data = read_high_res(&header, buffer)?
                     } //- High-res image data.
-                    [b'\x10', b'\0', b'\0'] => println!("Skipping particle data"), //- Animated particle sheet data.
-                    [b'C', b'R', b'C'] => println!("Skipping crc data"),           //- CRC data.
-                    [b'L', b'O', b'D'] => println!("Skipping lod data"), //- Texture LOD control information.
-                    [b'T', b'S', b'O'] => println!("Skipping vtf flags data"), //- Game-defined "extended" VTF flags.
-                    [b'K', b'V', b'D'] => println!("Skipping keyvalue data"), //- Arbitrary KeyValues data.
+                    [b'\x10', b'\0', b'\0'] => (), //- Animated particle sheet data.
+                    [b'C', b'R', b'C'] => (),      //- CRC data.
+                    [b'L', b'O', b'D'] => (),      //- Texture LOD control information.
+                    [b'T', b'S', b'O'] => (),      //- Game-defined "extended" VTF flags.
+                    [b'K', b'V', b'D'] => (),      //- Arbitrary KeyValues data.
                     _ => {
-                        panic!("Overreading entry data");
+                        panic!("Error reading entity")
                     }
                 };
             }
+
+            Ok(tex)
         } else {
-            //println!("{:?}", header);
+            // load data
 
             //TODO: There appears to be one byte of something
             let remaining_header = header_size - header_read;
@@ -327,25 +281,20 @@ impl BinaryData for VTF {
                 );
                 buffer.seek_relative(remaining_header)?;
             }
+            let low_res_data: Vec<u8> = read_low_res(&header, buffer)?;
+            let high_res_data = read_high_res(&header, buffer)?;
 
-            low_res_data = read_low_res(&header, buffer)?;
-            high_res_data = read_high_res(&header, buffer)?;
-
-            //low res is always going to be dtx1 or none
+            Ok(Self {
+                header,
+                header_7_3: None,
+                low_res_data: [low_res_data],
+                high_res_data,
+                low_res: OnceLock::new(),
+                high_res: OnceLock::new(),
+                low_res_imgui: OnceLock::new(),
+                high_res_imgui: OnceLock::new(),
+            })
         }
-
-        assert!(high_res_data.len() > 0);
-
-        Ok(Self {
-            header,
-            header_7_3,
-            low_res_data: [low_res_data],
-            high_res_data,
-            low_res: OnceLock::new(),
-            high_res: OnceLock::new(),
-            low_res_imgui: OnceLock::new(),
-            high_res_imgui: OnceLock::new(),
-        })
     }
 }
 
@@ -396,7 +345,7 @@ impl BinaryData for VTFHeader73 {}
 ///    { 'T', 'S', 'O' } - Game-defined "extended" VTF flags.
 ///    { 'K', 'V', 'D' } - Arbitrary KeyValues data.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Default, Debug, bytemuck::Zeroable)]
 struct ResourceEntryInfo {
     tag: [u8; 3], // A three-byte "tag" that identifies what this resource is.
     flags: u8, // Resource entry flags. The only known flag is 0x2, which indicates that no data chunk corresponds to this resource.
@@ -544,6 +493,67 @@ fn image_format_convert_data(
         }
         *data = dst;
     }
+}
+
+fn read_low_res(header: &VTFHeader, buffer: &mut BufReader<File>) -> io::Result<Vec<u8>> {
+    let low_res_image_format = header.low_res_image_format;
+    // load data
+    let low_res_size = low_res_image_format.bytes_for_size(
+        header.low_res_image_width as usize,
+        header.low_res_image_height as usize,
+        0,
+    );
+
+    let mut low_res_data = vec![0; low_res_size];
+
+    buffer.read_exact(&mut low_res_data[..])?;
+    Ok(low_res_data)
+}
+
+fn read_high_res(header: &VTFHeader, buffer: &mut BufReader<File>) -> io::Result<Vec<Vec<u8>>> {
+    let smallest_size = header.width.min(header.height);
+
+    // smallest texture is a 4x4
+    let smallest_mip = ((smallest_size as f32).log2().ceil() - 1.) as usize;
+
+    let wanted_mips = (header.mipmap_count as usize).min(smallest_mip);
+
+    let high_res_image_format = header.high_res_image_format;
+    let mut high_res_data = vec![Vec::new(); wanted_mips];
+
+    // seek forward through mip maps we don't want
+    let mut offset = 0;
+    for mip_level in wanted_mips..header.mipmap_count as usize {
+        offset += high_res_image_format.bytes_for_size(
+            header.width as usize,
+            header.height as usize,
+            mip_level,
+        ) as i64;
+    }
+    buffer.seek_relative(offset)?;
+    // have to operate in reverse to load correct data
+    for mip_level in (0..wanted_mips as usize).rev() {
+        high_res_data[mip_level] = vec![
+            0;
+            high_res_image_format.bytes_for_size(
+                header.width as usize,
+                header.height as usize,
+                mip_level,
+            )
+        ];
+
+        buffer.read_exact(&mut high_res_data[mip_level][..])?;
+
+        // Do things like add empty alpha channels
+        image_format_convert_data(
+            high_res_image_format,
+            &mut high_res_data[mip_level],
+            header.width as usize >> mip_level,
+            header.height as usize >> mip_level,
+            header.frames as usize,
+        );
+    }
+    Ok(high_res_data)
 }
 
 // export const enum VTFFlags {
