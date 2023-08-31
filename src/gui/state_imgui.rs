@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{rc::Rc, sync::Arc, time::Instant};
 
 use imgui::{Condition, FontSource, Image};
 use imgui_wgpu::{Renderer, RendererConfig};
@@ -17,6 +17,48 @@ pub struct StateImgui {
     platform: imgui_winit_support::WinitPlatform,
     renderer: Renderer,
     //puffin_ui : puffin_imgui::ProfilerUi,
+    windows: Vec<WindowState>,
+}
+
+pub struct WindowState {
+    opened: bool,
+    view: Arc<dyn Viewable>,
+}
+impl WindowState {
+    pub fn new(view: Arc<dyn Viewable>) -> Self {
+        Self {
+            opened: false,
+            view,
+        }
+    }
+    pub fn draw_menu(
+        &mut self,
+        ui: &imgui::Ui,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        renderer: &mut Renderer,
+    ) {
+        ui.checkbox(self.view.gui_label(), &mut self.opened);
+    }
+    pub fn draw_window(
+        &mut self,
+        ui: &imgui::Ui,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        renderer: &mut Renderer,
+    ) {
+        if self.opened {
+            let window = ui.window(self.view.gui_label());
+            window
+                .opened(&mut self.opened)
+                .size([300.0, 600.0], Condition::FirstUseEver)
+                .position([400.0, 0.0], Condition::FirstUseEver)
+                .build(|| {
+                    self.view.gui_view(ui, renderer, device, queue);
+                    //end
+                });
+        }
+    }
 }
 
 impl State for StateImgui {
@@ -38,89 +80,104 @@ impl State for StateImgui {
 
         let ui = self.imgui.frame();
 
+        if let Some(menu_bar) = ui.begin_main_menu_bar() {
+            for window in &mut self.windows {
+                window.draw_menu(ui, state.device(), state.queue(), &mut self.renderer);
+            }
+        }
+
+        for window in &mut self.windows {
+            window.draw_window(ui, state.device(), state.queue(), &mut self.renderer);
+        }
+
         {
-            let window = ui.window("Camera");
-            window
-                .size([400.0, 200.0], Condition::FirstUseEver)
-                .position([400.0, 200.0], Condition::FirstUseEver)
-                .build(|| {
-                    ui.text(format!("Frametime: {delta_s:?}"));
+            // let window = ui.window("Camera");
+            // window
+            //     .opened(&mut self.pak)
+            //     .size([400.0, 200.0], Condition::FirstUseEver)
+            //     .position([400.0, 200.0], Condition::FirstUseEver)
+            //     .build(|| {
+            //         ui.text(format!("Frametime: {delta_s:?}"));
 
-                    ui.text(format!(
-                        "Camera Pos: {}",
-                        state.camera().transform().get_pos()
-                    ));
+            //         ui.text(format!(
+            //             "Camera Pos: {}",
+            //             state.camera().transform().get_pos()
+            //         ));
 
-                    ui.text(format!(
-                        "Camera Rot: {:?}",
-                        state
-                            .camera()
-                            .transform()
-                            .get_rot()
-                            .to_euler(glam::EulerRot::XYZ)
-                    ));
+            //         ui.text(format!(
+            //             "Camera Rot: {:?}",
+            //             state
+            //                 .camera()
+            //                 .transform()
+            //                 .get_rot()
+            //                 .to_euler(glam::EulerRot::XYZ)
+            //         ));
 
-                    //end
-                });
-            {
-                let window = ui.window(state.texture_dir().gui_label());
-                window
-                    .size([300.0, 600.0], Condition::FirstUseEver)
-                    .position([0.0, 0.0], Condition::FirstUseEver)
-                    .build(|| {
-                        state.texture_dir().gui_view(
-                            ui,
-                            &mut self.renderer,
-                            state.device(),
-                            state.queue(),
-                        );
-                        //end
-                    });
-            }
-            {
-                let window = ui.window(state.misc_dir().gui_label());
-                window
-                    .size([300.0, 600.0], Condition::FirstUseEver)
-                    .position([400.0, 0.0], Condition::FirstUseEver)
-                    .build(|| {
-                        state.misc_dir().gui_view(
-                            ui,
-                            &mut self.renderer,
-                            state.device(),
-                            state.queue(),
-                        );
-                        //end
-                    });
-            }
+            //         //end
+            //     });
+            // {
+            //     let window = ui.window(state.texture_dir().gui_label());
+            //     window
+            //         .size([300.0, 600.0], Condition::FirstUseEver)
+            //         .position([0.0, 0.0], Condition::FirstUseEver)
+            //         .build(|| {
+            //             state.texture_dir().gui_view(
+            //                 ui,
+            //                 &mut self.renderer,
+            //                 state.device(),
+            //                 state.queue(),
+            //             );
+            //             //end
+            //         });
+            // }
+            // {
+            //     let window = ui.window(state.misc_dir().gui_label());
+            //     window
+            //         .size([300.0, 600.0], Condition::FirstUseEver)
+            //         .position([400.0, 0.0], Condition::FirstUseEver)
+            //         .build(|| {
+            //             state.misc_dir().gui_view(
+            //                 ui,
+            //                 &mut self.renderer,
+            //                 state.device(),
+            //                 state.queue(),
+            //             );
+            //             //end
+            //         });
+            // }
 
-            if let Some(pak) = &state.pak {
-                let window = ui.window("Map Pak");
-                window
-                    .size([300.0, 200.0], Condition::FirstUseEver)
-                    .position([400.0, 0.0], Condition::FirstUseEver)
-                    .build(|| {
-                        for e in &pak.entries {
-                            if let Some(_node) = ui.tree_node(&e.filename) {
-                                if let Some(tex) = e.get_vtf() {
-                                    Image::new(
-                                        *tex.get_high_res_imgui(
-                                            state.device(),
-                                            state.queue(),
-                                            &mut self.renderer,
-                                        ),
-                                        [64.0 * 4.0, 64.0 * 4.0],
-                                    )
-                                    .build(ui);
-                                }
+            // if self.pak {
+            //     if let Some(pak) = &state.pak {
+            //         let window = ui.window("Map Pak");
 
-                                if let Some(mat) = e.get_vmt() {
-                                    ui.text_wrapped(format!("{:#?}", mat))
-                                }
-                            }
-                        }
-                        //end
-                    });
-            }
+            //         window
+            //             .opened(&mut self.pak)
+            //             .size([300.0, 200.0], Condition::FirstUseEver)
+            //             .position([400.0, 0.0], Condition::FirstUseEver)
+            //             .build(|| {
+            //                 for e in &pak.entries {
+            //                     if let Some(_node) = ui.tree_node(&e.filename) {
+            //                         if let Some(tex) = e.get_vtf() {
+            //                             Image::new(
+            //                                 *tex.get_high_res_imgui(
+            //                                     state.device(),
+            //                                     state.queue(),
+            //                                     &mut self.renderer,
+            //                                 ),
+            //                                 [64.0 * 4.0, 64.0 * 4.0],
+            //                             )
+            //                             .build(ui);
+            //                         }
+
+            //                         if let Some(mat) = e.get_vmt() {
+            //                             ui.text_wrapped(format!("{:#?}", mat))
+            //                         }
+            //                     }
+            //                 }
+            //                 //end
+            //             });
+            //     }
+            // }
 
             //self.puffin_ui.window(ui);
         }
@@ -211,6 +268,10 @@ impl State for StateImgui {
             last_frame: Instant::now(),
             platform,
             renderer: imgui_renderer,
+            windows: vec![
+                WindowState::new(renderer.misc_dir().clone()),
+                WindowState::new(renderer.texture_dir().clone()),
+            ],
         }
     }
 }

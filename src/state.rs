@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use crate::bsp::pak::BSPPak;
@@ -57,8 +58,8 @@ pub struct StateRenderer {
     camera_controller: CameraController,
     camera_bind_group_layout: wgpu::BindGroupLayout,
     camera_bind_group: wgpu::BindGroup,
-    texture_dir: VPKDirectory,
-    misc_dir: VPKDirectory,
+    texture_dir: Arc<VPKDirectory>,
+    misc_dir: Arc<VPKDirectory>,
     pub pak: Option<BSPPak>,
 }
 impl StateInstance {
@@ -324,8 +325,8 @@ impl StateRenderer {
         let depth_texture =
             texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
-        let texture_dir = VPKDirectory::load(PathBuf::from(TEX_PATH)).unwrap();
-        let misc_dir = VPKDirectory::load(PathBuf::from(MISC_PATH)).unwrap();
+        let texture_dir = Arc::new(VPKDirectory::load(PathBuf::from(TEX_PATH)).unwrap());
+        let misc_dir = Arc::new(VPKDirectory::load(PathBuf::from(MISC_PATH)).unwrap());
 
         puffin::set_scopes_on(true); // you may want to control this with a flag
                                      //let  puffin_ui = puffin_imgui::ProfilerUi::default();
@@ -370,10 +371,11 @@ impl StateRenderer {
     pub fn camera_bind_group(&self) -> &wgpu::BindGroup {
         &self.camera_bind_group
     }
-    pub fn texture_dir(&self) -> &VPKDirectory {
+
+    pub fn texture_dir(&self) -> &Arc<VPKDirectory> {
         &self.texture_dir
     }
-    pub fn misc_dir(&self) -> &VPKDirectory {
+    pub fn misc_dir(&self) -> &Arc<VPKDirectory> {
         &self.misc_dir
     }
     pub fn camera_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
