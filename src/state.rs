@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use crate::bsp::pak::BSPPak;
 use crate::camera::{Camera, CameraUniform};
 use crate::camera_controller::CameraController;
-use crate::state_imgui::StateImgui;
+use crate::gui::state_imgui::StateImgui;
 use crate::state_mesh::StateMesh;
 use crate::texture::{self, Texture};
 

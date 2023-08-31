@@ -5,7 +5,6 @@ pub mod camera_controller;
 pub mod gui;
 pub mod shader;
 pub mod state;
-pub mod state_imgui;
 pub mod state_mesh;
 pub mod texture;
 pub mod transform;

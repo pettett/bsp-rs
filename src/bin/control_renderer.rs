@@ -100,8 +100,6 @@ pub fn get_material<'a>(
     let mut local_material_path = format!("materials/{}.vmt", material_name);
     local_material_path.make_ascii_lowercase();
 
-    println!("{}", local_material_path);
-
     let global_material_path = map_specific_material_map
         .get(local_material_path.as_str())
         .unwrap_or(&local_material_path.as_str())
@@ -212,7 +210,6 @@ pub fn main() {
                     if let Some(mat) = vmt.data.get("include") {
                         Some((entry.filename.as_str(), mat.as_str()))
                     } else {
-                        println!("{:?}", vmt);
                         None
                     }
                 } else {
