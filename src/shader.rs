@@ -1,6 +1,6 @@
 use crate::{
     state::StateRenderer,
-    vertex::{UVVertex, Vertex},
+    vertex::{UVAlphaVertex, UVVertex, Vertex},
 };
 
 pub struct Shader {
@@ -23,6 +23,12 @@ impl Shader {
             .device()
             .create_shader_module(wgpu::include_wgsl!("textured_shader.wgsl"));
         Self::new::<UVVertex>(renderer, shader, wgpu::PrimitiveTopology::TriangleList)
+    }
+    pub fn new_displacement(renderer: &StateRenderer) -> Self {
+        let shader = renderer
+            .device()
+            .create_shader_module(wgpu::include_wgsl!("displacement.wgsl"));
+        Self::new::<UVAlphaVertex>(renderer, shader, wgpu::PrimitiveTopology::TriangleList)
     }
     pub fn new_white_lines<V: Vertex + bytemuck::Pod>(renderer: &StateRenderer) -> Self {
         let shader = renderer

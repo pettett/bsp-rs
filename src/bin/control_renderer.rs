@@ -1,6 +1,6 @@
 use bsp_explorer::{
     bsp::{
-        consts::{LumpType},
+        consts::LumpType,
         displacement::{BSPDispInfo, BSPDispVert},
         edges::{BSPEdge, BSPSurfEdge},
         face::BSPFace,
@@ -9,21 +9,38 @@ use bsp_explorer::{
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
     shader::Shader,
-    vertex::UVVertex,
+    vertex::{UVAlphaVertex, UVVertex, Vertex},
 };
 use glam::{vec2, vec3, Vec3, Vec4};
 use rayon::prelude::*;
 use std::{collections::HashMap, sync::Arc};
 
-
 use bsp_explorer::{run, state_mesh::StateMesh};
 #[derive(Default)]
-struct MeshBuilder {
+struct MeshBuilder<V: Vertex + Default> {
     tris: Vec<u16>,
     //tri_map: HashMap<u16, u16>,
-    verts: Vec<UVVertex>,
+    verts: Vec<V>,
 }
-impl MeshBuilder {
+impl MeshBuilder<UVAlphaVertex> {
+    pub fn add_vert_a(&mut self, _index: u16, vertex: Vec3, s: Vec4, t: Vec4, alpha: f32) {
+        //if !self.tri_map.contains_key(&index) {
+        // if not contained, add in and generate uvs
+        let u = s.dot(Vec4::from((vertex, 1.0)));
+        let v = t.dot(Vec4::from((vertex, 1.0)));
+
+        //self.tri_map.insert(index, self.verts.len() as u16);
+
+        self.verts.push(UVAlphaVertex {
+            position: vertex,
+            uv: vec2(u, v),
+            alpha,
+        });
+        //}
+    }
+}
+
+impl MeshBuilder<UVVertex> {
     pub fn add_vert(&mut self, _index: u16, vertex: Vec3, s: Vec4, t: Vec4) {
         //if !self.tri_map.contains_key(&index) {
         // if not contained, add in and generate uvs
@@ -38,6 +55,8 @@ impl MeshBuilder {
         });
         //}
     }
+}
+impl<V: Vertex + Default> MeshBuilder<V> {
     pub fn push_tri(&mut self) {
         for i in 0..3u16 {
             self.tris.push(self.verts.len() as u16 + i - 3);
@@ -105,7 +124,7 @@ pub fn main() {
         // for now, filter by texture of first face
 
         println!("Loading BSP Faces...");
-        let mut textured_tris = HashMap::<i32, MeshBuilder>::new();
+        let mut textured_tris = HashMap::<i32, MeshBuilder<UVVertex>>::new();
 
         for face in faces.iter() {
             let root_edge_index = face.first_edge as usize;
@@ -142,28 +161,16 @@ pub fn main() {
 
         let pak: BSPPak = pak_header.read_binary(&mut buffer).unwrap();
 
-        let map: HashMap<&str, &str> = pak
+        // map map specific materials to global materials
+        let map_specific_material_map: HashMap<&str, &str> = pak
             .entries
             .par_iter()
             .filter_map(|entry| {
-                if entry.filename.contains(".vmt") {
-                    let data = std::str::from_utf8(&entry.bytes[..]).unwrap();
-                    if let Some(include) = data.find("\"include\"") {
-                        // Get this value
-                        let data = &data[include + 9..];
-
-                        if let Some(open) = data.find('"') {
-                            let data = &data[open + 1..];
-
-                            if let Some(close) = data.find('"') {
-                                Some((entry.filename.as_str(), &data[..close]))
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
+                if let Some(vmt) = entry.get_vmt() {
+                    if let Some(mat) = vmt.data.get("include") {
+                        Some((entry.filename.as_str(), mat.as_str()))
                     } else {
+                        println!("{:?}", vmt);
                         None
                     }
                 } else {
@@ -176,7 +183,7 @@ pub fn main() {
         let tex_data_string_table = header.get_lump::<BSPTexDataStringTable>(&mut buffer);
         let tex_data_string_data = header.get_lump_header(LumpType::TEXDATA_STRING_DATA);
 
-        let tex_name_map: HashMap<i32, String> = textured_tris
+        let material_name_map: HashMap<i32, String> = textured_tris
             .iter()
             .map(|(tex, _tris)| {
                 (
@@ -187,40 +194,54 @@ pub fn main() {
             })
             .collect();
 
+        let r = state.renderer();
         let textures: HashMap<i32, String> = textured_tris
-            .par_iter()
-            .map(|(tex, _tris)| {
+            .iter()
+            .filter_map(|(tex, _tris)| {
                 //TODO: Material data is stored in the misc file, load those
-                let tex_name = match tex_name_map[tex].as_str() {
-                    "nature/red_grass" => "nature/dirtfloor011a",
-                    "nature/red_grass_thin" => "nature/dirtfloor011a",
-                    "nature/blendtoxictoxic004a" => "nature/toxicslime001a",
-                    "nature/canal_reeds" => "nature/sandfloor010a",
-                    "nature/blendrockdirt008a" => "nature/cliffface001a",
-                    "nature/blenddirtgrass008b" => "nature/dirtfloor012a",
-                    "nature/blenddirtgrass008a" => "nature/dirtfloor006a",
-                    "nature/blendsandsand008b" => "nature/sandfloor009a",
-                    _ => tex_name_map[tex].as_str(),
-                };
+                let material_name = material_name_map[tex].as_str();
+
+                // Get material data
+                let mut local_material_path = format!("materials/{}.vmt", material_name);
+                local_material_path.make_ascii_lowercase();
+
+                println!("{}", local_material_path);
+
+                let global_material_path = map_specific_material_map
+                    .get(local_material_path.as_str())
+                    .unwrap_or(&local_material_path.as_str())
+                    .to_ascii_lowercase();
+
+                match r.misc_dir().load_vmt(&global_material_path) {
+                    Ok(Some(vmt)) => Some((*tex, vmt.get_tex_name())),
+                    Ok(None) => {
+                        println!(
+                            "Material {} does not have valid vmt data",
+                            global_material_path
+                        );
+                        None
+                    }
+                    Err(e) => {
+                        println!("Error loading material: {} ", e);
+                        None
+                    }
+                }
 
                 // turn surfaces into meshes
-                let filename_mat = format!("materials/{}.vmt", tex_name);
 
-                if let Some(mapped_file) = map.get(filename_mat.as_str()) {
-                    let mut s = (*mapped_file).to_owned();
-                    s.make_ascii_lowercase();
-                    (*tex, s.replace(".vmt", ".vtf"))
-                } else {
-                    (*tex, format!("materials/{}.vtf", tex_name))
-                }
+                //if let Some(mapped_file) = map.get(filename_mat.as_str()) {
+                //    let mut s = (*mapped_file).to_owned();
+                //    s.make_ascii_lowercase();
+                //    (*tex, s.replace(".vmt", ".vtf"))
+                //} else {
+                //    (*tex, format!("materials/{}.vtf", tex_name))
+                //}
             })
             .collect();
 
-        let r = state.renderer();
-
         println!("Loading BSP Textures...");
         //preload all textures in parallel
-        textures.iter().for_each(|(tex, _name)| {
+        textures.par_iter().for_each(|(tex, _name)| {
             if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[tex]) {
                 tex.get_high_res(r.device(), r.queue());
             }
@@ -231,20 +252,22 @@ pub fn main() {
         let shader_tex = Arc::new(Shader::new_textured(state.renderer()));
 
         for (tex, builder) in &textured_tris {
-            if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[tex]) {
-                let mut mesh = StateMesh::new_empty(r, shader_tex.clone());
+            if let Some(path) = textures.get(tex) {
+                if let Ok(Some(tex)) = r.texture_dir().load_vtf(path) {
+                    let mut mesh = StateMesh::new_empty(r, shader_tex.clone());
 
-                mesh.from_verts_and_tris(
-                    instance.clone(),
-                    bytemuck::cast_slice(&builder.verts),
-                    bytemuck::cast_slice(&builder.tris),
-                    builder.tris.len() as u32,
-                );
+                    mesh.from_verts_and_tris(
+                        instance.clone(),
+                        bytemuck::cast_slice(&builder.verts),
+                        bytemuck::cast_slice(&builder.tris),
+                        builder.tris.len() as u32,
+                    );
 
-                mesh.load_tex(instance.clone(), &tex.get_high_res(r.device(), r.queue()));
-                state.add_mesh(mesh);
-            } else {
-                println!("Could not find texture for {}", textures[tex])
+                    mesh.load_tex(instance.clone(), &tex.get_high_res(r.device(), r.queue()));
+                    state.add_mesh(mesh);
+                } else {
+                    println!("Could not find texture for {}", textures[tex])
+                }
             }
         }
 

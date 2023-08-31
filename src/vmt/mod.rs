@@ -25,8 +25,23 @@ pub enum VMTUnit {
 }
 #[derive(Debug, Default)]
 pub struct VMT {
-    shader: String,
-    data: HashMap<String, String>,
+    pub shader: String,
+    pub data: HashMap<String, String>,
+}
+
+impl VMT {
+    pub fn get_tex_name(&self) -> String {
+        //TODO: This is just annoying
+        let mut name = format!(
+            "materials/{}.vtf",
+            self.data
+                .get("$basetexture")
+                .unwrap_or(&"".to_owned())
+                .replace('\\', "/")
+        );
+        name.make_ascii_lowercase();
+        name
+    }
 }
 
 fn remove_comments(data: &mut String) {
@@ -117,7 +132,7 @@ impl BinaryData for VMT {
             //TODO: Make sure this works.
             // need to close a bracket
             if opens > closes {
-                println!("Material needs more closes");
+                //println!("Material needs more closes");
                 buffer.read_until(b'}', &mut data)?;
             } else if opens < closes {
                 panic!("Material needs more opens. this should be impossible");
