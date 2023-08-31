@@ -26,9 +26,19 @@ pub enum VMTUnit {
 #[derive(Debug, Default)]
 pub struct VMT {
     shader: String,
-    data: HashMap<String, VMTUnit>,
+    data: HashMap<String, String>,
 }
 
+fn consume_string(data: &mut &str) -> String {
+    let next = data.find('"').unwrap() + 1;
+    let after = data[next..].find('"').unwrap();
+
+    let str = data[next..next + after].to_owned();
+
+    *data = &data[next + after..];
+
+    return str;
+}
 impl BinaryData for VMT {
     fn read<R: Read + Seek>(
         buffer: &mut std::io::BufReader<R>,
@@ -55,9 +65,43 @@ impl BinaryData for VMT {
 
         let data = String::from_utf8(data).unwrap();
 
-        println!("{}", data);
+        let mut view = &mut data.as_str();
+
+        let shader = consume_string(&mut view);
+
+        println!("{}", shader);
+        println!("{}", view);
 
         Ok(Self::default())
+    }
+}
+
+#[cfg(test)]
+mod vmt_tests {
+    use super::consume_string;
+
+    #[test]
+    fn test_decode() {
+        let data = r#"
+"VertexLitGeneric"
+{
+     "$basetexture" "Models/Combine_soldier/Combine_elite"
+     "$bumpmap" "models/combine_soldier/combine_elite_normal"
+     "$envmap" "env_cubemap"
+     "$normalmapalphaenvmapmask" 1
+     "$envmapcontrast" 1
+     "$model" 1
+     "$selfillum" 1
+}
+		"#
+        .to_owned();
+
+        let mut view = &mut data.as_str();
+
+        let shader = consume_string(&mut view);
+
+        println!("{}", shader);
+        println!("{}", view);
     }
 }
 // export interface VMT {
