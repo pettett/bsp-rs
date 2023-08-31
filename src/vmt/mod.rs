@@ -32,15 +32,25 @@ pub struct VMT {
 impl VMT {
     pub fn get_tex_name(&self) -> String {
         //TODO: This is just annoying
-        let mut name = format!(
+        format!(
             "materials/{}.vtf",
-            self.data
-                .get("$basetexture")
-                .unwrap_or(&"".to_owned())
+            self.get_basetex2()
+                .unwrap_or_else(|| self.get_basetex().unwrap())
                 .replace('\\', "/")
-        );
-        name.make_ascii_lowercase();
-        name
+        )
+    }
+    pub fn get_tex2_name(&self) -> String {
+        //TODO: This is just annoying
+        format!(
+            "materials/{}.vtf",
+            self.get_basetex().unwrap().replace('\\', "/")
+        )
+    }
+    pub fn get_basetex(&self) -> Option<&str> {
+        self.data.get("$basetexture").map(String::as_str)
+    }
+    pub fn get_basetex2(&self) -> Option<&str> {
+        self.data.get("$basetexture2").map(String::as_str)
     }
 }
 
@@ -103,7 +113,9 @@ fn consume_vmt(data: &mut &str) -> Result<VMT, ()> {
         let s2 = consume_string(&mut line_data);
 
         match (s1, s2) {
-            (Ok(s1), Ok(s2)) => {
+            (Ok(mut s1), Ok(mut s2)) => {
+                s1.make_ascii_lowercase();
+                s2.make_ascii_lowercase();
                 vmt.data.insert(s1, s2);
             }
             _ => {}
@@ -141,7 +153,9 @@ impl BinaryData for VMT {
             }
         }
 
-        let data = String::from_utf8(data).unwrap();
+        let mut data = String::from_utf8(data).unwrap();
+
+        remove_comments(&mut data);
 
         let vmt = consume_vmt(&mut data.as_str()).unwrap();
 

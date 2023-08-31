@@ -4,7 +4,7 @@ use crate::{
     texture,
     vertex::{UVVertex, Vertex},
 };
-use std::{fs::File, io::BufReader, sync::Arc};
+use std::{collections::HashMap, fs::File, io::BufReader, sync::Arc};
 
 use glam::{vec3, Vec3};
 
@@ -16,7 +16,7 @@ pub struct StateMesh {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     index_format: wgpu::IndexFormat,
-    texture_bind_group: Option<wgpu::BindGroup>,
+    texture_bind_group: HashMap<u32, wgpu::BindGroup>,
     shader: Arc<Shader>,
     num_indices: u32,
     //puffin_ui : puffin_imgui::ProfilerUi,
@@ -35,10 +35,9 @@ impl StateMesh {
         self.shader.draw(state, render_pass, _output, _view);
 
         render_pass.set_bind_group(0, state.camera_bind_group(), &[]);
-        if let Some(tex) = &self.texture_bind_group {
-            render_pass.set_bind_group(1, tex, &[]);
-        } else {
-            //panic!("No bind group!");
+
+        for (i, tex) in &self.texture_bind_group {
+            render_pass.set_bind_group(*i, tex, &[]);
         }
 
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
@@ -97,7 +96,7 @@ impl StateMesh {
             vertex_buffer,
             index_buffer,
             num_indices: indices_data.len() as u32,
-            texture_bind_group: None,
+            texture_bind_group: Default::default(),
             shader,
             index_format: wgpu::IndexFormat::Uint16,
         }
@@ -173,22 +172,30 @@ impl StateMesh {
         self.index_format = wgpu::IndexFormat::Uint16;
     }
 
-    pub fn load_tex(&mut self, instance: Arc<StateInstance>, texture: &texture::Texture) {
-        self.texture_bind_group = Some(instance.device().create_bind_group(
-            &wgpu::BindGroupDescriptor {
-                layout: &self.shader.texture_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(texture.view()),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(texture.sampler()),
-                    },
-                ],
-                label: Some("diffuse_bind_group"),
-            },
-        ))
+    pub fn load_tex(
+        &mut self,
+        instance: Arc<StateInstance>,
+        bind_index: u32,
+        texture: &texture::Texture,
+    ) {
+        self.texture_bind_group.insert(
+            bind_index,
+            instance
+                .device()
+                .create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &self.shader.texture_bind_group_layout(bind_index).unwrap(),
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(texture.view()),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(texture.sampler()),
+                        },
+                    ],
+                    label: Some("diffuse_bind_group"),
+                }),
+        );
     }
 }

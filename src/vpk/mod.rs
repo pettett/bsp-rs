@@ -32,7 +32,7 @@ use std::{
     fs::File,
     io::{self, BufRead, BufReader, Read},
     path::PathBuf,
-    sync::{OnceLock},
+    sync::OnceLock,
 };
 
 use crate::{binaries::BinaryData, vmt::VMT, vtf::VTF};

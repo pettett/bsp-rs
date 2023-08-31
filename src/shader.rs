@@ -5,10 +5,14 @@ use crate::{
 
 pub struct Shader {
     render_pipeline: wgpu::RenderPipeline,
-    pub texture_bind_group_layout: wgpu::BindGroupLayout,
+    texture_bind_group_layouts: Vec<wgpu::BindGroupLayout>,
 }
 
 impl Shader {
+    pub fn texture_bind_group_layout(&self, i: u32) -> Option<&wgpu::BindGroupLayout> {
+        self.texture_bind_group_layouts.get(i as usize - 1)
+    }
+
     pub fn draw<'a>(
         &'a self,
         _state: &'a StateRenderer,
@@ -22,30 +26,32 @@ impl Shader {
         let shader = renderer
             .device()
             .create_shader_module(wgpu::include_wgsl!("textured_shader.wgsl"));
-        Self::new::<UVVertex>(renderer, shader, wgpu::PrimitiveTopology::TriangleList)
+        Self::new::<UVVertex>(renderer, shader, 1, wgpu::PrimitiveTopology::TriangleList)
     }
     pub fn new_displacement(renderer: &StateRenderer) -> Self {
         let shader = renderer
             .device()
             .create_shader_module(wgpu::include_wgsl!("displacement.wgsl"));
-        Self::new::<UVAlphaVertex>(renderer, shader, wgpu::PrimitiveTopology::TriangleList)
+        Self::new::<UVAlphaVertex>(renderer, shader, 2, wgpu::PrimitiveTopology::TriangleList)
     }
     pub fn new_white_lines<V: Vertex + bytemuck::Pod>(renderer: &StateRenderer) -> Self {
         let shader = renderer
             .device()
             .create_shader_module(wgpu::include_wgsl!("solid_white.wgsl"));
-        Self::new::<V>(renderer, shader, wgpu::PrimitiveTopology::LineList)
+        Self::new::<V>(renderer, shader, 0, wgpu::PrimitiveTopology::LineList)
     }
 
     pub fn new<V: Vertex + bytemuck::Pod>(
         renderer: &StateRenderer,
         shader: wgpu::ShaderModule,
+        textures: usize,
         topology: wgpu::PrimitiveTopology,
     ) -> Self {
-        let texture_bind_group_layout =
-            renderer
-                .device()
-                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        let mut texture_bind_group_layouts = Vec::new();
+
+        for i in 0..textures {
+            texture_bind_group_layouts.push(renderer.device().create_bind_group_layout(
+                &wgpu::BindGroupLayoutDescriptor {
                     entries: &[
                         wgpu::BindGroupLayoutEntry {
                             binding: 0,
@@ -67,17 +73,22 @@ impl Shader {
                         },
                     ],
                     label: Some("texture_bind_group_layout"),
-                });
+                },
+            ));
+        }
+
+        let mut bind_group_layouts = Vec::new();
+        bind_group_layouts.push(renderer.camera_bind_group_layout());
+        for t in &texture_bind_group_layouts {
+            bind_group_layouts.push(t)
+        }
 
         let render_pipeline_layout =
             renderer
                 .device()
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Render Pipeline Layout"),
-                    bind_group_layouts: &[
-                        &renderer.camera_bind_group_layout(),
-                        &texture_bind_group_layout,
-                    ],
+                    bind_group_layouts: &bind_group_layouts[..],
                     push_constant_ranges: &[],
                 });
 
@@ -131,7 +142,7 @@ impl Shader {
                 });
         Self {
             render_pipeline,
-            texture_bind_group_layout,
+            texture_bind_group_layouts,
         }
     }
 }

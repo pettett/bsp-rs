@@ -7,10 +7,14 @@ struct CameraUniform {
 var<uniform> camera: CameraUniform;
 
 @group(1) @binding(0)
-var t_diffuse: texture_2d<f32>;
+var t_diffuse0: texture_2d<f32>;
 @group(1)@binding(1)
-var s_diffuse: sampler;
+var s_diffuse0: sampler;
 
+@group(2) @binding(0)
+var t_diffuse1: texture_2d<f32>;
+@group(2)@binding(1)
+var s_diffuse1: sampler;
 
 struct VertexInput {
 	//@builtin(vertex_index) vert : u32,
@@ -40,5 +44,7 @@ fn vs_main(
 // Fragment shader
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return  textureSample(t_diffuse, s_diffuse, in.tex_coords) * in.alpha;
+	var alpha = in.alpha / 255.0;
+    return  textureSample(t_diffuse0, s_diffuse0, in.tex_coords) * (1.0-alpha) + 
+			textureSample(t_diffuse1, s_diffuse1, in.tex_coords) * alpha;
 }

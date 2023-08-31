@@ -59,7 +59,7 @@ impl Vertex for UVAlphaVertex {
                 wgpu::VertexAttribute {
                     offset: (std::mem::size_of::<Vec3>() + std::mem::size_of::<Vec2>())
                         as wgpu::BufferAddress,
-                    shader_location: 1,
+                    shader_location: 2,
                     format: wgpu::VertexFormat::Float32,
                 },
             ],

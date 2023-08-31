@@ -9,7 +9,9 @@ use bsp_explorer::{
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
     shader::Shader,
+    state::StateRenderer,
     vertex::{UVAlphaVertex, UVVertex, Vertex},
+    vmt::VMT,
 };
 use glam::{vec2, vec3, Vec3, Vec4};
 use rayon::prelude::*;
@@ -86,6 +88,41 @@ impl<V: Vertex + Default> MeshBuilder<V> {
     }
 }
 
+pub fn get_material<'a>(
+    material_index: &i32,
+    renderer: &'a StateRenderer,
+    material_name_map: &HashMap<i32, String>,
+    map_specific_material_map: &HashMap<&str, &str>,
+) -> Option<&'a VMT> {
+    let material_name = material_name_map[material_index].as_str();
+
+    // Get material data
+    let mut local_material_path = format!("materials/{}.vmt", material_name);
+    local_material_path.make_ascii_lowercase();
+
+    println!("{}", local_material_path);
+
+    let global_material_path = map_specific_material_map
+        .get(local_material_path.as_str())
+        .unwrap_or(&local_material_path.as_str())
+        .to_ascii_lowercase();
+
+    match renderer.misc_dir().load_vmt(&global_material_path) {
+        Ok(Some(vmt)) => Some(vmt),
+        Ok(None) => {
+            println!(
+                "Material {} does not have valid vmt data",
+                global_material_path
+            );
+            None
+        }
+        Err(e) => {
+            println!("Error loading material: {} ", e);
+            None
+        }
+    }
+}
+
 pub fn main() {
     println!("Starting...");
     pollster::block_on(run(|state| {
@@ -127,6 +164,11 @@ pub fn main() {
         let mut textured_tris = HashMap::<i32, MeshBuilder<UVVertex>>::new();
 
         for face in faces.iter() {
+            if face.disp_info != -1 {
+                // skip displacements
+                continue;
+            }
+
             let root_edge_index = face.first_edge as usize;
             let root_edge = surfedges[root_edge_index].get_edge(&edges);
 
@@ -198,44 +240,8 @@ pub fn main() {
         let textures: HashMap<i32, String> = textured_tris
             .iter()
             .filter_map(|(tex, _tris)| {
-                //TODO: Material data is stored in the misc file, load those
-                let material_name = material_name_map[tex].as_str();
-
-                // Get material data
-                let mut local_material_path = format!("materials/{}.vmt", material_name);
-                local_material_path.make_ascii_lowercase();
-
-                println!("{}", local_material_path);
-
-                let global_material_path = map_specific_material_map
-                    .get(local_material_path.as_str())
-                    .unwrap_or(&local_material_path.as_str())
-                    .to_ascii_lowercase();
-
-                match r.misc_dir().load_vmt(&global_material_path) {
-                    Ok(Some(vmt)) => Some((*tex, vmt.get_tex_name())),
-                    Ok(None) => {
-                        println!(
-                            "Material {} does not have valid vmt data",
-                            global_material_path
-                        );
-                        None
-                    }
-                    Err(e) => {
-                        println!("Error loading material: {} ", e);
-                        None
-                    }
-                }
-
-                // turn surfaces into meshes
-
-                //if let Some(mapped_file) = map.get(filename_mat.as_str()) {
-                //    let mut s = (*mapped_file).to_owned();
-                //    s.make_ascii_lowercase();
-                //    (*tex, s.replace(".vmt", ".vtf"))
-                //} else {
-                //    (*tex, format!("materials/{}.vtf", tex_name))
-                //}
+                get_material(tex, r, &material_name_map, &map_specific_material_map)
+                    .map(|vmt| (*tex, vmt.get_tex_name()))
             })
             .collect();
 
@@ -250,6 +256,7 @@ pub fn main() {
         println!("Loading BSP meshes...");
         let shader_lines = Arc::new(Shader::new_white_lines::<Vec3>(state.renderer()));
         let shader_tex = Arc::new(Shader::new_textured(state.renderer()));
+        let shader_disp = Arc::new(Shader::new_displacement(state.renderer()));
 
         for (tex, builder) in &textured_tris {
             if let Some(path) = textures.get(tex) {
@@ -263,7 +270,11 @@ pub fn main() {
                         builder.tris.len() as u32,
                     );
 
-                    mesh.load_tex(instance.clone(), &tex.get_high_res(r.device(), r.queue()));
+                    mesh.load_tex(
+                        instance.clone(),
+                        1,
+                        &tex.get_high_res(r.device(), r.queue()),
+                    );
                     state.add_mesh(mesh);
                 } else {
                     println!("Could not find texture for {}", textures[tex])
@@ -297,60 +308,82 @@ pub fn main() {
             let s = tex.tex_s / data.width as f32;
             let t = tex.tex_t / data.height as f32;
 
-            if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[&texdata]) {
-                let mut builder = MeshBuilder::default();
+            if let Some(vmt) =
+                get_material(&texdata, r, &material_name_map, &map_specific_material_map)
+            {
+                if let Ok(Some(tex0)) = r.texture_dir().load_vtf(&vmt.get_tex_name()) {
+                    if let Ok(Some(tex1)) = r.texture_dir().load_vtf(&vmt.get_tex2_name()) {
+                        let mut builder = MeshBuilder::default();
 
-                let _c = info.start_position;
+                        let _c = info.start_position;
 
-                let disp_side_len = (1 << (info.power)) + 1;
+                        let disp_side_len = (1 << (info.power)) + 1;
 
-                let get_i = |x: usize, y: usize| -> usize { x + disp_side_len * y };
+                        let get_i = |x: usize, y: usize| -> usize { x + disp_side_len * y };
 
-                for y in 0..disp_side_len {
-                    let dy = y as f32 / (disp_side_len as f32 - 1.0);
+                        for y in 0..disp_side_len {
+                            let dy = y as f32 / (disp_side_len as f32 - 1.0);
 
-                    let v0 = Vec3::lerp(corners[0], corners[3], dy);
-                    let v1 = Vec3::lerp(corners[1], corners[2], dy);
+                            let v0 = Vec3::lerp(corners[0], corners[3], dy);
+                            let v1 = Vec3::lerp(corners[1], corners[2], dy);
 
-                    for x in 0..disp_side_len {
-                        let dx = x as f32 / (disp_side_len as f32 - 1.0);
+                            for x in 0..disp_side_len {
+                                let dx = x as f32 / (disp_side_len as f32 - 1.0);
 
-                        let i = get_i(x, y);
+                                let i = get_i(x, y);
 
-                        let vert = disp_verts[i + info.disp_vert_start as usize];
+                                let vert = disp_verts[i + info.disp_vert_start as usize];
 
-                        let pos = vert.vec + Vec3::lerp(v0, v1, dx);
+                                let pos = vert.vec + Vec3::lerp(v0, v1, dx);
 
-                        builder.add_vert(i as u16, pos, s, t);
+                                builder.add_vert_a(i as u16, pos, s, t, vert.alpha);
+                            }
+                        }
+                        let disp_side_len = disp_side_len as u16;
+
+                        // Build grid index buffer.
+                        for y in 0..(disp_side_len - 1) {
+                            for x in 0..(disp_side_len - 1) {
+                                let base = y * disp_side_len + x;
+                                builder.add_tri([
+                                    base,
+                                    base + disp_side_len,
+                                    base + disp_side_len + 1,
+                                ]);
+                                builder.add_tri([base, base + disp_side_len + 1, base + 1]);
+                            }
+                        }
+
+                        assert_eq!(builder.tris.len() as u16, ((disp_side_len - 1).pow(2)) * 6);
+
+                        let mut mesh = StateMesh::new_empty(r, shader_disp.clone());
+
+                        mesh.from_verts_and_tris(
+                            instance.clone(),
+                            bytemuck::cast_slice(&builder.verts),
+                            bytemuck::cast_slice(&builder.tris),
+                            builder.tris.len() as u32,
+                        );
+
+                        mesh.load_tex(
+                            instance.clone(),
+                            1,
+                            &tex0.get_high_res(r.device(), r.queue()),
+                        );
+                        mesh.load_tex(
+                            instance.clone(),
+                            2,
+                            &tex1.get_high_res(r.device(), r.queue()),
+                        );
+
+                        state.add_mesh(mesh);
                     }
                 }
-                let disp_side_len = disp_side_len as u16;
-
-                // Build grid index buffer.
-                for y in 0..(disp_side_len - 1) {
-                    for x in 0..(disp_side_len - 1) {
-                        let base = y * disp_side_len + x;
-                        builder.add_tri([base, base + disp_side_len, base + disp_side_len + 1]);
-                        builder.add_tri([base, base + disp_side_len + 1, base + 1]);
-                    }
-                }
-
-                assert_eq!(builder.tris.len() as u16, ((disp_side_len - 1).pow(2)) * 6);
-
-                let mut mesh = StateMesh::new_empty(r, shader_tex.clone());
-
-                mesh.from_verts_and_tris(
-                    instance.clone(),
-                    bytemuck::cast_slice(&builder.verts),
-                    bytemuck::cast_slice(&builder.tris),
-                    builder.tris.len() as u32,
-                );
-
-                mesh.load_tex(instance.clone(), &tex.get_high_res(r.device(), r.queue()));
-
-                state.add_mesh(mesh);
             } else {
-                println!("Missing data for a displacement - {}", &textures[&texdata]);
+                println!(
+                    "Missing material for a displacement - {}",
+                    &textures[&texdata]
+                );
             }
         }
         state.add_mesh(StateMesh::new_box(
