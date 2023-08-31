@@ -1,6 +1,7 @@
 // // Valve Texture File
 
 pub mod consts;
+pub mod gui;
 mod header;
 
 use std::{
@@ -309,7 +310,7 @@ impl BinaryData for VTF {
         }
     }
 }
-
+#[cfg(test)]
 mod vtf_tests {
     use std::path::PathBuf;
 

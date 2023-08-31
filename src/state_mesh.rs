@@ -7,7 +7,6 @@ use crate::{
 use std::{fs::File, io::BufReader, sync::Arc};
 
 use glam::{vec3, Vec3};
-use gltf::mesh::util::ReadIndices;
 
 use wgpu::util::DeviceExt;
 
@@ -102,67 +101,6 @@ impl StateMesh {
             shader,
             index_format: wgpu::IndexFormat::Uint16,
         }
-    }
-
-    pub fn load_glb_mesh(&mut self, instance: Arc<StateInstance>) {
-        let (document, buffers, _images) =
-            gltf::import("assets/dragon_high.glb").expect("Torus import should work");
-
-        let mesh = document.meshes().next().unwrap();
-        let prim = mesh.primitives().next().unwrap();
-
-        let reader = prim.reader(|buffer| Some(&buffers[buffer.index()]));
-
-        let iter = reader.read_positions().unwrap();
-        let verts: Vec<[f32; 3]> = iter.collect();
-
-        self.vertex_buffer =
-            instance
-                .device()
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(&verts[..]),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-
-        let (index_buffer, index_format, num_indices) = match reader.read_indices() {
-            Some(ReadIndices::U16(iter)) => {
-                let indicies: Vec<u16> = iter.collect();
-
-                (
-                    instance
-                        .device()
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Index Buffer"),
-                            contents: bytemuck::cast_slice(&indicies[..]),
-                            usage: wgpu::BufferUsages::INDEX,
-                        }),
-                    wgpu::IndexFormat::Uint16,
-                    indicies.len(),
-                )
-            }
-            Some(ReadIndices::U32(iter)) => {
-                let indicies: Vec<u32> = iter.collect();
-
-                (
-                    instance
-                        .device()
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Index Buffer"),
-                            contents: bytemuck::cast_slice(&indicies[..]),
-                            usage: wgpu::BufferUsages::INDEX,
-                        }),
-                    wgpu::IndexFormat::Uint32,
-                    indicies.len(),
-                )
-            }
-            _ => panic!("No indices"),
-        };
-        // Update the value stored in this mesh
-        self.index_buffer = index_buffer;
-
-        self.num_indices = num_indices as u32;
-        self.index_format = index_format;
     }
 
     pub fn load_debug_edges(

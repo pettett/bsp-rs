@@ -2,6 +2,7 @@ pub mod binaries;
 pub mod bsp;
 pub mod camera;
 pub mod camera_controller;
+pub mod gui;
 pub mod shader;
 pub mod state;
 pub mod state_imgui;

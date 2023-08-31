@@ -8,9 +8,11 @@
 // export type VKFPairUnit = string | number | VKFPair[];
 // export type VKFPair<T extends VKFPairUnit = VKFPairUnit> = [string, T];
 
+pub mod gui;
+
 use std::{
     collections::HashMap,
-    io::{Read, Seek},
+    io::{BufRead, Read, Seek},
 };
 
 use crate::binaries::BinaryData;
@@ -23,6 +25,7 @@ pub enum VMTUnit {
 }
 #[derive(Debug, Default)]
 pub struct VMT {
+    shader: String,
     data: HashMap<String, VMTUnit>,
 }
 
@@ -31,9 +34,26 @@ impl BinaryData for VMT {
         buffer: &mut std::io::BufReader<R>,
         max_size: Option<usize>,
     ) -> std::io::Result<Self> {
-        let mut data = String::new();
+        let mut data = Vec::new();
 
-        buffer.read_to_string(&mut data)?;
+        buffer.read_until(b'{', &mut data)?;
+        buffer.read_until(b'}', &mut data)?;
+        loop {
+            let opens = data.iter().filter(|&&c| c == b'{').count();
+            let closes = data.iter().filter(|&&c| c == b'}').count();
+            //TODO: Make sure this works.
+            // need to close a bracket
+            if opens > closes {
+                println!("Material needs more closes");
+                buffer.read_until(b'}', &mut data)?;
+            } else if opens < closes {
+                panic!("Material needs more opens. this should be impossible");
+            } else {
+                break;
+            }
+        }
+
+        let data = String::from_utf8(data).unwrap();
 
         println!("{}", data);
 

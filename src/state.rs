@@ -13,8 +13,11 @@ use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::event::*;
 use winit::window::Window;
-const PATH: &str =
+const TEX_PATH: &str =
     "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";
+
+const MISC_PATH: &str =
+    "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_misc_dir.vpk";
 
 pub trait State {
     fn render_pass(
@@ -55,6 +58,7 @@ pub struct StateRenderer {
     camera_bind_group_layout: wgpu::BindGroupLayout,
     camera_bind_group: wgpu::BindGroup,
     texture_dir: VPKDirectory,
+    misc_dir: VPKDirectory,
     pub pak: Option<BSPPak>,
 }
 impl StateInstance {
@@ -320,7 +324,8 @@ impl StateRenderer {
         let depth_texture =
             texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
-        let texture_dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
+        let texture_dir = VPKDirectory::load(PathBuf::from(TEX_PATH)).unwrap();
+        let misc_dir = VPKDirectory::load(PathBuf::from(MISC_PATH)).unwrap();
 
         puffin::set_scopes_on(true); // you may want to control this with a flag
                                      //let  puffin_ui = puffin_imgui::ProfilerUi::default();
@@ -342,6 +347,7 @@ impl StateRenderer {
             camera_buffer,
             camera_bind_group,
             texture_dir,
+            misc_dir,
             pak: None,
         }
     }
@@ -366,6 +372,9 @@ impl StateRenderer {
     }
     pub fn texture_dir(&self) -> &VPKDirectory {
         &self.texture_dir
+    }
+    pub fn misc_dir(&self) -> &VPKDirectory {
+        &self.misc_dir
     }
     pub fn camera_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         &self.camera_bind_group_layout

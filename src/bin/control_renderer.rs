@@ -13,7 +13,6 @@ use bsp_explorer::{
     vertex::UVVertex,
 };
 use glam::{vec2, vec3, Vec3, Vec4};
-use gltf::Mesh;
 use rayon::prelude::*;
 use std::{collections::HashMap, hash::Hash, sync::Arc, thread};
 use stream_unzip::ZipReader;
@@ -70,11 +69,13 @@ impl MeshBuilder {
 }
 
 pub fn main() {
+    println!("Starting...");
     pollster::block_on(run(|state| {
+        println!("Loading BSP File...");
         let instance = state.renderer().instance();
 
         let (header,mut buffer) = BSPHeader::load(
-			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_06.bsp").unwrap();
+			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp").unwrap();
 
         header.validate();
 
@@ -85,6 +86,8 @@ pub fn main() {
         //let mut mesh = StateMesh::new(state.renderer(), wgpu::PrimitiveTopology::LineList);
         //mesh.load_debug_edges(instance.clone(), &header, &mut buffer);
         //state.add_mesh(mesh);
+
+        println!("Loading BSP Headers...");
 
         let faces = header.get_lump::<BSPFace>(&mut buffer);
         let surfedges = header.get_lump::<BSPSurfEdge>(&mut buffer);
@@ -102,6 +105,7 @@ pub fn main() {
         //let mut tris = Vec::<u16>::new();
         // for now, filter by texture of first face
 
+        println!("Loading BSP Faces...");
         let mut textured_tris = HashMap::<i32, MeshBuilder>::new();
 
         for face in faces.iter() {
@@ -134,13 +138,10 @@ pub fn main() {
             }
         }
 
+        println!("Loading BSP Pak...");
         let pak_header = header.get_lump_header(LumpType::PAKFILE);
 
         let pak: BSPPak = pak_header.read_binary(&mut buffer).unwrap();
-
-        for e in &pak.entries {
-            println!("{}", e.filename);
-        }
 
         let map: HashMap<&str, &str> = pak
             .entries
@@ -172,6 +173,7 @@ pub fn main() {
             })
             .collect();
 
+        println!("Loading BSP Texture strings...");
         let tex_data_string_table = header.get_lump::<BSPTexDataStringTable>(&mut buffer);
         let tex_data_string_data = header.get_lump_header(LumpType::TEXDATA_STRING_DATA);
 
@@ -189,21 +191,35 @@ pub fn main() {
         let textures: HashMap<i32, String> = textured_tris
             .par_iter()
             .map(|(tex, tris)| {
+                //TODO: Material data is stored in the misc file, load those
+                let tex_name = match tex_name_map[tex].as_str() {
+                    "nature/red_grass" => "nature/dirtfloor011a",
+                    "nature/red_grass_thin" => "nature/dirtfloor011a",
+                    "nature/blendtoxictoxic004a" => "nature/toxicslime001a",
+                    "nature/canal_reeds" => "nature/sandfloor010a",
+                    "nature/blendrockdirt008a" => "nature/cliffface001a",
+                    "nature/blenddirtgrass008b" => "nature/dirtfloor012a",
+                    "nature/blenddirtgrass008a" => "nature/dirtfloor006a",
+                    "nature/blendsandsand008b" => "nature/sandfloor009a",
+                    _ => tex_name_map[tex].as_str(),
+                };
+
                 // turn surfaces into meshes
-                let filename_mat = format!("materials/{}.vmt", tex_name_map[tex]);
+                let filename_mat = format!("materials/{}.vmt", tex_name);
 
                 if let Some(mapped_file) = map.get(filename_mat.as_str()) {
                     let mut s = (*mapped_file).to_owned();
                     s.make_ascii_lowercase();
                     (*tex, s.replace(".vmt", ".vtf"))
                 } else {
-                    (*tex, format!("materials/{}.vtf", tex_name_map[tex]))
+                    (*tex, format!("materials/{}.vtf", tex_name))
                 }
             })
             .collect();
 
         let r = state.renderer();
 
+        println!("Loading BSP Textures...");
         //preload all textures in parallel
         textures.iter().for_each(|(tex, name)| {
             if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[tex]) {
@@ -211,6 +227,7 @@ pub fn main() {
             }
         });
 
+        println!("Loading BSP meshes...");
         let shader_lines = Arc::new(Shader::new_white_lines::<Vec3>(state.renderer()));
         let shader_tex = Arc::new(Shader::new_textured(state.renderer()));
 
@@ -234,6 +251,7 @@ pub fn main() {
 
         // Load displacement data
 
+        println!("Loading BSP displacements...");
         let infos = header.get_lump::<BSPDispInfo>(&mut buffer);
         let disp_verts = header.get_lump::<BSPDispVert>(&mut buffer);
 

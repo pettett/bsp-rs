@@ -24,6 +24,9 @@
 //     maxPackFile: number;
 // }
 
+pub mod file;
+pub mod gui;
+
 use std::{
     cell::OnceCell,
     collections::HashMap,
@@ -33,7 +36,7 @@ use std::{
     sync::{Once, OnceLock},
 };
 
-use crate::{binaries::BinaryData, vtf::VTF};
+use crate::{binaries::BinaryData, vmt::VMT, vtf::VTF};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -86,6 +89,7 @@ pub struct VPKFile {
     entry: VPKDirectoryEntry,
     preload: Option<Vec<u8>>,
     vtf: OnceLock<Option<VTF>>,
+    vmt: OnceLock<Option<VMT>>,
 }
 #[derive(Debug)]
 pub enum VPKDirectoryTree {
@@ -199,6 +203,7 @@ impl VPKDirectory {
                             entry,
                             preload,
                             vtf: OnceLock::new(),
+                            vmt: OnceLock::new(),
                         },
                     );
 
@@ -215,43 +220,64 @@ impl VPKDirectory {
             files,
         })
     }
-}
 
-impl VPKDirectory {
     pub fn load_vtf(&self, vpk_path: &str) -> io::Result<Option<&VTF>> {
         let file_data = self.files.get(vpk_path).ok_or(io::Error::new(
             io::ErrorKind::InvalidInput,
             format!("File path {} not present", vpk_path),
         ))?;
 
-        Ok(file_data
-            .vtf
+        self.load_file_once(vpk_path, ".vtf", &file_data.vtf, file_data)
+    }
+
+    pub fn load_vmt(&self, vpk_path: &str) -> io::Result<Option<&VMT>> {
+        let file_data = self.files.get(vpk_path).ok_or(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("File path {} not present", vpk_path),
+        ))?;
+
+        self.load_file_once(vpk_path, ".vmt", &file_data.vmt, file_data)
+    }
+
+    fn load_file_once<'a, T: BinaryData>(
+        &'a self,
+        vpk_path: &str,
+        ext: &str,
+        cell: &'a OnceLock<Option<T>>,
+        file_data: &VPKFile,
+    ) -> io::Result<Option<&'a T>> {
+        Ok(cell
             .get_or_init(|| {
-                // Attempt to load
-
-                let index = file_data.entry.ArchiveIndex;
-                // replace dir with number
-                let mut header_pak_path = self.dir_path.to_path_buf();
-                let dir_file = self.dir_path.file_name().unwrap().to_string_lossy();
-                header_pak_path.set_file_name(dir_file.replace("_dir", &format!("_{index:0>3}")));
-
-                // open file
-                let file = File::open(header_pak_path).unwrap();
-                let mut buffer = BufReader::new(file);
-                // seek and load
-                if buffer
-                    .seek_relative(file_data.entry.EntryOffset as i64)
-                    .is_ok()
-                {
-                    match VTF::read(&mut buffer, None) {
-                        Ok(vtf) => Some(vtf),
-                        Err(_) => None,
-                    }
-                } else {
-                    None
+                if !vpk_path.ends_with(ext) {
+                    return None;
                 }
+                // Attempt to load
+                self.load_file::<T>(file_data)
             })
             .as_ref())
+    }
+
+    fn load_file<F: BinaryData>(&self, file_data: &VPKFile) -> Option<F> {
+        // Attempt to load
+
+        let index = file_data.entry.ArchiveIndex;
+        // replace dir with number
+        let mut header_pak_path = self.dir_path.to_path_buf();
+        let dir_file = self.dir_path.file_name().unwrap().to_string_lossy();
+        header_pak_path.set_file_name(dir_file.replace("_dir", &format!("_{index:0>3}")));
+
+        // open file
+        let file = File::open(header_pak_path).unwrap();
+        let mut buffer = BufReader::new(file);
+        // seek and load
+        if buffer
+            .seek_relative(file_data.entry.EntryOffset as i64)
+            .is_ok()
+        {
+            F::read(&mut buffer, None).ok()
+        } else {
+            None
+        }
     }
 }
 

@@ -4,8 +4,6 @@ use std::{
     mem, slice,
 };
 
-use bytemuck::Zeroable;
-
 use crate::binaries::BinaryData;
 
 use super::consts::LumpType;

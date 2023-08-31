@@ -6,6 +6,7 @@ use wgpu::{Device, Queue};
 use winit::event::Event;
 
 use crate::{
+    gui::Viewable,
     state::{State, StateRenderer},
     vpk::{VPKDirectory, VPKDirectoryTree},
 };
@@ -17,47 +18,6 @@ pub struct StateImgui {
     platform: imgui_winit_support::WinitPlatform,
     renderer: Renderer,
     //puffin_ui : puffin_imgui::ProfilerUi,
-}
-
-fn draw_dir(
-    ui: &Ui,
-    renderer: &mut Renderer,
-    device: &Device,
-    queue: &Queue,
-    tree: &VPKDirectoryTree,
-    dir: &VPKDirectory,
-) {
-    match tree {
-        VPKDirectoryTree::Leaf(file) => {
-            let uncomp_data = dir.load_vtf(file).unwrap();
-
-            ui.text(file);
-            if let Some(tex) = uncomp_data {
-                Image::new(
-                    *tex.get_low_res_imgui(device, queue, renderer),
-                    [32.0, 32.0],
-                )
-                .build(ui);
-
-                if let Some(_node) = ui.tree_node("High res") {
-                    Image::new(
-                        *tex.get_high_res_imgui(device, queue, renderer),
-                        [64.0 * 4.0, 64.0 * 4.0],
-                    )
-                    .build(ui);
-                }
-            }
-        }
-        VPKDirectoryTree::Node(dir_inner) => {
-            let mut keys: Vec<&String> = dir_inner.keys().collect();
-            keys.sort();
-            for file in keys {
-                if let Some(_node) = ui.tree_node(file) {
-                    draw_dir(ui, renderer, device, queue, &dir_inner[file], dir);
-                }
-            }
-        }
-    }
 }
 
 impl State for StateImgui {
@@ -103,21 +63,36 @@ impl State for StateImgui {
 
                     //end
                 });
-            let window = ui.window("Texture Pak");
-            window
-                .size([300.0, 600.0], Condition::FirstUseEver)
-                .position([0.0, 0.0], Condition::FirstUseEver)
-                .build(|| {
-                    draw_dir(
-                        ui,
-                        &mut self.renderer,
-                        state.device(),
-                        state.queue(),
-                        state.texture_dir().get_root(),
-                        state.texture_dir(),
-                    )
-                    //end
-                });
+            {
+                let window = ui.window(state.texture_dir().gui_label());
+                window
+                    .size([300.0, 600.0], Condition::FirstUseEver)
+                    .position([0.0, 0.0], Condition::FirstUseEver)
+                    .build(|| {
+                        state.texture_dir().gui_view(
+                            ui,
+                            &mut self.renderer,
+                            state.device(),
+                            state.queue(),
+                        );
+                        //end
+                    });
+            }
+            {
+                let window = ui.window(state.misc_dir().gui_label());
+                window
+                    .size([300.0, 600.0], Condition::FirstUseEver)
+                    .position([400.0, 0.0], Condition::FirstUseEver)
+                    .build(|| {
+                        state.misc_dir().gui_view(
+                            ui,
+                            &mut self.renderer,
+                            state.device(),
+                            state.queue(),
+                        );
+                        //end
+                    });
+            }
 
             if let Some(pak) = &state.pak {
                 let window = ui.window("Map Pak");

@@ -11,8 +11,7 @@ wgpu = "0.16"
 env_logger = "0.10"
 log = "0.4"
 pollster = "0.3"
-bytemuck = { version = "1.12", features = ["derive"] }
-gltf = "1.0"
+bytemuck = { version = "1.13", features = ["derive", "extern_crate_alloc"] }
 puffin = "0.16"
 crate = "0.0.2"
 imgui = "0.11"
