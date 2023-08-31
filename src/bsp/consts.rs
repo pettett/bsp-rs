@@ -24,12 +24,12 @@ pub const MAX_MAP_TEXINFO: usize = 12288;
 pub const MAX_MAP_TEXDATA: usize = 2048;
 pub const MAX_MAP_DISPINFO: usize = 2048;
 pub const MAX_MAP_DISP_VERTS: usize =
-    (MAX_MAP_DISPINFO * ((1 << MAX_MAP_DISP_POWER) + 1) * ((1 << MAX_MAP_DISP_POWER) + 1));
-pub const MAX_MAP_DISP_TRIS: usize = ((1 << MAX_MAP_DISP_POWER) * (1 << MAX_MAP_DISP_POWER) * 2);
+    MAX_MAP_DISPINFO * ((1 << MAX_MAP_DISP_POWER) + 1) * ((1 << MAX_MAP_DISP_POWER) + 1);
+pub const MAX_MAP_DISP_TRIS: usize = (1 << MAX_MAP_DISP_POWER) * (1 << MAX_MAP_DISP_POWER) * 2;
 pub const MAX_DISPVERTS: usize = NUM_DISP_POWER_VERTS(MAX_MAP_DISP_POWER);
 pub const MAX_DISPTRIS: usize = NUM_DISP_POWER_TRIS(MAX_MAP_DISP_POWER);
 pub const MAX_MAP_AREAS: usize = 256;
-pub const MAX_MAP_AREA_BYTES: usize = (MAX_MAP_AREAS / 8);
+pub const MAX_MAP_AREA_BYTES: usize = MAX_MAP_AREAS / 8;
 pub const MAX_MAP_AREAPORTALS: usize = 1024;
 // Planes come in pairs, thus an even number.
 pub const MAX_MAP_PLANES: usize = 65536;

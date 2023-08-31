@@ -66,7 +66,7 @@ mod bsp_tests {
 
     #[test]
     fn test_header() {
-        let (header, mut buffer) = BSPHeader::load(PATH).unwrap();
+        let (header, _buffer) = BSPHeader::load(PATH).unwrap();
         header.validate();
     }
 

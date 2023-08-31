@@ -1,5 +1,4 @@
 use std::{
-    fs::File,
     io::{self, BufReader, Cursor, Read, Seek},
     sync::OnceLock,
 };
@@ -58,7 +57,7 @@ impl Lump for BSPPak {
         LumpType::PAKFILE
     }
 
-    fn validate(lump: &Box<[Self]>) {}
+    fn validate(_lump: &Box<[Self]>) {}
 }
 
 impl BinaryData for BSPPak {

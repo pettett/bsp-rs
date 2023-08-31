@@ -28,12 +28,11 @@ pub mod file;
 pub mod gui;
 
 use std::{
-    cell::OnceCell,
     collections::HashMap,
     fs::File,
     io::{self, BufRead, BufReader, Read},
     path::PathBuf,
-    sync::{Once, OnceLock},
+    sync::{OnceLock},
 };
 
 use crate::{binaries::BinaryData, vmt::VMT, vtf::VTF};

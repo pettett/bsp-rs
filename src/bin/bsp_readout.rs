@@ -1,5 +1,4 @@
 use bsp_explorer::bsp::{
-    consts::*,
     edges::{BSPEdge, BSPSurfEdge},
     face::BSPFace,
     header::BSPHeader,
@@ -7,12 +6,9 @@ use bsp_explorer::bsp::{
     Lump,
 };
 use glam::Vec3;
-use num_traits::FromPrimitive;
+
 use std::{
-    fmt,
-    fs::File,
-    io::{self, BufReader, Read, Seek},
-    mem, slice,
+    io::{self},
 };
 
 pub fn main() -> io::Result<()> {

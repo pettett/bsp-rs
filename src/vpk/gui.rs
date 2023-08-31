@@ -2,7 +2,7 @@ use imgui_wgpu::Renderer;
 
 use crate::gui::Viewable;
 
-use super::{VPKDirectory, VPKDirectoryTree, VPKFile};
+use super::{VPKDirectory, VPKDirectoryTree};
 
 fn draw_dir(
     ui: &imgui::Ui,

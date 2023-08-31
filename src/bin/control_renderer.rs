@@ -1,6 +1,6 @@
 use bsp_explorer::{
     bsp::{
-        consts::{LumpType, NUM_DISP_POWER_VERTS},
+        consts::{LumpType},
         displacement::{BSPDispInfo, BSPDispVert},
         edges::{BSPEdge, BSPSurfEdge},
         face::BSPFace,
@@ -9,13 +9,12 @@ use bsp_explorer::{
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
     shader::Shader,
-    state::State,
     vertex::UVVertex,
 };
 use glam::{vec2, vec3, Vec3, Vec4};
 use rayon::prelude::*;
-use std::{collections::HashMap, hash::Hash, sync::Arc, thread};
-use stream_unzip::ZipReader;
+use std::{collections::HashMap, sync::Arc};
+
 
 use bsp_explorer::{run, state_mesh::StateMesh};
 #[derive(Default)]
@@ -25,7 +24,7 @@ struct MeshBuilder {
     verts: Vec<UVVertex>,
 }
 impl MeshBuilder {
-    pub fn add_vert(&mut self, index: u16, vertex: Vec3, s: Vec4, t: Vec4) {
+    pub fn add_vert(&mut self, _index: u16, vertex: Vec3, s: Vec4, t: Vec4) {
         //if !self.tri_map.contains_key(&index) {
         // if not contained, add in and generate uvs
         let u = s.dot(Vec4::from((vertex, 1.0)));
@@ -179,7 +178,7 @@ pub fn main() {
 
         let tex_name_map: HashMap<i32, String> = textured_tris
             .iter()
-            .map(|(tex, tris)| {
+            .map(|(tex, _tris)| {
                 (
                     *tex,
                     tex_data_string_table[tex_data[*tex as usize].name_string_table_id as usize]
@@ -190,7 +189,7 @@ pub fn main() {
 
         let textures: HashMap<i32, String> = textured_tris
             .par_iter()
-            .map(|(tex, tris)| {
+            .map(|(tex, _tris)| {
                 //TODO: Material data is stored in the misc file, load those
                 let tex_name = match tex_name_map[tex].as_str() {
                     "nature/red_grass" => "nature/dirtfloor011a",
@@ -221,7 +220,7 @@ pub fn main() {
 
         println!("Loading BSP Textures...");
         //preload all textures in parallel
-        textures.iter().for_each(|(tex, name)| {
+        textures.iter().for_each(|(tex, _name)| {
             if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[tex]) {
                 tex.get_high_res(r.device(), r.queue());
             }
@@ -278,7 +277,7 @@ pub fn main() {
             if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[&texdata]) {
                 let mut builder = MeshBuilder::default();
 
-                let c = info.start_position;
+                let _c = info.start_position;
 
                 let disp_side_len = (1 << (info.power)) + 1;
 

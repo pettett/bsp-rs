@@ -11,7 +11,7 @@ pub struct Shader {
 impl Shader {
     pub fn draw<'a>(
         &'a self,
-        state: &'a StateRenderer,
+        _state: &'a StateRenderer,
         render_pass: &mut wgpu::RenderPass<'a>,
         _output: &wgpu::SurfaceTexture,
         _view: &wgpu::TextureView,

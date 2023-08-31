@@ -25,5 +25,5 @@ impl Lump for BSPModel {
         LumpType::MODELS
     }
 
-    fn validate(lump: &Box<[Self]>) {}
+    fn validate(_lump: &Box<[Self]>) {}
 }

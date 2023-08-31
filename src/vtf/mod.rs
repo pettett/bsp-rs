@@ -5,10 +5,8 @@ pub mod gui;
 mod header;
 
 use std::{
-    cell::OnceCell,
     fmt,
-    fs::File,
-    io::{self, BufReader, Error, Read, Seek},
+    io::{self, BufReader, Read, Seek},
     mem,
     sync::OnceLock,
 };
@@ -197,7 +195,7 @@ impl VTF {
 impl BinaryData for VTF {
     fn read<R: Read + Seek>(
         buffer: &mut std::io::BufReader<R>,
-        max_size: Option<usize>,
+        _max_size: Option<usize>,
     ) -> std::io::Result<Self> {
         let mut data_read = 0;
 
@@ -327,7 +325,7 @@ mod vtf_tests {
         for file in dir.get_file_names() {
             if file.contains(".vtf") {
                 let data = dir.load_vtf(file).unwrap().unwrap();
-                let lr = data.header.low_res_image_format;
+                let _lr = data.header.low_res_image_format;
                 let hr = data.header.high_res_image_format;
                 if hr != ImageFormat::DXT5 && hr != ImageFormat::DXT1 {
                     println!("{} {:?}", file, hr);

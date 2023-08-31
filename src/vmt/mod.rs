@@ -29,20 +29,83 @@ pub struct VMT {
     data: HashMap<String, String>,
 }
 
-fn consume_string(data: &mut &str) -> String {
-    let next = data.find('"').unwrap() + 1;
-    let after = data[next..].find('"').unwrap();
+fn remove_comments(data: &mut String) {
+    loop {
+        if let Some(next_comment) = data.find(r"//") {
+            println!("{}", next_comment);
+            if let Some(next_newline) = data[next_comment..].find("\n") {
+                // replace up to next line
+                data.replace_range(next_comment..next_comment + next_newline, "");
+            } else {
+                // replace to end of file
+                data.replace_range(next_comment.., "");
+            }
+        } else {
+            break;
+        }
+    }
+}
+
+fn view_up_to_line(data: &str) -> &str {
+    if let Some(next_newline) = data[..].find("\n") {
+        // View up to nextline character
+        &data[..next_newline]
+    } else {
+        // View up to end of file
+        data
+    }
+}
+fn consume_line(data: &mut &str) -> Result<(), ()> {
+    if let Some(next_newline) = data[..].find("\n") {
+        // clip up to next new line
+        *data = &data[next_newline + 1..];
+        Ok(())
+    } else {
+        Err(())
+    }
+}
+
+fn consume_string(data: &mut &str) -> Result<String, ()> {
+    let next = data.find('"').ok_or(())? + 1;
+    let after = data[next..].find('"').ok_or(())?;
 
     let str = data[next..next + after].to_owned();
 
-    *data = &data[next + after..];
+    *data = &data[next + after + 1..];
 
-    return str;
+    return Ok(str);
 }
+
+fn consume_vmt(data: &mut &str) -> Result<VMT, ()> {
+    let mut vmt = VMT::default();
+    vmt.shader = consume_string(data)?;
+
+    loop {
+        let mut line_data = view_up_to_line(data);
+
+        let s1 = consume_string(&mut line_data);
+        //TODO: Read things like ints/floats/vectors/sub maps
+        let s2 = consume_string(&mut line_data);
+
+        match (s1, s2) {
+            (Ok(s1), Ok(s2)) => {
+                vmt.data.insert(s1, s2);
+            }
+            _ => {}
+        }
+
+        // otherwise, consume lines until we find something, or break
+        if consume_line(data).is_err() {
+            break;
+        }
+    }
+    Ok(vmt)
+}
+
 impl BinaryData for VMT {
     fn read<R: Read + Seek>(
         buffer: &mut std::io::BufReader<R>,
-        max_size: Option<usize>,
+        _max_size: Option<usize>,
     ) -> std::io::Result<Self> {
         let mut data = Vec::new();
 
@@ -65,29 +128,25 @@ impl BinaryData for VMT {
 
         let data = String::from_utf8(data).unwrap();
 
-        let mut view = &mut data.as_str();
+        let vmt = consume_vmt(&mut data.as_str()).unwrap();
 
-        let shader = consume_string(&mut view);
-
-        println!("{}", shader);
-        println!("{}", view);
-
-        Ok(Self::default())
+        Ok(vmt)
     }
 }
 
 #[cfg(test)]
 mod vmt_tests {
-    use super::consume_string;
+    use crate::vmt::{consume_vmt, remove_comments};
 
     #[test]
     fn test_decode() {
-        let data = r#"
+        let mut data = r#"
 "VertexLitGeneric"
 {
      "$basetexture" "Models/Combine_soldier/Combine_elite"
      "$bumpmap" "models/combine_soldier/combine_elite_normal"
-     "$envmap" "env_cubemap"
+     // Hello "gamers"
+	 "$envmap" "env_cubemap"
      "$normalmapalphaenvmapmask" 1
      "$envmapcontrast" 1
      "$model" 1
@@ -96,12 +155,13 @@ mod vmt_tests {
 		"#
         .to_owned();
 
-        let mut view = &mut data.as_str();
+        remove_comments(&mut data);
+        println!("{}", data);
 
-        let shader = consume_string(&mut view);
+        let vmt = consume_vmt(&mut data.as_str()).unwrap();
 
-        println!("{}", shader);
-        println!("{}", view);
+        println!("{}", vmt.shader);
+        println!("{:?}", vmt.data);
     }
 }
 // export interface VMT {

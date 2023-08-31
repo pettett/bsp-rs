@@ -1,14 +1,13 @@
 use std::time::Instant;
 
-use imgui::{Condition, FontSource, Image, Ui};
+use imgui::{Condition, FontSource, Image};
 use imgui_wgpu::{Renderer, RendererConfig};
-use wgpu::{Device, Queue};
+
 use winit::event::Event;
 
 use crate::{
     gui::Viewable,
     state::{State, StateRenderer},
-    vpk::{VPKDirectory, VPKDirectoryTree},
 };
 
 pub struct StateImgui {
