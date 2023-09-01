@@ -95,31 +95,33 @@ pub fn get_material<'a>(
     material_name_map: &HashMap<i32, String>,
     map_specific_material_map: &HashMap<&str, &str>,
 ) -> Option<&'a VMT> {
-    let material_name = material_name_map[material_index].as_str();
+    if let Some(material_name) = material_name_map.get(material_index).map(String::as_str) {
+        // Get material data
 
-    // Get material data
-    println!("{}", material_name);
+        let vmt_r =
+            if let Some(&global_material_path) = map_specific_material_map.get(material_name) {
+                let p: VGlobalPath = global_material_path.into();
 
-    let vmt_r = if let Some(&global_material_path) = map_specific_material_map.get(material_name) {
-        let p: VGlobalPath = global_material_path.into();
+                renderer.misc_dir().load_vmt(&p)
+            } else {
+                renderer
+                    .misc_dir()
+                    .load_vmt(&VLocalPath::new("materials", material_name, "vmt"))
+            };
 
-        renderer.misc_dir().load_vmt(&p)
+        match vmt_r {
+            Ok(Some(vmt)) => Some(vmt),
+            Ok(None) => {
+                log::error!("Material {} does not have valid vmt data", material_name);
+                None
+            }
+            Err(e) => {
+                log::error!("{}", e);
+                None
+            }
+        }
     } else {
-        renderer
-            .misc_dir()
-            .load_vmt(&VLocalPath::new("materials", material_name, "vmt"))
-    };
-
-    match vmt_r {
-        Ok(Some(vmt)) => Some(vmt),
-        Ok(None) => {
-            log::error!("Material {} does not have valid vmt data", material_name);
-            None
-        }
-        Err(e) => {
-            log::error!("{}", e);
-            None
-        }
+        None
     }
 }
 
@@ -130,7 +132,7 @@ pub fn main() {
         let instance = state.renderer().instance();
 
         let (header,mut buffer) = BSPHeader::load(
-			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp").unwrap();
+			"D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_town_02a.bsp").unwrap();
 
         header.validate();
 
@@ -236,7 +238,7 @@ pub fn main() {
             .collect();
 
         let r = state.renderer();
-        let textures: HashMap<i32, String> = textured_tris
+        let textures: HashMap<i32, Option<String>> = textured_tris
             .iter()
             .filter_map(|(tex, _tris)| {
                 get_material(tex, r, &material_name_map, &map_specific_material_map)
@@ -246,12 +248,14 @@ pub fn main() {
 
         println!("Loading BSP Textures...");
         //preload all textures in parallel
-        textures.par_iter().for_each(|(tex, _name)| {
-            if let Ok(Some(tex)) =
-                r.texture_dir()
-                    .load_vtf(&VLocalPath::new("materials", &textures[tex], "vtf"))
-            {
-                tex.get_high_res(r.device(), r.queue());
+        textures.par_iter().for_each(|(tex, pos_name)| {
+            if let Some(name) = pos_name {
+                if let Ok(Some(vtf)) =
+                    r.texture_dir()
+                        .load_vtf(&VLocalPath::new("materials", &name, "vtf"))
+                {
+                    vtf.get_high_res(r.device(), r.queue());
+                }
             }
         });
 
@@ -261,7 +265,7 @@ pub fn main() {
         let shader_disp = Arc::new(Shader::new_displacement(state.renderer()));
 
         for (tex, builder) in &textured_tris {
-            if let Some(path) = textures.get(tex) {
+            if let Some(Some(path)) = textures.get(tex) {
                 if let Ok(Some(tex)) =
                     r.texture_dir()
                         .load_vtf(&VLocalPath::new("materials", path, "vtf"))
@@ -282,7 +286,7 @@ pub fn main() {
                     );
                     state.add_mesh(mesh);
                 } else {
-                    println!("Could not find texture for {}", textures[tex])
+                    println!("Could not find texture for {:?}", textures.get(tex))
                 }
             }
         }
@@ -316,16 +320,14 @@ pub fn main() {
             if let Some(vmt) =
                 get_material(&texdata, r, &material_name_map, &map_specific_material_map)
             {
-                if let Ok(Some(tex0)) = r.texture_dir().load_vtf(&VLocalPath::new(
-                    "materials",
-                    &vmt.get_tex_name(),
-                    "vtf",
-                )) {
-                    if let Ok(Some(tex1)) = r.texture_dir().load_vtf(&VLocalPath::new(
-                        "materials",
-                        &vmt.get_tex2_name(),
-                        "vtf",
-                    )) {
+                if let Some(Ok(Some(tex0))) = vmt.get_tex_name().map(|t| {
+                    r.texture_dir()
+                        .load_vtf(&VLocalPath::new("materials", &t, "vtf"))
+                }) {
+                    if let Some(Ok(Some(tex1))) = vmt.get_tex2_name().map(|t| {
+                        r.texture_dir()
+                            .load_vtf(&VLocalPath::new("materials", &t, "vtf"))
+                    }) {
                         let mut builder = MeshBuilder::default();
 
                         let _c = info.start_position;

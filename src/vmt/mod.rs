@@ -30,17 +30,18 @@ pub struct VMT {
 }
 
 impl VMT {
-    pub fn get_tex_name(&self) -> String {
+    pub fn get_tex_name(&self) -> Option<String> {
         //TODO: This is just annoying
 
-        self.get_basetex2()
-            .unwrap_or_else(|| self.get_basetex().unwrap())
-            .replace('\\', "/")
+        match self.get_basetex2().map(|f| f.replace('\\', "/")) {
+            None => self.get_tex2_name(),
+            f => f,
+        }
     }
-    pub fn get_tex2_name(&self) -> String {
+    pub fn get_tex2_name(&self) -> Option<String> {
         //TODO: This is just annoying
 
-        self.get_basetex().unwrap().replace('\\', "/")
+        self.get_basetex().map(|f| f.replace('\\', "/"))
     }
     pub fn get_basetex(&self) -> Option<&str> {
         self.data.get("$basetexture").map(String::as_str)
