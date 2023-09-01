@@ -10,6 +10,8 @@ use crate::{
     state::{State, StateRenderer},
 };
 
+use super::map_select::MapSelect;
+
 pub struct StateImgui {
     imgui: imgui::Context,
     last_cursor: Option<imgui::MouseCursor>,
@@ -271,6 +273,12 @@ impl State for StateImgui {
             windows: vec![
                 WindowState::new(renderer.misc_dir().clone()),
                 WindowState::new(renderer.texture_dir().clone()),
+                WindowState::new(Arc::new(
+                    MapSelect::new(
+                        "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\",
+                    )
+                    .unwrap(),
+                )),
             ],
         }
     }
