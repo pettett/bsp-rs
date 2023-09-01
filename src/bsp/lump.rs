@@ -1,4 +1,5 @@
 use std::{
+    fmt::Debug,
     fs::File,
     io::{self, BufReader, Read, Seek},
     mem, slice,
@@ -33,7 +34,11 @@ impl BSPLump {
     ) -> io::Result<Box<[T]>> {
         let item_size = mem::size_of::<T>();
 
-        assert_eq!(self.file_len as usize % item_size, 0);
+        assert_eq!(
+            self.file_len as usize % item_size,
+            0,
+            "Structure given does not fit nicely into lump data"
+        );
 
         let len = self.file_len as usize / item_size;
 

@@ -11,6 +11,7 @@ use super::{consts::LumpType, Lump};
 
 pub struct PakEntry {
     pub filename: String,
+    pub ext: String,
     pub bytes: Vec<u8>,
     pub vtf: OnceLock<Option<VTF>>,
     pub vmt: OnceLock<Option<VMT>>,
@@ -20,7 +21,7 @@ impl PakEntry {
     pub fn get_vtf(&self) -> Option<&VTF> {
         self.vtf
             .get_or_init(|| {
-                if self.filename.ends_with(".vtf") {
+                if self.ext == "vtf" {
                     let mut b = BufReader::new(Cursor::new(&self.bytes[..]));
                     VTF::read(&mut b, None).ok()
                 } else {
@@ -33,7 +34,7 @@ impl PakEntry {
     pub fn get_vmt(&self) -> Option<&VMT> {
         self.vmt
             .get_or_init(|| {
-                if self.filename.ends_with(".vmt") {
+                if self.ext == "vmt" {
                     let mut b = BufReader::new(Cursor::new(&self.bytes[..]));
                     VMT::read(&mut b, None).ok()
                 } else {
@@ -78,11 +79,17 @@ impl BinaryData for BSPPak {
         let entries: Vec<PakEntry> = zip_reader
             .drain_entries()
             .iter()
-            .map(|e| PakEntry {
-                filename: e.header().filename.clone(),
-                bytes: e.compressed_data().to_vec(),
-                vtf: OnceLock::new(),
-                vmt: OnceLock::new(),
+            .map(|e| {
+                let first_dir_sep = e.header().filename.find('/').unwrap();
+                let ext_sep = e.header().filename.find('.').unwrap();
+
+                PakEntry {
+                    filename: e.header().filename[first_dir_sep + 1..ext_sep].to_owned(),
+                    ext: e.header().filename[ext_sep + 1..].to_owned(),
+                    bytes: e.compressed_data().to_vec(),
+                    vtf: OnceLock::new(),
+                    vmt: OnceLock::new(),
+                }
             })
             .collect();
 

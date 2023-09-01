@@ -157,7 +157,7 @@ impl Lump for BSPTexDataStringTable {
         0
     }
     fn lump_type() -> LumpType {
-        LumpType::TEXDATA_STRING_TABLE
+        LumpType::TexdataStringTable
     }
     fn validate(_lump: &Box<[Self]>) {
         println!("Validated dtexdatastringdata_t lump!")

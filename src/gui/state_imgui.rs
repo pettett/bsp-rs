@@ -1,6 +1,6 @@
-use std::{rc::Rc, sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant};
 
-use imgui::{Condition, FontSource, Image};
+use imgui::{Condition, FontSource};
 use imgui_wgpu::{Renderer, RendererConfig};
 
 use winit::event::Event;

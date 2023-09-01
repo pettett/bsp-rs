@@ -10,6 +10,7 @@ use bsp_explorer::{
     },
     shader::Shader,
     state::StateRenderer,
+    util::v_path::{VGlobalPath, VLocalPath},
     vertex::{UVAlphaVertex, UVVertex, Vertex},
     vmt::VMT,
 };
@@ -97,25 +98,26 @@ pub fn get_material<'a>(
     let material_name = material_name_map[material_index].as_str();
 
     // Get material data
-    let mut local_material_path = format!("materials/{}.vmt", material_name);
-    local_material_path.make_ascii_lowercase();
+    println!("{}", material_name);
 
-    let global_material_path = map_specific_material_map
-        .get(local_material_path.as_str())
-        .unwrap_or(&local_material_path.as_str())
-        .to_ascii_lowercase();
+    let vmt_r = if let Some(&global_material_path) = map_specific_material_map.get(material_name) {
+        let p: VGlobalPath = global_material_path.into();
 
-    match renderer.misc_dir().load_vmt(&global_material_path) {
+        renderer.misc_dir().load_vmt(&p)
+    } else {
+        renderer
+            .misc_dir()
+            .load_vmt(&VLocalPath::new("materials", material_name, "vmt"))
+    };
+
+    match vmt_r {
         Ok(Some(vmt)) => Some(vmt),
         Ok(None) => {
-            println!(
-                "Material {} does not have valid vmt data",
-                global_material_path
-            );
+            log::error!("Material {} does not have valid vmt data", material_name);
             None
         }
         Err(e) => {
-            println!("Error loading material: {} ", e);
+            log::error!("{}", e);
             None
         }
     }
@@ -220,7 +222,7 @@ pub fn main() {
 
         println!("Loading BSP Texture strings...");
         let tex_data_string_table = header.get_lump::<BSPTexDataStringTable>(&mut buffer);
-        let tex_data_string_data = header.get_lump_header(LumpType::TEXDATA_STRING_DATA);
+        let tex_data_string_data = header.get_lump_header(LumpType::TexdataStringData);
 
         let material_name_map: HashMap<i32, String> = textured_tris
             .iter()
@@ -245,7 +247,10 @@ pub fn main() {
         println!("Loading BSP Textures...");
         //preload all textures in parallel
         textures.par_iter().for_each(|(tex, _name)| {
-            if let Ok(Some(tex)) = r.texture_dir().load_vtf(&textures[tex]) {
+            if let Ok(Some(tex)) =
+                r.texture_dir()
+                    .load_vtf(&VLocalPath::new("materials", &textures[tex], "vtf"))
+            {
                 tex.get_high_res(r.device(), r.queue());
             }
         });
@@ -257,7 +262,10 @@ pub fn main() {
 
         for (tex, builder) in &textured_tris {
             if let Some(path) = textures.get(tex) {
-                if let Ok(Some(tex)) = r.texture_dir().load_vtf(path) {
+                if let Ok(Some(tex)) =
+                    r.texture_dir()
+                        .load_vtf(&VLocalPath::new("materials", path, "vtf"))
+                {
                     let mut mesh = StateMesh::new_empty(r, shader_tex.clone());
 
                     mesh.from_verts_and_tris(
@@ -308,8 +316,16 @@ pub fn main() {
             if let Some(vmt) =
                 get_material(&texdata, r, &material_name_map, &map_specific_material_map)
             {
-                if let Ok(Some(tex0)) = r.texture_dir().load_vtf(&vmt.get_tex_name()) {
-                    if let Ok(Some(tex1)) = r.texture_dir().load_vtf(&vmt.get_tex2_name()) {
+                if let Ok(Some(tex0)) = r.texture_dir().load_vtf(&VLocalPath::new(
+                    "materials",
+                    &vmt.get_tex_name(),
+                    "vtf",
+                )) {
+                    if let Ok(Some(tex1)) = r.texture_dir().load_vtf(&VLocalPath::new(
+                        "materials",
+                        &vmt.get_tex2_name(),
+                        "vtf",
+                    )) {
                         let mut builder = MeshBuilder::default();
 
                         let _c = info.start_position;
@@ -377,10 +393,7 @@ pub fn main() {
                     }
                 }
             } else {
-                println!(
-                    "Missing material for a displacement - {}",
-                    &textures[&texdata]
-                );
+                println!("Missing material for a displacement");
             }
         }
         state.add_mesh(StateMesh::new_box(

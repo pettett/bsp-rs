@@ -35,7 +35,7 @@ use std::{
     sync::OnceLock,
 };
 
-use crate::{binaries::BinaryData, vmt::VMT, vtf::VTF};
+use crate::{binaries::BinaryData, util::v_path::VPath, vmt::VMT, vtf::VTF};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -90,6 +90,19 @@ pub struct VPKFile {
     vtf: OnceLock<Option<VTF>>,
     vmt: OnceLock<Option<VMT>>,
 }
+
+impl VPKFile {
+    pub fn load_file<'a, T: BinaryData, F: FnOnce(&'a VPKFile) -> &'a OnceLock<Option<T>>>(
+        &'a self,
+        vpk: &VPKDirectory,
+        get_cell: F,
+    ) -> io::Result<Option<&'a T>> {
+        Ok(get_cell(self)
+            .get_or_init(|| vpk.load_file::<T>(self))
+            .as_ref())
+    }
+}
+
 #[derive(Debug)]
 pub enum VPKDirectoryTree {
     Leaf(String),
@@ -101,12 +114,12 @@ pub struct VPKDirectory {
     header: VPKHeader_v2,
     max_pack_file: u16,
     root: VPKDirectoryTree,
-    files: HashMap<String, VPKFile>,
+    files: HashMap<String, HashMap<String, HashMap<String, VPKFile>>>,
 }
 
 impl VPKDirectoryTree {
-    pub fn add_entry(&mut self, entry: &str) {
-        self.add_entry_inner(entry, entry);
+    pub fn add_entry(&mut self, prefix: &str, dir: &str, ext: &str) {
+        self.add_entry_inner(dir, dir);
     }
 
     fn add_entry_inner(&mut self, parsed_entry: &str, entry: &str) {
@@ -136,9 +149,9 @@ impl VPKDirectoryTree {
 }
 
 impl VPKDirectory {
-    pub fn get_file_names(&self) -> std::collections::hash_map::Keys<'_, String, VPKFile> {
-        self.files.keys()
-    }
+    //pub fn get_file_names(&self) -> std::collections::hash_map::Keys<'_, String, VPKFile> {
+    //    self.files.keys()
+    //}
 
     pub fn get_root(&self) -> &VPKDirectoryTree {
         &self.root
@@ -150,7 +163,7 @@ impl VPKDirectory {
         let header = VPKHeader_v2::read(&mut buffer, None)?;
         let mut root = VPKDirectoryTree::Node(HashMap::new());
         let mut max_pack_file = 0;
-        let mut files = HashMap::<String, VPKFile>::new();
+        let mut files = HashMap::<String, HashMap<String, HashMap<String, VPKFile>>>::new();
 
         loop {
             let ext = read_string(&mut buffer);
@@ -168,12 +181,6 @@ impl VPKDirectory {
                     if filename.len() == 0 {
                         break;
                     }
-                    let dir_prefix = if dir == "" || dir == " " {
-                        "".to_owned()
-                    } else {
-                        format!("{dir}/")
-                    };
-                    let path = format!("{dir_prefix}{filename}.{ext}");
 
                     let entry = VPKDirectoryEntry::read(&mut buffer, None).unwrap();
                     let terminator = entry.Terminator;
@@ -194,10 +201,13 @@ impl VPKDirectory {
                         None
                     };
 
-                    root.add_entry(&path);
+                    root.add_entry(&dir, &filename, &ext);
 
-                    files.insert(
-                        path,
+                    let ext_files = files.entry(ext.clone()).or_default();
+                    let dir_files = ext_files.entry(dir.clone()).or_default();
+
+                    dir_files.insert(
+                        filename,
                         VPKFile {
                             entry,
                             preload,
@@ -220,40 +230,39 @@ impl VPKDirectory {
         })
     }
 
-    pub fn load_vtf(&self, vpk_path: &str) -> io::Result<Option<&VTF>> {
-        let file_data = self.files.get(vpk_path).ok_or(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("File path {} not present", vpk_path),
-        ))?;
-
-        self.load_file_once(vpk_path, ".vtf", &file_data.vtf, file_data)
+    pub fn load_vtf(&self, path: &dyn VPath) -> io::Result<Option<&VTF>> {
+        self.load_file_once(path, |f| &f.vtf)
     }
 
-    pub fn load_vmt(&self, vpk_path: &str) -> io::Result<Option<&VMT>> {
-        let file_data = self.files.get(vpk_path).ok_or(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("File path {} not present", vpk_path),
-        ))?;
-
-        self.load_file_once(vpk_path, ".vmt", &file_data.vmt, file_data)
+    /// Load material from global path (materials/x/y.vmt)
+    pub fn load_vmt(&self, path: &dyn VPath) -> io::Result<Option<&VMT>> {
+        self.load_file_once(path, |f| &f.vmt)
     }
 
-    fn load_file_once<'a, T: BinaryData>(
+    pub fn load_file_once<'a, T: BinaryData, F: FnOnce(&'a VPKFile) -> &'a OnceLock<Option<T>>>(
         &'a self,
-        vpk_path: &str,
-        ext: &str,
-        cell: &'a OnceLock<Option<T>>,
-        file_data: &VPKFile,
+        path: &dyn VPath,
+        get_cell: F,
     ) -> io::Result<Option<&'a T>> {
-        Ok(cell
-            .get_or_init(|| {
-                if !vpk_path.ends_with(ext) {
-                    return None;
-                }
-                // Attempt to load
-                self.load_file::<T>(file_data)
-            })
-            .as_ref())
+        let ext_files = self.files.get(path.ext()).ok_or(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("Extension {} not present", path.ext()),
+        ))?;
+        let dir = ext_files.get(&path.dir()).ok_or(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "Directory Prefix {} not present while loading {}",
+                path.dir(),
+                path.filename()
+            ),
+        ))?;
+
+        let file_data = dir.get(path.filename()).ok_or(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("File {} not present", path.filename()),
+        ))?;
+
+        file_data.load_file(self, get_cell)
     }
 
     fn load_file<F: BinaryData>(&self, file_data: &VPKFile) -> Option<F> {
@@ -323,9 +332,13 @@ mod vpk_tests {
     fn test_dir() {
         let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
 
-        for file in dir.files.keys() {
-            if file.contains("floor") {
-                println!("{}", file);
+        for (ext, dirs) in &dir.files {
+            println!("EXT: {}", ext);
+            for (dir, files) in dirs {
+                println!("DIR: {}", dir);
+                for (file, data) in files {
+                    println!("FILE: {}", file);
+                }
             }
         }
     }
@@ -334,10 +347,10 @@ mod vpk_tests {
     fn test_tree() {
         let mut root = VPKDirectoryTree::Node(HashMap::new());
 
-        root.add_entry("test/file/please/ignore.txt");
-        root.add_entry("test/file/please/receive.txt");
-        root.add_entry("test/folder/");
-        root.add_entry("test/folder/please/receive.txt");
+        //root.add_entry("test/file/please/ignore.txt");
+        //root.add_entry("test/file/please/receive.txt");
+        //root.add_entry("test/folder/");
+        //root.add_entry("test/folder/please/receive.txt");
 
         println!("{:?}", root);
     }

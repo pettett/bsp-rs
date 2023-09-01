@@ -32,19 +32,15 @@ pub struct VMT {
 impl VMT {
     pub fn get_tex_name(&self) -> String {
         //TODO: This is just annoying
-        format!(
-            "materials/{}.vtf",
-            self.get_basetex2()
-                .unwrap_or_else(|| self.get_basetex().unwrap())
-                .replace('\\', "/")
-        )
+
+        self.get_basetex2()
+            .unwrap_or_else(|| self.get_basetex().unwrap())
+            .replace('\\', "/")
     }
     pub fn get_tex2_name(&self) -> String {
         //TODO: This is just annoying
-        format!(
-            "materials/{}.vtf",
-            self.get_basetex().unwrap().replace('\\', "/")
-        )
+
+        self.get_basetex().unwrap().replace('\\', "/")
     }
     pub fn get_basetex(&self) -> Option<&str> {
         self.data.get("$basetexture").map(String::as_str)

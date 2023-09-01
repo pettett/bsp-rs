@@ -13,15 +13,7 @@ fn draw_dir(
     dir: &VPKDirectory,
 ) {
     match tree {
-        VPKDirectoryTree::Leaf(file) => {
-            if let Some(tex) = dir.load_vtf(file).unwrap() {
-                tex.gui_view(ui, renderer, device, queue);
-            } else if let Some(mat) = dir.load_vmt(file).unwrap() {
-                mat.gui_view(ui, renderer, device, queue);
-            } else {
-                ui.text("Unknown format")
-            }
-        }
+        VPKDirectoryTree::Leaf(file) => {}
         VPKDirectoryTree::Node(dir_inner) => {
             let mut keys: Vec<&String> = dir_inner.keys().collect();
             keys.sort();
@@ -42,7 +34,28 @@ impl Viewable for VPKDirectory {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) {
-        draw_dir(ui, renderer, device, queue, &self.root, self)
+        for (ext, dirs) in &self.files {
+            if let Some(_node) = ui.tree_node(ext) {
+                for (dir, files) in dirs {
+                    if let Some(_node) = ui.tree_node(dir) {
+                        for (file, data) in files {
+                            if let Some(_node) = ui.tree_node(file) {
+                                // Try to load any data associated with this file
+
+                                if let Some(tex) = data.load_file(&self, |f| &f.vtf).unwrap() {
+                                    tex.gui_view(ui, renderer, device, queue);
+                                } else if let Some(mat) = data.load_file(&self, |f| &f.vmt).unwrap()
+                                {
+                                    mat.gui_view(ui, renderer, device, queue);
+                                } else {
+                                    ui.text("Unknown format")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn gui_label(&self) -> &str {

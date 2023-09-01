@@ -51,7 +51,7 @@ impl Lump for BSPDispVert {
     }
 
     fn lump_type() -> super::consts::LumpType {
-        LumpType::DISP_VERTS
+        LumpType::DispVerts
     }
 
     fn validate(_lump: &Box<[Self]>) {}
@@ -66,11 +66,11 @@ pub struct BSPDispTri {
 flags! {
     #[repr(u16)]
     pub enum DispTri: u16 {
-        TAG_SURFACE 	= 0x1,
-        TAG_WALKABLE 	= 0x2,
-        TAG_BUILDABLE = 0x4,
-        FLAG_SURFPROP1 = 0x8,
-        FLAG_SURFPROP2 = 0x10
+        TagSurface 		= 0x1,
+        TagWalkable 	= 0x2,
+        TagBuildable 	= 0x4,
+        FlagSurfprop1 	= 0x8,
+        FlagSurfprop2	= 0x10
     }
 }
 
@@ -104,10 +104,10 @@ pub enum NeighbourEdge {
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 pub enum NeighbourOrientation {
-    ORIENTATION_CCW_0 = 0,
-    ORIENTATION_CCW_90 = 1,
-    ORIENTATION_CCW_180 = 2,
-    ORIENTATION_CCW_270 = 3,
+    OrientationCcw0 = 0,
+    OrientationCcw90 = 1,
+    OrientationCcw180 = 2,
+    OrientationCcw270 = 3,
 }
 
 unsafe impl Zeroable for NeighbourOrientation {}
@@ -118,9 +118,9 @@ unsafe impl Pod for NeighbourOrientation {}
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 pub enum NeighbourSpan {
-    CORNER_TO_CORNER = 0,
-    CORNER_TO_MIDPOINT = 1,
-    MIDPOINT_TO_CORNER = 2,
+    CornerToCorner = 0,
+    CornerToMidpoint = 1,
+    MidpointToCorner = 2,
 }
 
 unsafe impl Zeroable for NeighbourSpan {}

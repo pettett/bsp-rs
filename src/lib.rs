@@ -8,6 +8,7 @@ pub mod state;
 pub mod state_mesh;
 pub mod texture;
 pub mod transform;
+pub mod util;
 pub mod vertex;
 pub mod vmt;
 pub mod vpk;
