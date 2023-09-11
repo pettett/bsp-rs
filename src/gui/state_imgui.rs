@@ -1,9 +1,10 @@
 use std::{sync::Arc, time::Instant};
 
+use bevy_ecs::system::Resource;
 use imgui::{Condition, FontSource};
 use imgui_wgpu::{Renderer, RendererConfig};
 
-use winit::event::Event;
+use winit::{event::Event, window::Window};
 
 use crate::{
     gui::Viewable,
@@ -285,9 +286,9 @@ impl State for StateImgui {
 }
 
 impl StateImgui {
-    pub fn handle_event<T>(&mut self, state: &StateRenderer, event: &Event<T>) -> bool {
+    pub fn handle_event<T>(&mut self, window: &Window, event: &Event<T>) -> bool {
         self.platform
-            .handle_event(self.imgui.io_mut(), state.window(), event);
+            .handle_event(self.imgui.io_mut(), window, event);
 
         self.imgui.io().want_capture_mouse
     }

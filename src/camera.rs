@@ -1,7 +1,9 @@
+use bevy_ecs::prelude::*;
+
 use glam::{Mat4, Quat, Vec3A};
 
 use crate::transform::Transform;
-
+#[derive(Component)]
 pub struct Camera {
     pub transform: Transform,
     pub aspect: f32,
@@ -57,18 +59,17 @@ impl Camera {
 // We need this for Rust to store our data correctly for the shaders
 #[repr(C)]
 // This is so we can store this in a buffer
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Debug, Default, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Component)]
 pub struct CameraUniform {
     view_proj: Mat4,
 }
 impl CameraUniform {
-    pub fn new() -> Self {
-        Self {
-            view_proj: Mat4::IDENTITY,
-        }
-    }
-
     pub fn update_view_proj(&mut self, camera: &Camera) {
         self.view_proj = camera.build_view_projection_matrix();
+    }
+}
+pub fn update_view_proj(mut query: Query<(&mut CameraUniform, &Camera)>) {
+    for (mut u, c) in query.iter_mut() {
+        u.view_proj = c.build_view_projection_matrix();
     }
 }

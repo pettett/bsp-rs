@@ -6,12 +6,13 @@ use crate::{
 };
 use std::{collections::HashMap, fs::File, io::BufReader, sync::Arc};
 
+use bevy_ecs::component::Component;
 use glam::{vec3, Vec3};
 
 use wgpu::util::DeviceExt;
 
 use crate::state::{StateInstance, StateRenderer};
-
+#[derive(Component)]
 pub struct StateMesh {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,

@@ -237,12 +237,16 @@ pub fn main() {
             })
             .collect();
 
-        let r = state.renderer();
         let textures: HashMap<i32, Option<String>> = textured_tris
             .iter()
             .filter_map(|(tex, _tris)| {
-                get_material(tex, r, &material_name_map, &map_specific_material_map)
-                    .map(|vmt| (*tex, vmt.get_tex_name()))
+                get_material(
+                    tex,
+                    state.renderer(),
+                    &material_name_map,
+                    &map_specific_material_map,
+                )
+                .map(|vmt| (*tex, vmt.get_tex_name()))
             })
             .collect();
 
@@ -250,11 +254,12 @@ pub fn main() {
         //preload all textures in parallel
         textures.par_iter().for_each(|(tex, pos_name)| {
             if let Some(name) = pos_name {
-                if let Ok(Some(vtf)) =
-                    r.texture_dir()
-                        .load_vtf(&VLocalPath::new("materials", &name, "vtf"))
-                {
-                    vtf.get_high_res(r.device(), r.queue());
+                if let Ok(Some(vtf)) = state.renderer().texture_dir().load_vtf(&VLocalPath::new(
+                    "materials",
+                    &name,
+                    "vtf",
+                )) {
+                    vtf.get_high_res(state.renderer().device(), state.renderer().queue());
                 }
             }
         });
@@ -266,11 +271,12 @@ pub fn main() {
 
         for (tex, builder) in &textured_tris {
             if let Some(Some(path)) = textures.get(tex) {
-                if let Ok(Some(tex)) =
-                    r.texture_dir()
-                        .load_vtf(&VLocalPath::new("materials", path, "vtf"))
-                {
-                    let mut mesh = StateMesh::new_empty(r, shader_tex.clone());
+                if let Ok(Some(tex)) = state.renderer().texture_dir().load_vtf(&VLocalPath::new(
+                    "materials",
+                    path,
+                    "vtf",
+                )) {
+                    let mut mesh = StateMesh::new_empty(state.renderer(), shader_tex.clone());
 
                     mesh.from_verts_and_tris(
                         instance.clone(),
@@ -282,9 +288,9 @@ pub fn main() {
                     mesh.load_tex(
                         instance.clone(),
                         1,
-                        &tex.get_high_res(r.device(), r.queue()),
+                        &tex.get_high_res(state.renderer().device(), state.renderer().queue()),
                     );
-                    state.add_mesh(mesh);
+                    state.world_mut().spawn((mesh));
                 } else {
                     println!("Could not find texture for {:?}", textures.get(tex))
                 }
@@ -317,16 +323,25 @@ pub fn main() {
             let s = tex.tex_s / data.width as f32;
             let t = tex.tex_t / data.height as f32;
 
-            if let Some(vmt) =
-                get_material(&texdata, r, &material_name_map, &map_specific_material_map)
-            {
+            if let Some(vmt) = get_material(
+                &texdata,
+                state.renderer(),
+                &material_name_map,
+                &map_specific_material_map,
+            ) {
                 if let Some(Ok(Some(tex0))) = vmt.get_tex_name().map(|t| {
-                    r.texture_dir()
-                        .load_vtf(&VLocalPath::new("materials", &t, "vtf"))
+                    state.renderer().texture_dir().load_vtf(&VLocalPath::new(
+                        "materials",
+                        &t,
+                        "vtf",
+                    ))
                 }) {
                     if let Some(Ok(Some(tex1))) = vmt.get_tex2_name().map(|t| {
-                        r.texture_dir()
-                            .load_vtf(&VLocalPath::new("materials", &t, "vtf"))
+                        state.renderer().texture_dir().load_vtf(&VLocalPath::new(
+                            "materials",
+                            &t,
+                            "vtf",
+                        ))
                     }) {
                         let mut builder = MeshBuilder::default();
 
@@ -371,7 +386,7 @@ pub fn main() {
 
                         assert_eq!(builder.tris.len() as u16, ((disp_side_len - 1).pow(2)) * 6);
 
-                        let mut mesh = StateMesh::new_empty(r, shader_disp.clone());
+                        let mut mesh = StateMesh::new_empty(state.renderer(), shader_disp.clone());
 
                         mesh.from_verts_and_tris(
                             instance.clone(),
@@ -383,27 +398,27 @@ pub fn main() {
                         mesh.load_tex(
                             instance.clone(),
                             1,
-                            &tex0.get_high_res(r.device(), r.queue()),
+                            &tex0.get_high_res(state.renderer().device(), state.renderer().queue()),
                         );
                         mesh.load_tex(
                             instance.clone(),
                             2,
-                            &tex1.get_high_res(r.device(), r.queue()),
+                            &tex1.get_high_res(state.renderer().device(), state.renderer().queue()),
                         );
 
-                        state.add_mesh(mesh);
+                        state.world_mut().spawn((mesh,));
                     }
                 }
             } else {
                 println!("Missing material for a displacement");
             }
         }
-        state.add_mesh(StateMesh::new_box(
-            r,
-            vec3(0., 0., 0.),
-            vec3(1000., 1000., 1000.),
-            shader_lines,
-        ));
+        //state.add_mesh(StateMesh::new_box(
+        //    r,
+        //    vec3(0., 0., 0.),
+        //    vec3(1000., 1000., 1000.),
+        //    shader_lines,
+        //));
 
         state.renderer_mut().pak = Some(pak);
     }));

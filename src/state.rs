@@ -3,17 +3,24 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use crate::bsp::pak::BSPPak;
-use crate::camera::{Camera, CameraUniform};
-use crate::camera_controller::CameraController;
+use crate::camera::{update_view_proj, Camera, CameraUniform};
+use crate::camera_controller::{
+    on_key_in, on_mouse_in, on_mouse_mv, update_camera, CameraController, KeyIn, MouseIn, MouseMv,
+};
 use crate::gui::state_imgui::StateImgui;
 use crate::state_mesh::StateMesh;
 use crate::texture::{self, Texture};
 
 use crate::vpk::VPKDirectory;
+use bevy_ecs::entity::Entity;
+use bevy_ecs::event::Events;
+use bevy_ecs::schedule::Schedule;
+use bevy_ecs::system::{Res, Resource};
+use bevy_ecs::world::{Mut, World};
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::event::*;
-use winit::window::Window;
+use winit::window::{Window, WindowId};
 const TEX_PATH: &str =
     "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";
 
@@ -33,10 +40,8 @@ pub trait State {
 }
 
 pub struct StateApp {
-    meshes: Arc<Mutex<Vec<StateMesh>>>,
-    imgui: StateImgui,
-    renderer: StateRenderer,
-    //puffin_ui : puffin_imgui::ProfilerUi,
+    world: World,
+    schedule: Schedule,
 }
 
 /// Data that will be read only for the course of the program
@@ -45,23 +50,24 @@ pub struct StateInstance {
     device: wgpu::Device,
     queue: wgpu::Queue,
 }
-
+#[derive(Resource)]
 pub struct StateRenderer {
     instance: Arc<StateInstance>,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
-    window: Window,
+    window: Arc<Window>,
     depth_texture: Texture,
-    camera: Camera,
-    camera_uniform: CameraUniform,
+    camera_entity: Entity,
     camera_buffer: wgpu::Buffer,
-    camera_controller: CameraController,
     camera_bind_group_layout: wgpu::BindGroupLayout,
     camera_bind_group: wgpu::BindGroup,
     texture_dir: Arc<VPKDirectory>,
     misc_dir: Arc<VPKDirectory>,
     pub pak: Option<BSPPak>,
 }
+
+struct ImGuiMarker();
+
 impl StateInstance {
     pub fn surface(&self) -> &wgpu::Surface {
         &self.surface
@@ -73,60 +79,105 @@ impl StateInstance {
         &self.queue
     }
 }
+#[derive(bevy_ecs::event::Event)]
+struct MyWindowEvent<'a> {
+    window_id: WindowId,
+    event: WindowEvent<'a>,
+}
 
 impl StateApp {
     /// Creating some of the wgpu types requires async code
     /// https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#state-new
-    pub async fn new(renderer: StateRenderer) -> Self {
+    pub async fn new(mut world: World, renderer: StateRenderer) -> Self {
+        world.insert_non_send_resource(StateImgui::init(&renderer));
+        world.insert_resource(renderer);
+        let mut schedule = Schedule::default();
+
+        world.insert_resource(Events::<MouseIn>::default());
+        world.insert_resource(Events::<MouseMv>::default());
+        world.insert_resource(Events::<KeyIn>::default());
+
+        // Add our system to the schedule
+        schedule.add_systems((
+            on_mouse_in,
+            on_mouse_mv,
+            on_key_in,
+            update_camera,
+            update_view_proj,
+        ));
         Self {
-            imgui: StateImgui::init(&renderer),
-            meshes: Arc::new(Mutex::new(Vec::new())),
-            renderer,
-            //puffin_ui
+            world,
+            schedule, //puffin_ui
         }
     }
-
-    pub fn add_mesh(&self, mesh: StateMesh) {
-        self.meshes.lock().unwrap().push(mesh)
+    pub fn world(&self) -> &World {
+        &self.world
     }
-
+    pub fn world_mut(&mut self) -> &mut World {
+        &mut self.world
+    }
     pub fn renderer(&self) -> &StateRenderer {
-        &self.renderer
+        &self.world.get_resource().unwrap()
     }
-    pub fn renderer_mut(&mut self) -> &mut StateRenderer {
-        &mut self.renderer
+    pub fn renderer_mut(&mut self) -> Mut<'_, StateRenderer> {
+        self.world.get_resource_mut().unwrap()
     }
     // impl State
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
-            self.renderer.size = new_size;
-            self.renderer.camera.aspect = new_size.width as f32 / new_size.height as f32;
-            self.renderer.config.width = new_size.width;
-            self.renderer.config.height = new_size.height;
-            self.renderer.depth_texture = texture::Texture::create_depth_texture(
-                self.renderer.device(),
-                self.renderer.config(),
+            let mut renderer = self.world.get_resource_mut::<StateRenderer>().unwrap();
+
+            renderer.size = new_size;
+            //TODO:
+            //renderer.camera.aspect = new_size.width as f32 / new_size.height as f32;
+            renderer.config.width = new_size.width;
+            renderer.config.height = new_size.height;
+            renderer.depth_texture = texture::Texture::create_depth_texture(
+                renderer.device(),
+                renderer.config(),
                 "depth_texture",
             );
-            self.renderer
+            renderer
                 .instance
                 .surface
-                .configure(&self.renderer.instance.device, &self.renderer.config);
+                .configure(&renderer.instance.device, &renderer.config);
         }
     }
 
     pub fn size(&self) -> PhysicalSize<u32> {
-        self.renderer.size
+        self.renderer().size
     }
 
     pub fn handle_event<T>(&mut self, event: &Event<T>) -> bool {
-        self.imgui.handle_event(&self.renderer, event)
+        let window = self
+            .world
+            .get_resource::<StateRenderer>()
+            .unwrap()
+            .window
+            .clone();
+        self.world
+            .get_non_send_resource_mut::<StateImgui>()
+            .unwrap()
+            .handle_event(&window, event)
     }
 
-    pub fn input(&mut self, event: &WindowEvent, can_use_mouse: bool) -> bool {
-        self.renderer
-            .camera_controller
-            .process_events(event, can_use_mouse)
+    pub fn input(&mut self, event: &WindowEvent, can_use_mouse: bool) {
+        //let mut renderer = self.world.get_resource_mut::<StateRenderer>().unwrap();
+
+        match event {
+            WindowEvent::MouseInput { state, button, .. } if can_use_mouse => self
+                .world
+                .send_event(MouseIn(state.clone(), button.clone())),
+            WindowEvent::KeyboardInput { input, .. } => self.world.send_event(KeyIn(input.clone())),
+            WindowEvent::CursorMoved { position, .. } => {
+                self.world.send_event(MouseMv(position.clone()))
+            }
+            _ => (),
+        }
+
+        //renderer
+        //    .camera_controller
+        //    .process_events(event, can_use_mouse)
     }
 
     pub fn update(&mut self) {}
@@ -134,34 +185,42 @@ impl StateApp {
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         puffin::profile_function!();
 
-        let output = self.renderer.instance.surface.get_current_texture()?;
+        self.schedule.run(&mut self.world);
+
+        let renderer = self.world.get_resource::<StateRenderer>().unwrap();
+
+        let output = renderer.instance.surface.get_current_texture()?;
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         let mut encoder =
-            self.renderer
+            renderer
                 .instance
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("Render Encoder"),
                 });
 
-        self.renderer
-            .camera_controller
-            .update_camera(&mut self.renderer.camera);
+        //renderer
+        //    .camera_controller
+        //    .update_camera(&mut renderer.camera);
 
-        self.renderer
-            .camera_uniform
-            .update_view_proj(&self.renderer.camera);
-        self.renderer.instance.queue.write_buffer(
-            &self.renderer.camera_buffer,
+        //renderer.camera_uniform.update_view_proj(&renderer.camera);
+
+        renderer.instance.queue.write_buffer(
+            &renderer.camera_buffer,
             0,
-            bytemuck::cast_slice(&[self.renderer.camera_uniform]),
+            bytemuck::cast_slice(&[*self
+                .world
+                .entity(*renderer.camera())
+                .get::<CameraUniform>()
+                .unwrap()]),
         );
 
         {
-            let meshes = self.meshes.lock().unwrap();
+            let mut q = self.world.query::<&StateMesh>();
+            //let meshes = self.meshes.lock().unwrap();
             let mut render_pass: wgpu::RenderPass<'_> =
                 encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Render Pass"),
@@ -182,7 +241,7 @@ impl StateApp {
                         }),
                     ],
                     depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: &self.renderer.depth_texture.view(),
+                        view: &self.renderer().depth_texture.view(),
                         depth_ops: Some(wgpu::Operations {
                             load: wgpu::LoadOp::Clear(1.0),
                             store: true,
@@ -190,8 +249,9 @@ impl StateApp {
                         stencil_ops: None,
                     }),
                 });
-            for mesh in meshes.iter() {
-                mesh.draw(&self.renderer, &mut render_pass, &output, &view);
+
+            for mesh in q.iter(&self.world) {
+                mesh.draw(&self.renderer(), &mut render_pass, &output, &view);
             }
         }
         // self.debug_mesh
@@ -205,11 +265,14 @@ impl StateApp {
         //     &view,
         // );
 
-        self.imgui
-            .render_pass(&self.renderer, &mut encoder, &output, &view);
+        //let mut imgui = self
+        //    .world
+        //    .get_non_send_resource_mut::<StateImgui>()
+        //    .unwrap();
+        //imgui.render_pass(&self.world.resource(), &mut encoder, &output, &view);
 
         // submit will accept anything that implements IntoIter
-        self.renderer
+        self.renderer()
             .instance
             .queue
             .submit(std::iter::once(encoder.finish()));
@@ -222,7 +285,7 @@ impl StateApp {
 impl StateRenderer {
     /// Creating some of the wgpu types requires async code
     /// https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#state-new
-    pub async fn new(window: Window) -> Self {
+    pub async fn new(window: Window, world: &mut World) -> Self {
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -287,7 +350,7 @@ impl StateRenderer {
 
         let camera = Camera::new(config.width as f32 / config.height as f32);
 
-        let mut camera_uniform = CameraUniform::new();
+        let mut camera_uniform = CameraUniform::default();
         camera_uniform.update_view_proj(&camera);
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -331,8 +394,16 @@ impl StateRenderer {
         puffin::set_scopes_on(true); // you may want to control this with a flag
                                      //let  puffin_ui = puffin_imgui::ProfilerUi::default();
 
+        let camera_entity = world
+            .spawn((
+                Camera::new(1.),
+                CameraController::new(10.),
+                CameraUniform::default(),
+            ))
+            .id();
+
         Self {
-            window,
+            window: Arc::new(window),
             instance: Arc::new(StateInstance {
                 surface,
                 device,
@@ -341,10 +412,8 @@ impl StateRenderer {
             camera_bind_group_layout,
             config,
             size,
-            camera,
+            camera_entity,
             depth_texture,
-            camera_controller,
-            camera_uniform,
             camera_buffer,
             camera_bind_group,
             texture_dir,
@@ -385,7 +454,7 @@ impl StateRenderer {
     pub fn instance(&self) -> Arc<StateInstance> {
         self.instance.clone()
     }
-    pub fn camera(&self) -> &Camera {
-        &self.camera
+    pub fn camera(&self) -> &Entity {
+        &self.camera_entity
     }
 }

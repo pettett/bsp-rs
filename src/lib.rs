@@ -14,6 +14,7 @@ pub mod vmt;
 pub mod vpk;
 pub mod vtf;
 
+use bevy_ecs::world::World;
 use state::{StateApp, StateRenderer};
 
 use winit::{
@@ -29,10 +30,11 @@ where
     env_logger::init();
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let mut world = World::default();
 
-    let renderer = StateRenderer::new(window).await;
+    let renderer = StateRenderer::new(window, &mut world).await;
 
-    let mut state = StateApp::new(renderer).await;
+    let mut state = StateApp::new(world, renderer).await;
 
     init(&mut state);
 
