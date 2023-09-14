@@ -13,9 +13,9 @@ use crate::texture::{self, Texture};
 
 use crate::vpk::VPKDirectory;
 use bevy_ecs::entity::Entity;
-use bevy_ecs::event::Events;
+use bevy_ecs::event::{EventReader, EventWriter, Events};
 use bevy_ecs::schedule::Schedule;
-use bevy_ecs::system::{Res, Resource};
+use bevy_ecs::system::{Commands, NonSend, NonSendMut, Query, Res, Resource};
 use bevy_ecs::world::{Mut, World};
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
@@ -99,11 +99,13 @@ impl StateApp {
 
         // Add our system to the schedule
         schedule.add_systems((
+            handle_world_events,
             on_mouse_in,
             on_mouse_mv,
             on_key_in,
             update_camera,
             update_view_proj,
+            draw,
         ));
         Self {
             world,
@@ -187,73 +189,6 @@ impl StateApp {
 
         self.schedule.run(&mut self.world);
 
-        let renderer = self.world.get_resource::<StateRenderer>().unwrap();
-
-        let output = renderer.instance.surface.get_current_texture()?;
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let mut encoder =
-            renderer
-                .instance
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
-
-        //renderer
-        //    .camera_controller
-        //    .update_camera(&mut renderer.camera);
-
-        //renderer.camera_uniform.update_view_proj(&renderer.camera);
-
-        renderer.instance.queue.write_buffer(
-            &renderer.camera_buffer,
-            0,
-            bytemuck::cast_slice(&[*self
-                .world
-                .entity(*renderer.camera())
-                .get::<CameraUniform>()
-                .unwrap()]),
-        );
-
-        {
-            let mut q = self.world.query::<&StateMesh>();
-            //let meshes = self.meshes.lock().unwrap();
-            let mut render_pass: wgpu::RenderPass<'_> =
-                encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Render Pass"),
-                    color_attachments: &[
-                        // This is what @location(0) in the fragment shader targets
-                        Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color {
-                                    r: 0.1,
-                                    g: 0.2,
-                                    b: 0.3,
-                                    a: 1.0,
-                                }),
-                                store: true,
-                            },
-                        }),
-                    ],
-                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: &self.renderer().depth_texture.view(),
-                        depth_ops: Some(wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(1.0),
-                            store: true,
-                        }),
-                        stencil_ops: None,
-                    }),
-                });
-
-            for mesh in q.iter(&self.world) {
-                mesh.draw(&self.renderer(), &mut render_pass, &output, &view);
-            }
-        }
         // self.debug_mesh
         //     .lock()
         //     .unwrap()
@@ -269,17 +204,90 @@ impl StateApp {
         //    .world
         //    .get_non_send_resource_mut::<StateImgui>()
         //    .unwrap();
-        //imgui.render_pass(&self.world.resource(), &mut encoder, &output, &view);
-
-        // submit will accept anything that implements IntoIter
-        self.renderer()
-            .instance
-            .queue
-            .submit(std::iter::once(encoder.finish()));
-        output.present();
+        //
 
         Ok(())
     }
+}
+
+pub fn draw(
+    meshes: Query<(&StateMesh,)>,
+    cameras: Query<(&CameraUniform,)>,
+    mut imgui: NonSendMut<StateImgui>,
+    renderer: Res<StateRenderer>,
+    mut commands: Commands,
+    mut events: EventWriter<WorldChangingEvent>,
+) {
+    let output = renderer.instance.surface.get_current_texture().unwrap();
+
+    let view = output
+        .texture
+        .create_view(&wgpu::TextureViewDescriptor::default());
+
+    let mut encoder =
+        renderer
+            .instance
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
+
+    //renderer
+    //    .camera_controller
+    //    .update_camera(&mut renderer.camera);
+
+    //renderer.camera_uniform.update_view_proj(&renderer.camera);
+
+    renderer.instance.queue.write_buffer(
+        &renderer.camera_buffer,
+        0,
+        bytemuck::cast_slice(&[*cameras.single().0]),
+    );
+
+    {
+        //let meshes = self.meshes.lock().unwrap();
+        let mut render_pass: wgpu::RenderPass<'_> =
+            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[
+                    // This is what @location(0) in the fragment shader targets
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: 0.1,
+                                g: 0.2,
+                                b: 0.3,
+                                a: 1.0,
+                            }),
+                            store: true,
+                        },
+                    }),
+                ],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &renderer.depth_texture.view(),
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
+            });
+
+        for (mesh,) in meshes.iter() {
+            mesh.draw(&renderer, &mut render_pass, &output, &view);
+        }
+    }
+
+    imgui.render_pass(&renderer, &mut encoder, &output, &view);
+
+    // submit will accept anything that implements IntoIter
+    renderer
+        .instance
+        .queue
+        .submit(std::iter::once(encoder.finish()));
+    output.present();
 }
 
 impl StateRenderer {
