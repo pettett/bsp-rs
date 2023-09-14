@@ -1,4 +1,11 @@
-use std::{fs, io, path::PathBuf};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
+
+use bevy_ecs::system::Commands;
+
+use crate::{bsp::loader::load_bsp, state::StateRenderer};
 
 use super::Viewable;
 
@@ -10,12 +17,14 @@ impl MapSelect {
         // Get a list of all entries in the folder
         let entries = fs::read_dir(path)?;
 
+        let root = Path::new(path);
+
         // Extract the filenames from the directory entries and store them in a vector
         let file_names = entries
             .filter_map(|entry| {
                 let path = entry.ok()?.path();
                 if path.is_file() && path.extension().unwrap().to_str() == Some("bsp") {
-                    Some(path)
+                    Some(root.join(path))
                 } else {
                     None
                 }
@@ -29,14 +38,15 @@ impl Viewable for MapSelect {
     fn gui_view(
         &self,
         ui: &imgui::Ui,
-        renderer: &mut imgui_wgpu::Renderer,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        renderer: &StateRenderer,
+        ui_renderer: &mut imgui_wgpu::Renderer,
+        commands: &mut Commands,
     ) {
-        for f in &self.file_names {
-            let n = f.file_name().unwrap().to_str().unwrap();
-            if ui.button(n) {
-                println!("Loading {}", n);
+        for map_path in &self.file_names {
+            let map_name = map_path.file_name().unwrap().to_str().unwrap();
+            if ui.button(map_name) {
+                println!("Loading {}", map_name);
+                load_bsp(map_path, commands, renderer);
             }
         }
     }

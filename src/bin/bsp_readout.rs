@@ -9,10 +9,11 @@ use glam::Vec3;
 
 use std::{
     io::{self},
+    path::Path,
 };
 
 pub fn main() -> io::Result<()> {
-    let (header, mut buffer) = BSPHeader::load("D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_01.bsp")?;
+    let (header, mut buffer) = BSPHeader::load(Path::new("D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_01.bsp"))?;
     header.validate();
 
     let planes = header.get_lump::<BSPPlane>(&mut buffer);

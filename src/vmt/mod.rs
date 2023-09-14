@@ -54,7 +54,6 @@ impl VMT {
 fn remove_comments(data: &mut String) {
     loop {
         if let Some(next_comment) = data.find(r"//") {
-            println!("{}", next_comment);
             if let Some(next_newline) = data[next_comment..].find("\n") {
                 // replace up to next line
                 data.replace_range(next_comment..next_comment + next_newline, "");

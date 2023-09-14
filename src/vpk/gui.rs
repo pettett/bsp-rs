@@ -1,6 +1,7 @@
+use bevy_ecs::system::Commands;
 use imgui_wgpu::Renderer;
 
-use crate::gui::Viewable;
+use crate::{gui::Viewable, state::StateRenderer};
 
 use super::{VPKDirectory, VPKDirectoryTree};
 
@@ -30,9 +31,9 @@ impl Viewable for VPKDirectory {
     fn gui_view(
         &self,
         ui: &imgui::Ui,
-        renderer: &mut imgui_wgpu::Renderer,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        renderer: &StateRenderer,
+        ui_renderer: &mut imgui_wgpu::Renderer,
+        commands: &mut Commands,
     ) {
         for (ext, dirs) in &self.files {
             if let Some(_node) = ui.tree_node(ext) {
@@ -43,10 +44,10 @@ impl Viewable for VPKDirectory {
                                 // Try to load any data associated with this file
 
                                 if let Some(tex) = data.load_file(&self, |f| &f.vtf).unwrap() {
-                                    tex.gui_view(ui, renderer, device, queue);
+                                    tex.gui_view(ui, renderer, ui_renderer, commands);
                                 } else if let Some(mat) = data.load_file(&self, |f| &f.vmt).unwrap()
                                 {
-                                    mat.gui_view(ui, renderer, device, queue);
+                                    mat.gui_view(ui, renderer, ui_renderer, commands);
                                 } else {
                                     ui.text("Unknown format")
                                 }

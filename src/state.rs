@@ -63,7 +63,6 @@ pub struct StateRenderer {
     camera_bind_group: wgpu::BindGroup,
     texture_dir: Arc<VPKDirectory>,
     misc_dir: Arc<VPKDirectory>,
-    pub pak: Option<BSPPak>,
 }
 
 struct ImGuiMarker();
@@ -99,7 +98,6 @@ impl StateApp {
 
         // Add our system to the schedule
         schedule.add_systems((
-            handle_world_events,
             on_mouse_in,
             on_mouse_mv,
             on_key_in,
@@ -216,7 +214,6 @@ pub fn draw(
     mut imgui: NonSendMut<StateImgui>,
     renderer: Res<StateRenderer>,
     mut commands: Commands,
-    mut events: EventWriter<WorldChangingEvent>,
 ) {
     let output = renderer.instance.surface.get_current_texture().unwrap();
 
@@ -280,7 +277,7 @@ pub fn draw(
         }
     }
 
-    imgui.render_pass(&renderer, &mut encoder, &output, &view);
+    imgui.render_pass(&renderer, &mut encoder, &output, &view, &mut commands);
 
     // submit will accept anything that implements IntoIter
     renderer
@@ -391,8 +388,6 @@ impl StateRenderer {
             label: Some("camera_bind_group"),
         });
 
-        let camera_controller = CameraController::new(10.0);
-
         let depth_texture =
             texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
@@ -403,11 +398,7 @@ impl StateRenderer {
                                      //let  puffin_ui = puffin_imgui::ProfilerUi::default();
 
         let camera_entity = world
-            .spawn((
-                Camera::new(1.),
-                CameraController::new(10.),
-                CameraUniform::default(),
-            ))
+            .spawn((camera, CameraController::new(10.), camera_uniform))
             .id();
 
         Self {
@@ -426,7 +417,6 @@ impl StateRenderer {
             camera_bind_group,
             texture_dir,
             misc_dir,
-            pak: None,
         }
     }
 

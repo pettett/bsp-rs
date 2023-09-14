@@ -3,7 +3,9 @@ use std::{
     fmt,
     fs::File,
     io::{self, BufReader, Read},
-    mem, slice,
+    mem,
+    path::Path,
+    slice,
 };
 
 use crate::bsp::consts::LumpType;
@@ -44,7 +46,7 @@ impl fmt::Debug for BSPHeader {
 }
 
 impl BSPHeader {
-    pub fn load(path: &str) -> io::Result<(Self, BufReader<File>)> {
+    pub fn load(path: &Path) -> io::Result<(Self, BufReader<File>)> {
         let file = File::open(path)?;
         let mut buffer = BufReader::new(file);
 

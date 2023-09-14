@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Instant};
 
-use bevy_ecs::system::Resource;
+use bevy_ecs::system::{Commands, Resource};
 use imgui::{Condition, FontSource};
 use imgui_wgpu::{Renderer, RendererConfig};
 
@@ -37,18 +37,17 @@ impl WindowState {
     pub fn draw_menu(
         &mut self,
         ui: &imgui::Ui,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        renderer: &mut Renderer,
+        renderer: &StateRenderer,
+        ui_renderer: &mut Renderer,
     ) {
         ui.checkbox(self.view.gui_label(), &mut self.opened);
     }
     pub fn draw_window(
         &mut self,
         ui: &imgui::Ui,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        renderer: &mut Renderer,
+        renderer: &StateRenderer,
+        ui_renderer: &mut Renderer,
+        commands: &mut Commands,
     ) {
         if self.opened {
             let window = ui.window(self.view.gui_label());
@@ -57,20 +56,21 @@ impl WindowState {
                 .size([300.0, 600.0], Condition::FirstUseEver)
                 .position([400.0, 0.0], Condition::FirstUseEver)
                 .build(|| {
-                    self.view.gui_view(ui, renderer, device, queue);
+                    self.view.gui_view(ui, renderer, ui_renderer, commands);
                     //end
                 });
         }
     }
 }
 
-impl State for StateImgui {
-    fn render_pass(
+impl StateImgui {
+    pub fn render_pass(
         &mut self,
-        state: &StateRenderer,
+        renderer: &StateRenderer,
         encoder: &mut wgpu::CommandEncoder,
         _output: &wgpu::SurfaceTexture,
         view: &wgpu::TextureView,
+        commands: &mut Commands,
     ) {
         let delta_s = self.last_frame.elapsed();
         let now = Instant::now();
@@ -78,24 +78,24 @@ impl State for StateImgui {
         self.last_frame = now;
 
         self.platform
-            .prepare_frame(self.imgui.io_mut(), state.window())
+            .prepare_frame(self.imgui.io_mut(), renderer.window())
             .expect("Failed to prepare frame");
 
         let ui = self.imgui.frame();
 
         if let Some(menu_bar) = ui.begin_main_menu_bar() {
             for window in &mut self.windows {
-                window.draw_menu(ui, state.device(), state.queue(), &mut self.renderer);
+                window.draw_menu(ui, renderer, &mut self.renderer);
             }
         }
 
         for window in &mut self.windows {
-            window.draw_window(ui, state.device(), state.queue(), &mut self.renderer);
+            window.draw_window(ui, renderer, &mut self.renderer, commands);
         }
 
         if self.last_cursor != ui.mouse_cursor() {
             self.last_cursor = ui.mouse_cursor();
-            self.platform.prepare_render(ui, state.window());
+            self.platform.prepare_render(ui, renderer.window());
         }
 
         {
@@ -115,15 +115,15 @@ impl State for StateImgui {
             self.renderer
                 .render(
                     self.imgui.render(),
-                    state.queue(),
-                    state.device(),
+                    renderer.queue(),
+                    renderer.device(),
                     &mut rpass,
                 )
                 .expect("Rendering failed");
         }
     }
 
-    fn init(renderer: &StateRenderer) -> Self {
+    pub fn init(renderer: &StateRenderer) -> Self {
         // Set up dear imgui
         let mut imgui = imgui::Context::create();
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);

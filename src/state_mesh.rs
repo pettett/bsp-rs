@@ -9,7 +9,7 @@ use std::{collections::HashMap, fs::File, io::BufReader, sync::Arc};
 use bevy_ecs::component::Component;
 use glam::{vec3, Vec3};
 
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt, Device};
 
 use crate::state::{StateInstance, StateRenderer};
 #[derive(Component)]
@@ -47,9 +47,9 @@ impl StateMesh {
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
     }
 
-    pub fn new_box(renderer: &StateRenderer, min: Vec3, max: Vec3, shader: Arc<Shader>) -> Self {
+    pub fn new_box(device: &wgpu::Device, min: Vec3, max: Vec3, shader: Arc<Shader>) -> Self {
         Self::new(
-            renderer,
+            device,
             &[
                 vec3(min.x, min.y, min.z),
                 vec3(max.x, min.y, min.z),
@@ -66,32 +66,26 @@ impl StateMesh {
             shader,
         )
     }
-    pub fn new_empty(renderer: &StateRenderer, shader: Arc<Shader>) -> Self {
-        Self::new::<UVVertex>(renderer, &[], &[], shader)
+    pub fn new_empty(device: &wgpu::Device, shader: Arc<Shader>) -> Self {
+        Self::new::<UVVertex>(device, &[], &[], shader)
     }
     pub fn new<V: Vertex + bytemuck::Pod>(
-        renderer: &StateRenderer,
+        device: &wgpu::Device,
         verts_data: &[V],
         indices_data: &[u16],
         shader: Arc<Shader>,
     ) -> Self {
-        let vertex_buffer =
-            renderer
-                .device()
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(verts_data),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(verts_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
-        let index_buffer =
-            renderer
-                .device()
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(indices_data),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(indices_data),
+            usage: wgpu::BufferUsages::INDEX,
+        });
 
         StateMesh {
             vertex_buffer,
@@ -105,7 +99,7 @@ impl StateMesh {
 
     pub fn load_debug_edges(
         &mut self,
-        instance: Arc<StateInstance>,
+        device: &wgpu::Device,
         header: &BSPHeader,
         buffer: &mut BufReader<File>,
     ) {
@@ -118,23 +112,17 @@ impl StateMesh {
             annotated_verts[i].position = verts[i];
         }
 
-        self.vertex_buffer =
-            instance
-                .device()
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(&annotated_verts[..]),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+        self.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(&annotated_verts[..]),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
-        self.index_buffer =
-            instance
-                .device()
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(&edges[..]),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
+        self.index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(&edges[..]),
+            usage: wgpu::BufferUsages::INDEX,
+        });
 
         // Update the value stored in this mesh
 
@@ -144,28 +132,22 @@ impl StateMesh {
 
     pub fn from_verts_and_tris(
         &mut self,
-        instance: Arc<StateInstance>,
+        device: &wgpu::Device,
         verts: &[u8],
         tris: &[u8],
         num_indicies: u32,
     ) {
-        self.vertex_buffer =
-            instance
-                .device()
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: verts,
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+        self.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: verts,
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
-        self.index_buffer =
-            instance
-                .device()
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Index Buffer"),
-                    contents: tris,
-                    usage: wgpu::BufferUsages::INDEX,
-                });
+        self.index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: tris,
+            usage: wgpu::BufferUsages::INDEX,
+        });
 
         // Update the value stored in this mesh
 
@@ -173,30 +155,23 @@ impl StateMesh {
         self.index_format = wgpu::IndexFormat::Uint16;
     }
 
-    pub fn load_tex(
-        &mut self,
-        instance: Arc<StateInstance>,
-        bind_index: u32,
-        texture: &texture::Texture,
-    ) {
+    pub fn load_tex(&mut self, device: &wgpu::Device, bind_index: u32, texture: &texture::Texture) {
         self.texture_bind_group.insert(
             bind_index,
-            instance
-                .device()
-                .create_bind_group(&wgpu::BindGroupDescriptor {
-                    layout: &self.shader.texture_bind_group_layout(bind_index).unwrap(),
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(texture.view()),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(texture.sampler()),
-                        },
-                    ],
-                    label: Some("diffuse_bind_group"),
-                }),
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &self.shader.texture_bind_group_layout(bind_index).unwrap(),
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(texture.view()),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(texture.sampler()),
+                    },
+                ],
+                label: Some("diffuse_bind_group"),
+            }),
         );
     }
 }

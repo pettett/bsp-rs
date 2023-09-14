@@ -3,6 +3,7 @@ use std::{
     sync::OnceLock,
 };
 
+use bevy_ecs::system::Resource;
 use stream_unzip::ZipReader;
 
 use crate::{binaries::BinaryData, vmt::VMT, vtf::VTF};
@@ -44,7 +45,7 @@ impl PakEntry {
             .as_ref()
     }
 }
-
+#[derive(Resource)]
 pub struct BSPPak {
     pub entries: Vec<PakEntry>,
 }

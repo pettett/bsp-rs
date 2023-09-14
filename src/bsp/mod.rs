@@ -3,6 +3,7 @@ pub mod displacement;
 pub mod edges;
 pub mod face;
 pub mod header;
+pub mod loader;
 pub mod lump;
 pub mod model;
 pub mod pak;
@@ -42,6 +43,8 @@ pub use lump::Lump;
 
 #[cfg(test)]
 mod bsp_tests {
+    use std::path::Path;
+
     use stream_unzip::ZipReader;
 
     use bytemuck::Zeroable;
@@ -65,7 +68,7 @@ mod bsp_tests {
 
     #[test]
     fn test_header() {
-        let (header, _buffer) = BSPHeader::load(PATH).unwrap();
+        let (header, _buffer) = BSPHeader::load(Path::new(PATH)).unwrap();
         header.validate();
     }
 
@@ -106,7 +109,7 @@ mod bsp_tests {
 
     #[test]
     fn displacements() {
-        let (header, mut buffer) = BSPHeader::load(PATH).unwrap();
+        let (header, mut buffer) = BSPHeader::load(Path::new(PATH)).unwrap();
         let infos = header.get_lump::<BSPDispInfo>(&mut buffer);
         let verts = header.get_lump::<BSPDispVert>(&mut buffer);
         let faces = header.get_lump::<BSPFace>(&mut buffer);
@@ -145,7 +148,7 @@ mod bsp_tests {
 
     #[test]
     fn pakfile() {
-        let (header, mut buffer) = BSPHeader::load(PATH).unwrap();
+        let (header, mut buffer) = BSPHeader::load(Path::new(PATH)).unwrap();
         let pakfile = header.get_lump_header(LumpType::PAKFILE);
 
         let pakfile_data = pakfile.read_bytes(&mut buffer).unwrap();
@@ -173,7 +176,7 @@ mod bsp_tests {
     }
     #[test]
     fn tex_data_string_data() {
-        let (header, mut buffer) = BSPHeader::load(PATH).unwrap();
+        let (header, mut buffer) = BSPHeader::load(Path::new(PATH)).unwrap();
         let tex_data_string_data = header.get_lump_header(LumpType::TexdataStringData);
 
         assert!(tex_data_string_data.file_len <= MAX_MAP_TEXDATA_STRING_DATA);
@@ -188,7 +191,7 @@ mod bsp_tests {
 
     #[test]
     fn textures() {
-        let (header, mut buffer) = BSPHeader::load(PATH).unwrap();
+        let (header, mut buffer) = BSPHeader::load(Path::new(PATH)).unwrap();
         let tex_info = header.get_lump::<BSPTexInfo>(&mut buffer);
         let tex_data = header.get_lump::<BSPTexData>(&mut buffer);
         let tex_data_string_table = header.get_lump::<BSPTexDataStringTable>(&mut buffer);
@@ -209,7 +212,7 @@ mod bsp_tests {
     }
 
     fn test_lump<T: Lump + Clone + Zeroable>() {
-        let (header, mut buffer) = BSPHeader::load(PATH).unwrap();
+        let (header, mut buffer) = BSPHeader::load(Path::new(PATH)).unwrap();
         let lump: Box<[T]> = header
             .get_lump_header(T::lump_type())
             .decode(&mut buffer)

@@ -1,6 +1,7 @@
+use bevy_ecs::system::Commands;
 use imgui::TableFlags;
 
-use crate::gui::Viewable;
+use crate::{gui::Viewable, state::StateRenderer};
 
 use super::VMT;
 
@@ -8,9 +9,9 @@ impl Viewable for VMT {
     fn gui_view(
         &self,
         ui: &imgui::Ui,
-        _renderer: &mut imgui_wgpu::Renderer,
-        _device: &wgpu::Device,
-        _queue: &wgpu::Queue,
+        renderer: &StateRenderer,
+        ui_renderer: &mut imgui_wgpu::Renderer,
+        commands: &mut Commands,
     ) {
         ui.text(&self.shader);
 
