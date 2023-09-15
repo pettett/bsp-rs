@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+use crate::bsp::loader::load_bsp;
 use crate::bsp::pak::BSPPak;
 use crate::camera::{update_view_proj, Camera, CameraUniform};
 use crate::camera_controller::{
@@ -78,11 +79,9 @@ impl StateInstance {
         &self.queue
     }
 }
+
 #[derive(bevy_ecs::event::Event)]
-struct MyWindowEvent<'a> {
-    window_id: WindowId,
-    event: WindowEvent<'a>,
-}
+pub struct MapChangeEvent(pub PathBuf);
 
 impl StateApp {
     /// Creating some of the wgpu types requires async code
@@ -95,9 +94,11 @@ impl StateApp {
         world.insert_resource(Events::<MouseIn>::default());
         world.insert_resource(Events::<MouseMv>::default());
         world.insert_resource(Events::<KeyIn>::default());
+        world.insert_resource(Events::<MapChangeEvent>::default());
 
         // Add our system to the schedule
         schedule.add_systems((
+            load_map,
             on_mouse_in,
             on_mouse_mv,
             on_key_in,
@@ -205,6 +206,16 @@ impl StateApp {
         //
 
         Ok(())
+    }
+}
+
+pub fn load_map(
+    mut events: EventReader<MapChangeEvent>,
+    mut commands: Commands,
+    renderer: Res<StateRenderer>,
+) {
+    for e in events.iter() {
+        load_bsp(&e.0, &mut commands, &renderer)
     }
 }
 

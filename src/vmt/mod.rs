@@ -131,16 +131,17 @@ impl BinaryData for VMT {
         _max_size: Option<usize>,
     ) -> std::io::Result<Self> {
         let mut data = Vec::new();
-
         buffer.read_until(b'{', &mut data)?;
+
         buffer.read_until(b'}', &mut data)?;
-        loop {
+
+        for _ in 0..20 {
             let opens = data.iter().filter(|&&c| c == b'{').count();
             let closes = data.iter().filter(|&&c| c == b'}').count();
+
             //TODO: Make sure this works.
             // need to close a bracket
             if opens > closes {
-                //println!("Material needs more closes");
                 buffer.read_until(b'}', &mut data)?;
             } else if opens < closes {
                 panic!("Material needs more opens. this should be impossible");
@@ -188,6 +189,9 @@ mod vmt_tests {
         println!("{}", vmt.shader);
         println!("{:?}", vmt.data);
     }
+
+    #[test]
+    fn test_map() {}
 }
 // export interface VMT {
 //     _Root: string;

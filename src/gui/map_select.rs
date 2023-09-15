@@ -3,9 +3,17 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use bevy_ecs::system::Commands;
+use bevy_ecs::{
+    entity::Entity,
+    system::{Commands, Query, SystemState},
+    world::World,
+};
 
-use crate::{bsp::loader::load_bsp, state::StateRenderer};
+use crate::{
+    bsp::loader::load_bsp,
+    state::{MapChangeEvent, StateRenderer},
+    state_mesh::StateMesh,
+};
 
 use super::Viewable;
 
@@ -46,7 +54,22 @@ impl Viewable for MapSelect {
             let map_name = map_path.file_name().unwrap().to_str().unwrap();
             if ui.button(map_name) {
                 println!("Loading {}", map_name);
-                load_bsp(map_path, commands, renderer);
+                let map_path_clone = map_path.clone();
+
+                commands.add(|w: &mut World| {
+                    let mut system_state: SystemState<(Commands, Query<(Entity, &StateMesh)>)> =
+                        SystemState::new(w);
+
+                    let (mut commands, meshes) = system_state.get(w);
+
+                    for (entity, mesh) in meshes.iter() {
+                        commands.entity(entity).despawn();
+                    }
+
+                    system_state.apply(w);
+
+                    w.send_event(MapChangeEvent(map_path_clone))
+                });
             }
         }
     }
