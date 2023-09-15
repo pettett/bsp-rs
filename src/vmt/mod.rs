@@ -23,8 +23,10 @@ pub enum VMTUnit {
     Number(f32),
     Map(HashMap<String, VMTUnit>),
 }
+
 #[derive(Debug, Default)]
 pub struct VMT {
+    pub source: String, //DEBUG
     pub shader: String,
     pub data: HashMap<String, String>,
 }
@@ -76,6 +78,7 @@ fn view_up_to_line(data: &str) -> &str {
         data
     }
 }
+
 fn consume_line(data: &mut &str) -> Result<(), ()> {
     if let Some(next_newline) = data[..].find("\n") {
         // clip up to next new line
@@ -99,6 +102,7 @@ fn consume_string(data: &mut &str) -> Result<String, ()> {
 
 fn consume_vmt(data: &mut &str) -> Result<VMT, ()> {
     let mut vmt = VMT::default();
+    vmt.source = data.to_owned();
     vmt.shader = consume_string(data)?;
 
     loop {
@@ -128,29 +132,12 @@ fn consume_vmt(data: &mut &str) -> Result<VMT, ()> {
 impl BinaryData for VMT {
     fn read<R: Read + Seek>(
         buffer: &mut std::io::BufReader<R>,
-        _max_size: Option<usize>,
+        max_size: Option<usize>,
     ) -> std::io::Result<Self> {
-        let mut data = Vec::new();
-        buffer.read_until(b'{', &mut data)?;
+        let mut bytes = vec![0; max_size.unwrap()];
+        buffer.read_exact( &mut bytes)? ;
 
-        buffer.read_until(b'}', &mut data)?;
-
-        for _ in 0..20 {
-            let opens = data.iter().filter(|&&c| c == b'{').count();
-            let closes = data.iter().filter(|&&c| c == b'}').count();
-
-            //TODO: Make sure this works.
-            // need to close a bracket
-            if opens > closes {
-                buffer.read_until(b'}', &mut data)?;
-            } else if opens < closes {
-                panic!("Material needs more opens. this should be impossible");
-            } else {
-                break;
-            }
-        }
-
-        let mut data = String::from_utf8(data).unwrap();
+        let mut data = String::from_utf8(bytes).unwrap();
 
         remove_comments(&mut data);
 
@@ -162,7 +149,14 @@ impl BinaryData for VMT {
 
 #[cfg(test)]
 mod vmt_tests {
+    use std::path::{Path, PathBuf};
+    use crate::bsp::consts::LumpType;
+    use crate::bsp::header::BSPHeader;
+    use crate::bsp::pak::BSPPak;
     use crate::vmt::{consume_vmt, remove_comments};
+    use crate::vpk::VPKDirectory;
+
+    const PATH: &str = "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_01.bsp";
 
     #[test]
     fn test_decode() {
@@ -179,7 +173,7 @@ mod vmt_tests {
      "$selfillum" 1
 }
 		"#
-        .to_owned();
+            .to_owned();
 
         remove_comments(&mut data);
         println!("{}", data);
@@ -191,7 +185,32 @@ mod vmt_tests {
     }
 
     #[test]
-    fn test_map() {}
+    fn test_misc_dir() {
+        let dir = VPKDirectory::load(PathBuf::from("D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_misc_dir.vpk")).unwrap();
+
+        for (d, files) in &dir.files["vmt"] {
+            println!("DIR: {}", d);
+            for (file, data) in files {
+                print!("{:?}", data.load_vmt(&dir));
+            }
+        }
+    }
+
+    #[test]
+    fn test_maps() {
+        let (header, mut buffer) = BSPHeader::load(Path::new(PATH)).unwrap();
+
+        let pak_header = header.get_lump_header(LumpType::PAKFILE);
+
+        let pak: BSPPak = pak_header.read_binary(&mut buffer).unwrap();
+
+        for e in pak.entries {
+            let Some(vmt) = e.get_vmt() else { continue; };
+
+            println!("{}", vmt.shader);
+            println!("{:?}", vmt.data);
+        }
+    }
 }
 // export interface VMT {
 //     _Root: string;

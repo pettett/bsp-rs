@@ -15,17 +15,19 @@ use crate::{
 
 use super::consts::ImageFormat;
 
+pub type VRes<T> = Result<T, ()>;
+
 /// Thread safe VTF file with associated texture data
 pub struct VTF {
     header: VTFHeader,
     header_7_3: Option<VTFHeader73>,
     low_res_data: [Vec<u8>; 1],
     high_res_data: Vec<Vec<u8>>,
-    low_res: OnceLock<Texture>,
-    high_res: OnceLock<Texture>,
+    low_res: OnceLock<VRes<Texture>>,
+    high_res: OnceLock<VRes<Texture>>,
 
-    low_res_imgui: OnceLock<imgui::TextureId>,
-    high_res_imgui: OnceLock<imgui::TextureId>,
+    low_res_imgui: OnceLock<VRes<imgui::TextureId>>,
+    high_res_imgui: OnceLock<VRes<imgui::TextureId>>,
 }
 
 impl fmt::Debug for VTF {
@@ -81,12 +83,12 @@ impl VTF {
         self.header.low_res_image_height as u32
     }
 
-    pub fn get_high_res(&self, device: &Device, queue: &Queue) -> &Texture {
+    pub fn get_high_res(&self, device: &Device, queue: &Queue) -> &VRes<Texture> {
         self.high_res
             .get_or_init(|| self.upload_high_res(device, queue))
     }
 
-    pub fn get_low_res(&self, device: &Device, queue: &Queue) -> &Texture {
+    pub fn get_low_res(&self, device: &Device, queue: &Queue) -> &VRes<Texture> {
         self.low_res
             .get_or_init(|| self.upload_low_res(device, queue))
     }
@@ -95,11 +97,12 @@ impl VTF {
         device: &Device,
         queue: &Queue,
         renderer: &mut imgui_wgpu::Renderer,
-    ) -> &imgui::TextureId {
+    ) -> &VRes<imgui::TextureId> {
         self.high_res_imgui.get_or_init(|| {
-            renderer
-                .textures
-                .insert(self.get_high_res(device, queue).to_imgui(device, renderer))
+            match self.get_high_res(device, queue) {
+                Ok(high_res) => Ok(renderer.textures.insert(high_res.to_imgui(device, renderer))),
+                Err(e) => Err(*e)
+            }
         })
     }
     pub fn get_low_res_imgui(
@@ -107,35 +110,39 @@ impl VTF {
         device: &Device,
         queue: &Queue,
         renderer: &mut imgui_wgpu::Renderer,
-    ) -> &imgui::TextureId {
+    ) -> &VRes<imgui::TextureId> {
         self.low_res_imgui.get_or_init(|| {
-            renderer
-                .textures
-                .insert(self.get_low_res(device, queue).to_imgui(device, renderer))
+            match self.get_low_res(device, queue) {
+                Ok(low_res) => Ok(renderer.textures.insert(low_res.to_imgui(device, renderer))),
+                Err(e) => Err(*e)
+            }
         })
     }
 
-    fn upload_high_res(&self, device: &Device, queue: &Queue) -> Texture {
-        assert!(self.high_res_data.len() > 0);
-        self.upload(
-            device,
-            queue,
-            self.width(),
-            self.height(),
-            self.header.high_res_image_format,
-            &self.high_res_data[..],
-        )
+    fn upload_high_res(&self, device: &Device, queue: &Queue) -> VRes<Texture> {
+        if self.high_res_data.len() > 0 {
+            Ok(self.upload(
+                device,
+                queue,
+                self.width(),
+                self.height(),
+                self.header.high_res_image_format,
+                &self.high_res_data[..],
+            ))
+        } else {
+            Err(())
+        }
     }
 
-    fn upload_low_res(&self, device: &Device, queue: &Queue) -> Texture {
-        self.upload(
+    fn upload_low_res(&self, device: &Device, queue: &Queue) -> VRes<Texture> {
+        Ok(self.upload(
             device,
             queue,
             self.low_res_width(),
             self.low_res_height(),
             self.header.low_res_image_format,
             &self.low_res_data,
-        )
+        ))
     }
 
     fn upload(

@@ -27,6 +27,8 @@ impl Viewable for VMT {
                 ui.text(value);
             }
         }
+
+        ui.text(&self.source);
     }
 
     fn gui_label(&self) -> &str {

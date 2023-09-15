@@ -40,7 +40,8 @@ use crate::{binaries::BinaryData, util::v_path::VPath, vmt::VMT, vtf::VTF};
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct VPKHeader_v2 {
-    Signature: u32, // = 0x55aa1234;
+    Signature: u32,
+    // = 0x55aa1234;
     Version: u32,   // = 2;
 
     // The size, in bytes, of the directory tree
@@ -64,7 +65,8 @@ impl BinaryData for VPKHeader_v2 {}
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct VPKDirectoryEntry {
-    CRC: u32,          // A 32bit CRC of the file's data.
+    CRC: u32,
+    // A 32bit CRC of the file's data.
     PreloadBytes: u16, // The number of bytes contained in the index file.
 
     // A zero based index of the archive this file's data is contained in.
@@ -83,6 +85,7 @@ struct VPKDirectoryEntry {
 }
 
 impl BinaryData for VPKDirectoryEntry {}
+
 #[derive(Debug)]
 pub struct VPKFile {
     entry: VPKDirectoryEntry,
@@ -92,7 +95,21 @@ pub struct VPKFile {
 }
 
 impl VPKFile {
-    pub fn load_file<'a, T: BinaryData, F: FnOnce(&'a VPKFile) -> &'a OnceLock<Option<T>>>(
+    pub fn load_vmt(
+        &self,
+        vpk: &VPKDirectory,
+    ) -> io::Result<Option<&VMT>> {
+        self.load_file(vpk, |f| &f.vmt)
+    }
+
+    pub fn load_vtf(
+        &self,
+        vpk: &VPKDirectory,
+    ) -> io::Result<Option<&VTF>> {
+        self.load_file(vpk, |f| &f.vtf)
+    }
+
+    fn load_file<'a, T: BinaryData, F: FnOnce(&'a VPKFile) -> &'a OnceLock<Option<T>>>(
         &'a self,
         vpk: &VPKDirectory,
         get_cell: F,
@@ -114,7 +131,7 @@ pub struct VPKDirectory {
     header: VPKHeader_v2,
     max_pack_file: u16,
     root: VPKDirectoryTree,
-    files: HashMap<String, HashMap<String, HashMap<String, VPKFile>>>,
+    pub files: HashMap<String, HashMap<String, HashMap<String, VPKFile>>>,
 }
 
 impl VPKDirectoryTree {
@@ -282,7 +299,7 @@ impl VPKDirectory {
             .seek_relative(file_data.entry.EntryOffset as i64)
             .is_ok()
         {
-            F::read(&mut buffer, None).ok()
+            F::read(&mut buffer, Some(file_data.entry.EntryLength as usize)).ok()
         } else {
             None
         }
@@ -297,6 +314,7 @@ pub fn read_string(buffer: &mut BufReader<File>) -> String {
 
     unsafe { std::str::from_utf8_unchecked(&string_buf[..]) }.to_owned()
 }
+
 pub fn read_u32(buffer: &mut BufReader<File>) -> u32 {
     let mut string_buf = [0; 4];
 
@@ -304,6 +322,7 @@ pub fn read_u32(buffer: &mut BufReader<File>) -> u32 {
 
     u32::from_le_bytes(string_buf)
 }
+
 pub fn read_u16(buffer: &mut BufReader<File>) -> u16 {
     let mut string_buf = [0; 2];
 
@@ -311,6 +330,7 @@ pub fn read_u16(buffer: &mut BufReader<File>) -> u16 {
 
     u16::from_le_bytes(string_buf)
 }
+
 #[cfg(test)]
 mod vpk_tests {
     use super::*;

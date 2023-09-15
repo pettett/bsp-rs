@@ -113,11 +113,11 @@ pub fn get_material<'a>(
     match vmt_r {
         Ok(Some(vmt)) => Some(vmt),
         Ok(None) => {
-            log::error!("Material {} does not have valid vmt data", material_name);
+            println!("ERROR: Material {} does not have valid vmt data", material_name);
             None
         }
         Err(e) => {
-            log::error!("{}", e);
+            println!("ERROR: {}", e);
             None
         }
     }
@@ -272,6 +272,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
                     .texture_dir()
                     .load_vtf(&VLocalPath::new("materials", path, "vtf"))
             {
+                let Ok(high_res) = tex.get_high_res(device, renderer.queue()) else {continue;};
                 let mut mesh = StateMesh::new_empty(device, shader_tex.clone());
 
                 mesh.from_verts_and_tris(
@@ -281,7 +282,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
                     builder.tris.len() as u32,
                 );
 
-                mesh.load_tex(device, 1, &tex.get_high_res(device, renderer.queue()));
+                mesh.load_tex(device, 1, high_res);
                 commands.spawn(mesh);
             } else {
                 println!("Could not find texture for {:?}", textures.get(tex))
@@ -379,8 +380,10 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
                         builder.tris.len() as u32,
                     );
 
-                    mesh.load_tex(device, 1, &tex0.get_high_res(device, renderer.queue()));
-                    mesh.load_tex(device, 2, &tex1.get_high_res(device, renderer.queue()));
+                    let Ok(high_res1) = tex0.get_high_res(device, renderer.queue()) else {continue;};
+                    let Ok(high_res2) = tex1.get_high_res(device, renderer.queue()) else {continue;};
+                    mesh.load_tex(device, 1, high_res1);
+                    mesh.load_tex(device, 2, high_res2);
 
                     commands.spawn((mesh,));
                 }

@@ -14,18 +14,22 @@ impl Viewable for VTF {
     ) {
         ui.text(format!("{}x{}", self.width(), self.height()));
 
-        imgui::Image::new(
-            *self.get_low_res_imgui(renderer.device(), renderer.queue(), ui_renderer),
-            [32.0, 32.0],
-        )
-        .build(ui);
+        if let Ok(low_res) = self.get_low_res_imgui(renderer.device(), renderer.queue(), ui_renderer) {
+            imgui::Image::new(
+                *low_res,
+                [32.0, 32.0],
+            )
+                .build(ui);
+        }
 
         if let Some(_node) = ui.tree_node("High res") {
-            imgui::Image::new(
-                *self.get_high_res_imgui(renderer.device(), renderer.queue(), ui_renderer),
-                [64.0 * 4.0, 64.0 * 4.0],
-            )
-            .build(ui);
+            if let Ok(high_res) = self.get_high_res_imgui(renderer.device(), renderer.queue(), ui_renderer) {
+                imgui::Image::new(
+                    *high_res,
+                    [64.0 * 4.0, 64.0 * 4.0],
+                )
+                    .build(ui);
+            }
         }
     }
 

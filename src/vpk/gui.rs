@@ -43,13 +43,18 @@ impl Viewable for VPKDirectory {
                             if let Some(_node) = ui.tree_node(file) {
                                 // Try to load any data associated with this file
 
-                                if let Some(tex) = data.load_file(&self, |f| &f.vtf).unwrap() {
-                                    tex.gui_view(ui, renderer, ui_renderer, commands);
-                                } else if let Some(mat) = data.load_file(&self, |f| &f.vmt).unwrap()
-                                {
-                                    mat.gui_view(ui, renderer, ui_renderer, commands);
-                                } else {
-                                    ui.text("Unknown format")
+                                match ext.as_str() {
+                                    "vmt" => match data.load_vmt(&self) {
+                                        Ok(Some(vmt)) => vmt.gui_view(ui, renderer, ui_renderer, commands),
+                                        Ok(None) => ui.text("No Material"),
+                                        Err(e) => ui.text(format!("Error loading Material: {}", e)),
+                                    },
+                                    "vtf" => match data.load_vtf(&self) {
+                                        Ok(Some(vtf)) => vtf.gui_view(ui, renderer, ui_renderer, commands),
+                                        Ok(None) => ui.text("No Texture"),
+                                        Err(e) => ui.text(format!("Error loading Texture: {}", e)),
+                                    },
+                                    _ => ui.text("Unknown format")
                                 }
                             }
                         }

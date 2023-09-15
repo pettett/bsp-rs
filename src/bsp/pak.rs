@@ -37,7 +37,7 @@ impl PakEntry {
             .get_or_init(|| {
                 if self.ext == "vmt" {
                     let mut b = BufReader::new(Cursor::new(&self.bytes[..]));
-                    VMT::read(&mut b, None).ok()
+                    VMT::read(&mut b, Some(self.bytes.len())).ok()
                 } else {
                     None
                 }
