@@ -90,42 +90,6 @@ impl<V: Vertex + Default> MeshBuilder<V> {
     }
 }
 
-pub fn get_material<'a>(
-    material_index: &i32,
-    renderer: &'a StateRenderer,
-    material_name_map: &HashMap<i32, String>,
-    map_specific_material_map: &HashMap<&str, &str>,
-) -> Option<&'a VMT> {
-    let Some(material_name) = material_name_map.get(material_index).map(String::as_str) else {
-        return None;
-    };
-    // Get material data
-
-    let vmt_r = if let Some(&global_material_path) = map_specific_material_map.get(material_name) {
-        let p: VGlobalPath = global_material_path.into();
-        renderer.misc_dir().load_vmt(&p)
-    } else {
-        renderer
-            .misc_dir()
-            .load_vmt(&VLocalPath::new("materials", material_name, "vmt"))
-    };
-
-    match vmt_r {
-        Ok(Some(vmt)) => Some(vmt),
-        Ok(None) => {
-            println!(
-                "ERROR: Material {} does not have valid vmt data",
-                material_name
-            );
-            None
-        }
-        Err(e) => {
-            println!("ERROR: {}", e);
-            None
-        }
-    }
-}
-
 pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
     println!("Loading BSP File...");
 
@@ -203,23 +167,6 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
     let pak_header = header.get_lump_header(LumpType::PAKFILE);
 
     let pak: VPKDirectory = pak_header.read_binary(&mut buffer).unwrap();
-    let map_specific_material_map: HashMap<&str, &str> = Default::default();
-    // map map specific materials to global materials
-    // let map_specific_material_map: HashMap<&str, &str> = pak
-    //     .entries
-    //     .par_iter()
-    //     .filter_map(|entry| {
-    //         if let Some(vmt) = entry.get_vmt() {
-    //             if let Some(mat) = vmt.data.get("include") {
-    //                 Some((entry.filename.as_str(), mat.as_str()))
-    //             } else {
-    //                 None
-    //             }
-    //         } else {
-    //             None
-    //         }
-    //     })
-    //     .collect();
 
     println!("Loading BSP Texture strings...");
     let tex_data_string_table = header.get_lump::<BSPTexDataStringTable>(&mut buffer);
@@ -237,27 +184,30 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
         .collect();
 
     println!("Loading BSP Materials...");
-    let materials: HashMap<i32, Option<&VMT>> = textured_tris
+    let materials: HashMap<i32, &VMT> = textured_tris
         .par_iter()
         .filter_map(|(tex, _tris)| {
-            material_name_map.get(tex).map(|tex_name| {
-                println!("{tex_name}");
+            let Some(mat_name) = material_name_map.get(tex) else {
+                return None;
+            };
 
-                let mat_path = VLocalPath::new("materials", tex_name, "vmt");
+            let mat_path = VLocalPath::new("materials", mat_name, "vmt");
+            let pak_vmt = pak.load_vmt(&mat_path);
 
-                let pak_vmt = pak.load_vmt(&mat_path);
+            let vmt = if let Ok(Some(pak_vmt)) = pak_vmt {
+                renderer
+                    .misc_dir()
+                    .load_vmt(&VGlobalPath::from(pak_vmt.data["include"].as_str()))
+                    .unwrap()
+            } else {
+                renderer.misc_dir().load_vmt(&mat_path).unwrap()
+            };
 
-                let vmt = if let Ok(Some(pak_vmt)) = pak_vmt {
-                    renderer
-                        .misc_dir()
-                        .load_vmt(&VGlobalPath::from(pak_vmt.data["include"].as_str()))
-                        .unwrap()
-                } else {
-                    renderer.misc_dir().load_vmt(&mat_path).unwrap()
-                };
-
-                (*tex, vmt)
-            })
+            if let Some(vmt) = vmt {
+                Some((*tex, vmt))
+            } else {
+                None
+            }
         })
         .collect();
 
@@ -267,7 +217,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
     let shader_disp = Arc::new(Shader::new_displacement(renderer));
 
     for (tex, builder) in &textured_tris {
-        let Some(Some(vmt)) = materials.get(tex) else {
+        let Some(vmt) = materials.get(tex) else {
             println!("Could not find material for {:?}", tex);
             continue;
         };
@@ -322,88 +272,87 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
 
         // TODO: better way to get tex/uv info from faces
         let tex = tex_info[face.tex_info as usize];
-        let texdata = tex.tex_data;
-        let data = tex_data[texdata as usize];
+        let i_texdata = tex.tex_data;
+        let data = tex_data[i_texdata as usize];
 
         let s = tex.tex_s / data.width as f32;
         let t = tex.tex_t / data.height as f32;
 
-        if let Some(vmt) = get_material(
-            &texdata,
-            renderer,
-            &material_name_map,
-            &map_specific_material_map,
-        ) {
-            if let Some(Ok(Some(tex0))) = vmt.get_tex_name().map(|t| {
+        if let Some(vmt) = materials.get(&i_texdata) {
+            let Some(Ok(Some(tex0))) = vmt.get_tex_name().map(|t| {
                 renderer
                     .texture_dir()
                     .load_vtf(&VLocalPath::new("materials", &t, "vtf"))
-            }) {
-                if let Some(Ok(Some(tex1))) = vmt.get_tex2_name().map(|t| {
-                    renderer
-                        .texture_dir()
-                        .load_vtf(&VLocalPath::new("materials", &t, "vtf"))
-                }) {
-                    let mut builder = MeshBuilder::default();
+            }) else {
+                continue;
+            };
 
-                    let _c = info.start_position;
+            let Some(Ok(Some(tex1))) = vmt.get_tex2_name().map(|t| {
+                renderer
+                    .texture_dir()
+                    .load_vtf(&VLocalPath::new("materials", &t, "vtf"))
+            }) else {
+                continue;
+            };
 
-                    let disp_side_len = (1 << (info.power)) + 1;
+            let mut builder = MeshBuilder::default();
 
-                    let get_i = |x: usize, y: usize| -> usize { x + disp_side_len * y };
+            let _c = info.start_position;
 
-                    for y in 0..disp_side_len {
-                        let dy = y as f32 / (disp_side_len as f32 - 1.0);
+            let disp_side_len = (1 << (info.power)) + 1;
 
-                        let v0 = Vec3::lerp(corners[0], corners[3], dy);
-                        let v1 = Vec3::lerp(corners[1], corners[2], dy);
+            let get_i = |x: usize, y: usize| -> usize { x + disp_side_len * y };
 
-                        for x in 0..disp_side_len {
-                            let dx = x as f32 / (disp_side_len as f32 - 1.0);
+            for y in 0..disp_side_len {
+                let dy = y as f32 / (disp_side_len as f32 - 1.0);
 
-                            let i = get_i(x, y);
+                let v0 = Vec3::lerp(corners[0], corners[3], dy);
+                let v1 = Vec3::lerp(corners[1], corners[2], dy);
 
-                            let vert = disp_verts[i + info.disp_vert_start as usize];
+                for x in 0..disp_side_len {
+                    let dx = x as f32 / (disp_side_len as f32 - 1.0);
 
-                            let pos = vert.vec + Vec3::lerp(v0, v1, dx);
+                    let i = get_i(x, y);
 
-                            builder.add_vert_a(i as u16, pos, s, t, vert.alpha);
-                        }
-                    }
-                    let disp_side_len = disp_side_len as u16;
+                    let vert = disp_verts[i + info.disp_vert_start as usize];
 
-                    // Build grid index buffer.
-                    for y in 0..(disp_side_len - 1) {
-                        for x in 0..(disp_side_len - 1) {
-                            let base = y * disp_side_len + x;
-                            builder.add_tri([base, base + disp_side_len, base + disp_side_len + 1]);
-                            builder.add_tri([base, base + disp_side_len + 1, base + 1]);
-                        }
-                    }
+                    let pos = vert.vec + Vec3::lerp(v0, v1, dx);
 
-                    assert_eq!(builder.tris.len() as u16, ((disp_side_len - 1).pow(2)) * 6);
-
-                    let mut mesh = StateMesh::new_empty(device, shader_disp.clone());
-
-                    mesh.from_verts_and_tris(
-                        device,
-                        bytemuck::cast_slice(&builder.verts),
-                        bytemuck::cast_slice(&builder.tris),
-                        builder.tris.len() as u32,
-                    );
-
-                    let Ok(high_res1) = tex0.get_high_res(device, renderer.queue()) else {
-                        continue;
-                    };
-                    let Ok(high_res2) = tex1.get_high_res(device, renderer.queue()) else {
-                        continue;
-                    };
-                    mesh.load_tex(device, 1, high_res1);
-                    mesh.load_tex(device, 2, high_res2);
-
-                    commands.spawn((mesh,));
+                    builder.add_vert_a(i as u16, pos, s, t, vert.alpha);
                 }
             }
+            let disp_side_len = disp_side_len as u16;
+
+            // Build grid index buffer.
+            for y in 0..(disp_side_len - 1) {
+                for x in 0..(disp_side_len - 1) {
+                    let base = y * disp_side_len + x;
+                    builder.add_tri([base, base + disp_side_len, base + disp_side_len + 1]);
+                    builder.add_tri([base, base + disp_side_len + 1, base + 1]);
+                }
+            }
+
+            assert_eq!(builder.tris.len() as u16, ((disp_side_len - 1).pow(2)) * 6);
+
+            let mut mesh = StateMesh::new_empty(device, shader_disp.clone());
+
+            mesh.from_verts_and_tris(
+                device,
+                bytemuck::cast_slice(&builder.verts),
+                bytemuck::cast_slice(&builder.tris),
+                builder.tris.len() as u32,
+            );
+
+            let Ok(high_res1) = tex0.get_high_res(device, renderer.queue()) else {
+                continue;
+            };
+            let Ok(high_res2) = tex1.get_high_res(device, renderer.queue()) else {
+                continue;
+            };
+            mesh.load_tex(device, 1, high_res1);
+            mesh.load_tex(device, 2, high_res2);
+
+            commands.spawn((mesh,));
         } else {
             println!("Missing material for a displacement");
         }
