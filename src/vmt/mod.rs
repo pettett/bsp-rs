@@ -11,8 +11,10 @@
 pub mod gui;
 
 use std::{
+    cell::OnceCell,
     collections::HashMap,
     io::{Read, Seek},
+    sync::{Arc, OnceLock},
 };
 
 use crate::binaries::BinaryData;
@@ -24,14 +26,24 @@ pub enum VMTUnit {
     Map(HashMap<String, VMTUnit>),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct VMT {
     pub source: String, //DEBUG
     pub shader: String,
     pub data: HashMap<String, String>,
+    pub patch: OnceLock<Option<Arc<VMT>>>,
 }
 
 impl VMT {
+    pub fn new(source: String, shader: String) -> Self {
+        Self {
+            source,
+            shader,
+            data: Default::default(),
+            patch: Default::default(),
+        }
+    }
+
     pub fn get_tex_name(&self) -> Option<String> {
         //TODO: This is just annoying
 
@@ -46,10 +58,22 @@ impl VMT {
         self.get_basetex().map(|f| f.replace('\\', "/"))
     }
     pub fn get_basetex(&self) -> Option<&str> {
-        self.data.get("$basetexture").map(String::as_str)
+        self.get("$basetexture")
     }
     pub fn get_basetex2(&self) -> Option<&str> {
-        self.data.get("$basetexture2").map(String::as_str)
+        self.get("$basetexture2")
+    }
+    pub fn get_envmap(&self) -> Option<&str> {
+        self.get("$envmap")
+    }
+    pub fn get(&self, param: &str) -> Option<&str> {
+        if let Some(data) = self.data.get(param) {
+            Some(data.as_str())
+        } else if let Some(Some(patch)) = self.patch.get() {
+            patch.get(param)
+        } else {
+            None
+        }
     }
 }
 
@@ -101,9 +125,7 @@ fn consume_string(data: &mut &str) -> Result<String, ()> {
 }
 
 fn consume_vmt(data: &mut &str) -> Result<VMT, ()> {
-    let mut vmt = VMT::default();
-    vmt.source = data.to_owned();
-    vmt.shader = consume_string(data)?;
+    let mut vmt = VMT::new(data.to_owned(), consume_string(data)?);
 
     loop {
         let mut line_data = view_up_to_line(data);
@@ -153,6 +175,7 @@ mod vmt_tests {
     use crate::bsp::header::BSPHeader;
     use crate::vmt::{consume_vmt, remove_comments};
     use crate::vpk::VPKDirectory;
+    use std::collections::HashSet;
     use std::path::{Path, PathBuf};
 
     const PATH: &str = "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_01.bsp";
@@ -190,12 +213,17 @@ mod vmt_tests {
         ))
         .unwrap();
 
+        let mut shaders = HashSet::new();
+
         for (d, files) in &dir.files["vmt"] {
-            println!("DIR: {}", d);
             for (_file, data) in files {
-                print!("{:?}", data.load_vmt(&dir));
+                let Ok(Some(vmt)) = data.load_vmt(&dir) else {
+                    continue;
+                };
+                shaders.insert(vmt.shader.to_ascii_lowercase());
             }
         }
+        println!("{:?}", shaders);
     }
 
     #[test]
@@ -212,7 +240,6 @@ mod vmt_tests {
                 let Ok(Some(vmt)) = data.load_vmt(&dir) else {
                     continue;
                 };
-                println!("{}", vmt.shader);
                 println!("{:?}", vmt.data);
             }
         }

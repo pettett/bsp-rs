@@ -1,6 +1,6 @@
 use std::path::PathBuf;
-
-use std::sync::{Arc};
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use crate::bsp::loader::load_bsp;
 use crate::camera::{update_view_proj, Camera, CameraUniform};
@@ -13,14 +13,14 @@ use crate::vtexture::{self, VTexture};
 
 use crate::vpk::VPKDirectory;
 use bevy_ecs::entity::Entity;
-use bevy_ecs::event::{EventReader, Events};
+use bevy_ecs::event::{EventReader, EventWriter, Events};
 use bevy_ecs::schedule::Schedule;
-use bevy_ecs::system::{Commands, NonSendMut, Query, Res, Resource};
+use bevy_ecs::system::{Commands, NonSend, NonSendMut, Query, Res, Resource};
 use bevy_ecs::world::{Mut, World};
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use winit::event::*;
-use winit::window::{Window};
+use winit::window::{Window, WindowId};
 const TEX_PATH: &str =
     "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";
 
@@ -64,8 +64,6 @@ pub struct StateRenderer {
     texture_dir: Arc<VPKDirectory>,
     misc_dir: Arc<VPKDirectory>,
 }
-
-struct ImGuiMarker();
 
 impl StateInstance {
     pub fn surface(&self) -> &wgpu::Surface {

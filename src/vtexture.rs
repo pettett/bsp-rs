@@ -46,7 +46,9 @@ impl VTexture {
             sampler,
         }
     }
-
+    pub fn size(&self) -> wgpu::Extent3d {
+        self.texture.size()
+    }
     pub fn view(&self) -> &wgpu::TextureView {
         &self.view
     }

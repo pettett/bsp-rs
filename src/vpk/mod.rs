@@ -33,8 +33,10 @@ use std::{
     fs::File,
     io::{self, BufRead, BufReader, Cursor, Read},
     path::PathBuf,
-    sync::OnceLock,
+    sync::{Arc, OnceLock},
 };
+
+use bevy_ecs::system::Resource;
 
 use crate::{binaries::BinaryData, util::v_path::VPath, vmt::VMT, vtf::VTF};
 
@@ -105,26 +107,26 @@ impl BinaryData for VPKDirectoryEntry {}
 pub struct VPKFile {
     entry: VPKDirectoryEntry,
     preload: Option<Vec<u8>>,
-    vtf: OnceLock<Option<VTF>>,
-    vmt: OnceLock<Option<VMT>>,
+    vtf: OnceLock<Option<Arc<VTF>>>,
+    vmt: OnceLock<Option<Arc<VMT>>>,
 }
 
 impl VPKFile {
-    pub fn load_vmt(&self, vpk: &VPKDirectory) -> io::Result<Option<&VMT>> {
+    pub fn load_vmt(&self, vpk: &VPKDirectory) -> io::Result<Option<&Arc<VMT>>> {
         self.load_file(vpk, |f| &f.vmt)
     }
 
-    pub fn load_vtf(&self, vpk: &VPKDirectory) -> io::Result<Option<&VTF>> {
+    pub fn load_vtf(&self, vpk: &VPKDirectory) -> io::Result<Option<&Arc<VTF>>> {
         self.load_file(vpk, |f| &f.vtf)
     }
 
-    fn load_file<'a, T: BinaryData, F: FnOnce(&'a VPKFile) -> &'a OnceLock<Option<T>>>(
+    fn load_file<'a, T: BinaryData, F: FnOnce(&'a VPKFile) -> &'a OnceLock<Option<Arc<T>>>>(
         &'a self,
         vpk: &VPKDirectory,
         get_cell: F,
-    ) -> io::Result<Option<&'a T>> {
+    ) -> io::Result<Option<&'a Arc<T>>> {
         Ok(get_cell(self)
-            .get_or_init(|| vpk.load_file::<T>(self))
+            .get_or_init(|| vpk.load_file::<T>(self).map(|f| Arc::new(f)))
             .as_ref())
     }
 }
@@ -273,20 +275,24 @@ impl VPKDirectory {
         })
     }
 
-    pub fn load_vtf(&self, path: &dyn VPath) -> io::Result<Option<&VTF>> {
+    pub fn load_vtf(&self, path: &dyn VPath) -> io::Result<Option<&Arc<VTF>>> {
         self.load_file_once(path, |f| &f.vtf)
     }
 
     /// Load material from global path (materials/x/y.vmt)
-    pub fn load_vmt(&self, path: &dyn VPath) -> io::Result<Option<&VMT>> {
+    pub fn load_vmt(&self, path: &dyn VPath) -> io::Result<Option<&Arc<VMT>>> {
         self.load_file_once(path, |f| &f.vmt)
     }
 
-    pub fn load_file_once<'a, T: BinaryData, F: FnOnce(&'a VPKFile) -> &'a OnceLock<Option<T>>>(
+    pub fn load_file_once<
+        'a,
+        T: BinaryData,
+        F: FnOnce(&'a VPKFile) -> &'a OnceLock<Option<Arc<T>>>,
+    >(
         &'a self,
         path: &dyn VPath,
         get_cell: F,
-    ) -> io::Result<Option<&'a T>> {
+    ) -> io::Result<Option<&'a Arc<T>>> {
         let ext_files = self.files.get(path.ext()).ok_or(io::Error::new(
             io::ErrorKind::InvalidInput,
             format!("Extension {} not present", path.ext()),

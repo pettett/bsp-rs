@@ -28,6 +28,12 @@ impl Shader {
             .create_shader_module(wgpu::include_wgsl!("textured_shader.wgsl"));
         Self::new::<UVVertex>(renderer, shader, 1, wgpu::PrimitiveTopology::TriangleList)
     }
+    pub fn new_textured_envmap(renderer: &StateRenderer) -> Self {
+        let shader = renderer
+            .device()
+            .create_shader_module(wgpu::include_wgsl!("textured_shader_envmap.wgsl"));
+        Self::new::<UVVertex>(renderer, shader, 2, wgpu::PrimitiveTopology::TriangleList)
+    }
     pub fn new_displacement(renderer: &StateRenderer) -> Self {
         let shader = renderer
             .device()

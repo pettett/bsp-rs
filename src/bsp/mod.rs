@@ -3,6 +3,7 @@ pub mod displacement;
 pub mod edges;
 pub mod face;
 pub mod header;
+pub mod lightmap;
 pub mod loader;
 pub mod lump;
 pub mod model;
