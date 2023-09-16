@@ -3,7 +3,7 @@ use bevy_ecs::prelude::*;
 use glam::{Quat, Vec2, Vec3};
 use winit::{
     dpi::PhysicalPosition,
-    event::{ElementState, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent},
+    event::{ElementState, KeyboardInput, MouseButton, VirtualKeyCode},
 };
 #[derive(Component)]
 pub struct CameraController {

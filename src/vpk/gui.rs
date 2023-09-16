@@ -14,7 +14,7 @@ fn draw_dir(
     dir: &VPKDirectory,
 ) {
     match tree {
-        VPKDirectoryTree::Leaf(file) => {}
+        VPKDirectoryTree::Leaf(_file) => {}
         VPKDirectoryTree::Node(dir_inner) => {
             let mut keys: Vec<&String> = dir_inner.keys().collect();
             keys.sort();

@@ -10,7 +10,7 @@ impl Viewable for VTF {
         ui: &imgui::Ui,
         renderer: &StateRenderer,
         ui_renderer: &mut imgui_wgpu::Renderer,
-        commands: &mut Commands,
+        _commands: &mut Commands,
     ) {
         ui.text(format!("{}x{}", self.width(), self.height()));
 

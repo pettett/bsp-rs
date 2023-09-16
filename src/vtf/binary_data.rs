@@ -1,15 +1,10 @@
 use std::{
-    fmt,
     io::{self, BufReader, Read, Seek},
     mem,
-    sync::OnceLock,
 };
-
-use wgpu::{Device, Queue};
 
 use crate::{
     binaries::BinaryData,
-    vtexture::VTexture,
     vtf::header::{ResourceEntryInfo, VTFHeader, VTFHeader73},
 };
 

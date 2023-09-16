@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Instant};
 
-use bevy_ecs::system::{Commands, Resource};
+use bevy_ecs::system::{Commands};
 use imgui::{Condition, FontSource};
 use imgui_wgpu::{Renderer, RendererConfig};
 
@@ -37,8 +37,8 @@ impl WindowState {
     pub fn draw_menu(
         &mut self,
         ui: &imgui::Ui,
-        renderer: &StateRenderer,
-        ui_renderer: &mut Renderer,
+        _renderer: &StateRenderer,
+        _ui_renderer: &mut Renderer,
     ) {
         ui.checkbox(self.view.gui_label(), &mut self.opened);
     }
@@ -72,7 +72,7 @@ impl StateImgui {
         view: &wgpu::TextureView,
         commands: &mut Commands,
     ) {
-        let delta_s = self.last_frame.elapsed();
+        let _delta_s = self.last_frame.elapsed();
         let now = Instant::now();
         self.imgui.io_mut().update_delta_time(now - self.last_frame);
         self.last_frame = now;
@@ -83,7 +83,7 @@ impl StateImgui {
 
         let ui = self.imgui.frame();
 
-        if let Some(menu_bar) = ui.begin_main_menu_bar() {
+        if let Some(_menu_bar) = ui.begin_main_menu_bar() {
             for window in &mut self.windows {
                 window.draw_menu(ui, renderer, &mut self.renderer);
             }

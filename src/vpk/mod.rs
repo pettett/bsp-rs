@@ -145,7 +145,7 @@ pub struct VPKDirectory {
 }
 
 impl VPKDirectoryTree {
-    pub fn add_entry(&mut self, prefix: &str, dir: &str, ext: &str) {
+    pub fn add_entry(&mut self, _prefix: &str, dir: &str, _ext: &str) {
         self.add_entry_inner(dir, dir);
     }
 
@@ -392,7 +392,7 @@ mod vpk_tests {
             println!("EXT: {}", ext);
             for (dir, files) in dirs {
                 println!("DIR: {}", dir);
-                for (file, data) in files {
+                for (file, _data) in files {
                     println!("FILE: {}", file);
                 }
             }
@@ -401,7 +401,7 @@ mod vpk_tests {
 
     #[test]
     fn test_tree() {
-        let mut root = VPKDirectoryTree::Node(HashMap::new());
+        let root = VPKDirectoryTree::Node(HashMap::new());
 
         //root.add_entry("test/file/please/ignore.txt");
         //root.add_entry("test/file/please/receive.txt");

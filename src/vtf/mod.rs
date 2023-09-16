@@ -8,22 +8,13 @@ pub mod vtf;
 
 pub use vtf::VTF;
 
-use std::{
-    fmt,
-    io::{self, BufReader, Read, Seek},
-    mem,
-    sync::OnceLock,
-};
 
-use wgpu::{Device, Queue};
 
-use crate::{
-    binaries::BinaryData,
-    vtexture::VTexture,
-    vtf::header::{ResourceEntryInfo, VTFHeader, VTFHeader73},
-};
 
-use self::consts::ImageFormat;
+
+
+
+
 
 #[cfg(test)]
 mod vtf_tests {
@@ -31,14 +22,14 @@ mod vtf_tests {
 
     use crate::{util::v_path::VGlobalPath, vpk::VPKDirectory};
 
-    use super::consts::ImageFormat;
+    
 
     const PATH: &str =
         "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";
 
     #[test]
     fn test_load() {
-        let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
+        let _dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
         // for file in dir.get_file_names() {
         //     if file.contains(".vtf") {
         //         let data = dir.load_vtf(file).unwrap().unwrap();

@@ -1,16 +1,16 @@
-use std::collections::HashMap;
+
 use std::{
-    io::{self, BufReader, Cursor, Read, Seek},
+    io::{self, BufReader, Read, Seek},
     sync::OnceLock,
 };
 
-use bevy_ecs::system::Resource;
+
 use stream_unzip::ZipReader;
 
 use crate::bsp::consts::LumpType;
 use crate::bsp::Lump;
 use crate::vpk::{VPKDirectory, VPKDirectoryEntry, VPKFile, VPKHeader_v2};
-use crate::{binaries::BinaryData, bsp, vmt::VMT, vtf::VTF};
+use crate::{binaries::BinaryData};
 
 impl Lump for VPKDirectory {
     fn max() -> usize {

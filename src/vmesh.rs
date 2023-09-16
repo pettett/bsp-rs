@@ -9,9 +9,9 @@ use std::{collections::HashMap, fs::File, io::BufReader, sync::Arc};
 use bevy_ecs::component::Component;
 use glam::{vec3, Vec3};
 
-use wgpu::{util::DeviceExt, Device};
+use wgpu::{util::DeviceExt};
 
-use crate::state::{StateInstance, StateRenderer};
+use crate::state::{StateRenderer};
 #[derive(Component)]
 pub struct VMesh {
     vertex_buffer: wgpu::Buffer,

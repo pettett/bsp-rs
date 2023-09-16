@@ -16,7 +16,7 @@ use crate::{
     vpk::VPKDirectory,
 };
 use bevy_ecs::system::Commands;
-use glam::{vec2, vec3, Vec3, Vec4};
+use glam::{vec2, Vec3, Vec4};
 use rayon::prelude::*;
 use std::{collections::HashMap, path::Path, sync::Arc};
 
@@ -212,7 +212,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
         .collect();
 
     println!("Loading BSP meshes...");
-    let shader_lines = Arc::new(Shader::new_white_lines::<Vec3>(renderer));
+    let _shader_lines = Arc::new(Shader::new_white_lines::<Vec3>(renderer));
     let shader_tex = Arc::new(Shader::new_textured(renderer));
     let shader_disp = Arc::new(Shader::new_displacement(renderer));
 

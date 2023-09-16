@@ -10,7 +10,6 @@ use bevy_ecs::{
 };
 
 use crate::{
-    bsp::loader::load_bsp,
     state::{MapChangeEvent, StateRenderer},
     vmesh::VMesh,
 };
@@ -46,8 +45,8 @@ impl Viewable for MapSelect {
     fn gui_view(
         &self,
         ui: &imgui::Ui,
-        renderer: &StateRenderer,
-        ui_renderer: &mut imgui_wgpu::Renderer,
+        _renderer: &StateRenderer,
+        _ui_renderer: &mut imgui_wgpu::Renderer,
         commands: &mut Commands,
     ) {
         for map_path in &self.file_names {
@@ -62,7 +61,7 @@ impl Viewable for MapSelect {
 
                     let (mut commands, meshes) = system_state.get(w);
 
-                    for (entity, mesh) in meshes.iter() {
+                    for (entity, _mesh) in meshes.iter() {
                         commands.entity(entity).despawn();
                     }
 

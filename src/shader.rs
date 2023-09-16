@@ -49,7 +49,7 @@ impl Shader {
     ) -> Self {
         let mut texture_bind_group_layouts = Vec::new();
 
-        for i in 0..textures {
+        for _i in 0..textures {
             texture_bind_group_layouts.push(renderer.device().create_bind_group_layout(
                 &wgpu::BindGroupLayoutDescriptor {
                     entries: &[

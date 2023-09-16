@@ -12,7 +12,7 @@ pub mod gui;
 
 use std::{
     collections::HashMap,
-    io::{BufRead, Read, Seek},
+    io::{Read, Seek},
 };
 
 use crate::binaries::BinaryData;
@@ -192,7 +192,7 @@ mod vmt_tests {
 
         for (d, files) in &dir.files["vmt"] {
             println!("DIR: {}", d);
-            for (file, data) in files {
+            for (_file, data) in files {
                 print!("{:?}", data.load_vmt(&dir));
             }
         }
@@ -208,7 +208,7 @@ mod vmt_tests {
 
         for (d, files) in &dir.files["vmt"] {
             println!("DIR: {}", d);
-            for (file, data) in files {
+            for (_file, data) in files {
                 let Ok(Some(vmt)) = data.load_vmt(&dir) else {
                     continue;
                 };
