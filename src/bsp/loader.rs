@@ -235,33 +235,31 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
             )
         })
         .collect();
-    println!("Mapping texture names...");
-    let textures: HashMap<i32, Option<String>> = textured_tris
-        .iter()
+
+    println!("Loading BSP Materials...");
+    let materials: HashMap<i32, Option<&VMT>> = textured_tris
+        .par_iter()
         .filter_map(|(tex, _tris)| {
-            get_material(
-                tex,
-                renderer,
-                &material_name_map,
-                &map_specific_material_map,
-            )
-            .map(|vmt| (*tex, vmt.get_tex_name()))
+            material_name_map.get(tex).map(|tex_name| {
+                println!("{tex_name}");
+
+                let mat_path = VLocalPath::new("materials", tex_name, "vmt");
+
+                let pak_vmt = pak.load_vmt(&mat_path);
+
+                let vmt = if let Ok(Some(pak_vmt)) = pak_vmt {
+                    renderer
+                        .misc_dir()
+                        .load_vmt(&VGlobalPath::from(pak_vmt.data["include"].as_str()))
+                        .unwrap()
+                } else {
+                    renderer.misc_dir().load_vmt(&mat_path).unwrap()
+                };
+
+                (*tex, vmt)
+            })
         })
         .collect();
-
-    println!("Loading BSP Textures...");
-    //preload all textures in parallel
-    textures.par_iter().for_each(|(tex, pos_name)| {
-        if let Some(name) = pos_name {
-            if let Ok(Some(vtf)) =
-                renderer
-                    .texture_dir()
-                    .load_vtf(&VLocalPath::new("materials", &name, "vtf"))
-            {
-                vtf.get_high_res(device, renderer.queue());
-            }
-        }
-    });
 
     println!("Loading BSP meshes...");
     let shader_lines = Arc::new(Shader::new_white_lines::<Vec3>(renderer));
@@ -269,30 +267,39 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
     let shader_disp = Arc::new(Shader::new_displacement(renderer));
 
     for (tex, builder) in &textured_tris {
-        if let Some(Some(path)) = textures.get(tex) {
-            if let Ok(Some(tex)) =
-                renderer
-                    .texture_dir()
-                    .load_vtf(&VLocalPath::new("materials", path, "vtf"))
-            {
-                let Ok(high_res) = tex.get_high_res(device, renderer.queue()) else {
-                    continue;
-                };
-                let mut mesh = StateMesh::new_empty(device, shader_tex.clone());
+        let Some(Some(vmt)) = materials.get(tex) else {
+            println!("Could not find material for {:?}", tex);
+            continue;
+        };
 
-                mesh.from_verts_and_tris(
-                    device,
-                    bytemuck::cast_slice(&builder.verts),
-                    bytemuck::cast_slice(&builder.tris),
-                    builder.tris.len() as u32,
-                );
+        let Some(basetex) = vmt.get_tex_name() else {
+            println!("Could not find base texture for {:?}", vmt);
+            continue;
+        };
 
-                mesh.load_tex(device, 1, high_res);
-                commands.spawn(mesh);
-            } else {
-                println!("Could not find texture for {:?}", textures.get(tex))
-            }
-        }
+        let Ok(Some(tex)) =
+            renderer
+                .texture_dir()
+                .load_vtf(&VLocalPath::new("materials", &basetex, "vtf"))
+        else {
+            println!("Could not find texture for {:?}", materials.get(tex));
+            continue;
+        };
+
+        let Ok(high_res) = tex.get_high_res(device, renderer.queue()) else {
+            continue;
+        };
+        let mut mesh = StateMesh::new_empty(device, shader_tex.clone());
+
+        mesh.from_verts_and_tris(
+            device,
+            bytemuck::cast_slice(&builder.verts),
+            bytemuck::cast_slice(&builder.tris),
+            builder.tris.len() as u32,
+        );
+
+        mesh.load_tex(device, 1, high_res);
+        commands.spawn(mesh);
     }
 
     // Load displacement data

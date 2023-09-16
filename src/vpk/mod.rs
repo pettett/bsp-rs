@@ -291,6 +291,7 @@ impl VPKDirectory {
             io::ErrorKind::InvalidInput,
             format!("Extension {} not present", path.ext()),
         ))?;
+
         let dir = ext_files.get(&path.dir()).ok_or(io::Error::new(
             io::ErrorKind::InvalidInput,
             format!(
