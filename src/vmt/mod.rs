@@ -135,7 +135,7 @@ impl BinaryData for VMT {
         max_size: Option<usize>,
     ) -> std::io::Result<Self> {
         let mut bytes = vec![0; max_size.unwrap()];
-        buffer.read_exact( &mut bytes)? ;
+        buffer.read_exact(&mut bytes)?;
 
         let mut data = String::from_utf8(bytes).unwrap();
 
@@ -149,12 +149,11 @@ impl BinaryData for VMT {
 
 #[cfg(test)]
 mod vmt_tests {
-    use std::path::{Path, PathBuf};
     use crate::bsp::consts::LumpType;
     use crate::bsp::header::BSPHeader;
-    use crate::bsp::pak::BSPPak;
     use crate::vmt::{consume_vmt, remove_comments};
     use crate::vpk::VPKDirectory;
+    use std::path::{Path, PathBuf};
 
     const PATH: &str = "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_01.bsp";
 
@@ -173,7 +172,7 @@ mod vmt_tests {
      "$selfillum" 1
 }
 		"#
-            .to_owned();
+        .to_owned();
 
         remove_comments(&mut data);
         println!("{}", data);
@@ -186,7 +185,10 @@ mod vmt_tests {
 
     #[test]
     fn test_misc_dir() {
-        let dir = VPKDirectory::load(PathBuf::from("D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_misc_dir.vpk")).unwrap();
+        let dir = VPKDirectory::load(PathBuf::from(
+            "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_misc_dir.vpk",
+        ))
+        .unwrap();
 
         for (d, files) in &dir.files["vmt"] {
             println!("DIR: {}", d);
@@ -202,13 +204,17 @@ mod vmt_tests {
 
         let pak_header = header.get_lump_header(LumpType::PAKFILE);
 
-        let pak: BSPPak = pak_header.read_binary(&mut buffer).unwrap();
+        let dir: VPKDirectory = pak_header.read_binary(&mut buffer).unwrap();
 
-        for e in pak.entries {
-            let Some(vmt) = e.get_vmt() else { continue; };
-
-            println!("{}", vmt.shader);
-            println!("{:?}", vmt.data);
+        for (d, files) in &dir.files["vmt"] {
+            println!("DIR: {}", d);
+            for (file, data) in files {
+                let Ok(Some(vmt)) = data.load_vmt(&dir) else {
+                    continue;
+                };
+                println!("{}", vmt.shader);
+                println!("{:?}", vmt.data);
+            }
         }
     }
 }

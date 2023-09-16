@@ -6,7 +6,6 @@ pub mod header;
 pub mod loader;
 pub mod lump;
 pub mod model;
-pub mod pak;
 pub mod plane;
 pub mod textures;
 pub mod vert;

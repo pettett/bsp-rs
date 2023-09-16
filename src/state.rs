@@ -3,7 +3,6 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use crate::bsp::loader::load_bsp;
-use crate::bsp::pak::BSPPak;
 use crate::camera::{update_view_proj, Camera, CameraUniform};
 use crate::camera_controller::{
     on_key_in, on_mouse_in, on_mouse_mv, update_camera, CameraController, KeyIn, MouseIn, MouseMv,

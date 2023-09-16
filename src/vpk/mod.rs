@@ -26,11 +26,12 @@
 
 pub mod file;
 pub mod gui;
+pub mod pak;
 
 use std::{
     collections::HashMap,
     fs::File,
-    io::{self, BufRead, BufReader, Read},
+    io::{self, BufRead, BufReader, Cursor, Read},
     path::PathBuf,
     sync::OnceLock,
 };
@@ -39,10 +40,10 @@ use crate::{binaries::BinaryData, util::v_path::VPath, vmt::VMT, vtf::VTF};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct VPKHeader_v2 {
+pub struct VPKHeader_v2 {
     Signature: u32,
     // = 0x55aa1234;
-    Version: u32,   // = 2;
+    Version: u32, // = 2;
 
     // The size, in bytes, of the directory tree
     TreeSize: u32,
@@ -61,6 +62,20 @@ struct VPKHeader_v2 {
 }
 
 impl BinaryData for VPKHeader_v2 {}
+
+impl VPKHeader_v2 {
+    pub fn pak_header() -> Self {
+        Self {
+            Signature: 0,
+            Version: 0,
+            TreeSize: 0,
+            FileDataSectionSize: 0,
+            ArchiveMD5SectionSize: 0,
+            OtherMD5SectionSize: 0,
+            SignatureSectionSize: 0,
+        }
+    }
+}
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -95,17 +110,11 @@ pub struct VPKFile {
 }
 
 impl VPKFile {
-    pub fn load_vmt(
-        &self,
-        vpk: &VPKDirectory,
-    ) -> io::Result<Option<&VMT>> {
+    pub fn load_vmt(&self, vpk: &VPKDirectory) -> io::Result<Option<&VMT>> {
         self.load_file(vpk, |f| &f.vmt)
     }
 
-    pub fn load_vtf(
-        &self,
-        vpk: &VPKDirectory,
-    ) -> io::Result<Option<&VTF>> {
+    pub fn load_vtf(&self, vpk: &VPKDirectory) -> io::Result<Option<&VTF>> {
         self.load_file(vpk, |f| &f.vtf)
     }
 
@@ -131,6 +140,7 @@ pub struct VPKDirectory {
     header: VPKHeader_v2,
     max_pack_file: u16,
     root: VPKDirectoryTree,
+    /// Files map, mapped by extension, then directory, then filename
     pub files: HashMap<String, HashMap<String, HashMap<String, VPKFile>>>,
 }
 
@@ -170,8 +180,24 @@ impl VPKDirectory {
     //    self.files.keys()
     //}
 
+    pub fn insert(&mut self, ext: String, dir: String, filename: String, file: VPKFile) {
+        let ext_files = self.files.entry(ext).or_default();
+        let dir_files = ext_files.entry(dir).or_default();
+
+        dir_files.insert(filename, file);
+    }
+
     pub fn get_root(&self) -> &VPKDirectoryTree {
         &self.root
+    }
+    pub fn new(header: VPKHeader_v2) -> Self {
+        Self {
+            dir_path: Default::default(),
+            header: header,
+            max_pack_file: 0,
+            root: VPKDirectoryTree::Node(HashMap::new()),
+            files: Default::default(),
+        }
     }
     pub fn load(dir_path: PathBuf) -> io::Result<Self> {
         let file = File::open(&dir_path)?;
@@ -283,25 +309,34 @@ impl VPKDirectory {
     }
 
     fn load_file<F: BinaryData>(&self, file_data: &VPKFile) -> Option<F> {
-        // Attempt to load
+        if let Some(preload) = &file_data.preload {
+            // Load from preload data
+            //TODO: delete preload data after
 
-        let index = file_data.entry.ArchiveIndex;
-        // replace dir with number
-        let mut header_pak_path = self.dir_path.to_path_buf();
-        let dir_file = self.dir_path.file_name().unwrap().to_string_lossy();
-        header_pak_path.set_file_name(dir_file.replace("_dir", &format!("_{index:0>3}")));
+            let c = Cursor::new(preload);
+            let mut buffer = BufReader::new(c);
 
-        // open file
-        let file = File::open(header_pak_path).unwrap();
-        let mut buffer = BufReader::new(file);
-        // seek and load
-        if buffer
-            .seek_relative(file_data.entry.EntryOffset as i64)
-            .is_ok()
-        {
-            F::read(&mut buffer, Some(file_data.entry.EntryLength as usize)).ok()
+            F::read(&mut buffer, Some(preload.len())).ok()
         } else {
-            None
+            // Attempt to load
+            let index = file_data.entry.ArchiveIndex;
+            // replace dir with number
+            let mut header_pak_path = self.dir_path.to_path_buf();
+            let dir_file = self.dir_path.file_name().unwrap().to_string_lossy();
+            header_pak_path.set_file_name(dir_file.replace("_dir", &format!("_{index:0>3}")));
+
+            // open file
+            let file = File::open(header_pak_path).unwrap();
+            let mut buffer = BufReader::new(file);
+            // seek and load
+            if buffer
+                .seek_relative(file_data.entry.EntryOffset as i64)
+                .is_ok()
+            {
+                F::read(&mut buffer, Some(file_data.entry.EntryLength as usize)).ok()
+            } else {
+                None
+            }
         }
     }
 }

@@ -5,7 +5,6 @@ use crate::{
         edges::{BSPEdge, BSPSurfEdge},
         face::BSPFace,
         header::BSPHeader,
-        pak::BSPPak,
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
     shader::Shader,
@@ -14,6 +13,7 @@ use crate::{
     util::v_path::{VGlobalPath, VLocalPath},
     vertex::{UVAlphaVertex, UVVertex, Vertex},
     vmt::VMT,
+    vpk::VPKDirectory,
 };
 use bevy_ecs::system::Commands;
 use glam::{vec2, vec3, Vec3, Vec4};
@@ -113,7 +113,10 @@ pub fn get_material<'a>(
     match vmt_r {
         Ok(Some(vmt)) => Some(vmt),
         Ok(None) => {
-            println!("ERROR: Material {} does not have valid vmt data", material_name);
+            println!(
+                "ERROR: Material {} does not have valid vmt data",
+                material_name
+            );
             None
         }
         Err(e) => {
@@ -199,24 +202,24 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
     println!("Loading BSP Pak...");
     let pak_header = header.get_lump_header(LumpType::PAKFILE);
 
-    let pak: BSPPak = pak_header.read_binary(&mut buffer).unwrap();
-
+    let pak: VPKDirectory = pak_header.read_binary(&mut buffer).unwrap();
+    let map_specific_material_map: HashMap<&str, &str> = Default::default();
     // map map specific materials to global materials
-    let map_specific_material_map: HashMap<&str, &str> = pak
-        .entries
-        .par_iter()
-        .filter_map(|entry| {
-            if let Some(vmt) = entry.get_vmt() {
-                if let Some(mat) = vmt.data.get("include") {
-                    Some((entry.filename.as_str(), mat.as_str()))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
-        .collect();
+    // let map_specific_material_map: HashMap<&str, &str> = pak
+    //     .entries
+    //     .par_iter()
+    //     .filter_map(|entry| {
+    //         if let Some(vmt) = entry.get_vmt() {
+    //             if let Some(mat) = vmt.data.get("include") {
+    //                 Some((entry.filename.as_str(), mat.as_str()))
+    //             } else {
+    //                 None
+    //             }
+    //         } else {
+    //             None
+    //         }
+    //     })
+    //     .collect();
 
     println!("Loading BSP Texture strings...");
     let tex_data_string_table = header.get_lump::<BSPTexDataStringTable>(&mut buffer);
@@ -272,7 +275,9 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
                     .texture_dir()
                     .load_vtf(&VLocalPath::new("materials", path, "vtf"))
             {
-                let Ok(high_res) = tex.get_high_res(device, renderer.queue()) else {continue;};
+                let Ok(high_res) = tex.get_high_res(device, renderer.queue()) else {
+                    continue;
+                };
                 let mut mesh = StateMesh::new_empty(device, shader_tex.clone());
 
                 mesh.from_verts_and_tris(
@@ -380,8 +385,12 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
                         builder.tris.len() as u32,
                     );
 
-                    let Ok(high_res1) = tex0.get_high_res(device, renderer.queue()) else {continue;};
-                    let Ok(high_res2) = tex1.get_high_res(device, renderer.queue()) else {continue;};
+                    let Ok(high_res1) = tex0.get_high_res(device, renderer.queue()) else {
+                        continue;
+                    };
+                    let Ok(high_res2) = tex1.get_high_res(device, renderer.queue()) else {
+                        continue;
+                    };
                     mesh.load_tex(device, 1, high_res1);
                     mesh.load_tex(device, 2, high_res2);
 
@@ -399,6 +408,6 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
     //    shader_lines,
     //));
 
-    commands.insert_resource(pak);
+    //commands.insert_resource(pak);
     //renderer.pak = Some(pak);
 }
