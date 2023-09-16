@@ -50,5 +50,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	// if t.a < 0.1{
 	// 	discard;
 	// }
-	return t + e;
+	return  e;
 }

@@ -281,14 +281,16 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
             let pak_vmt = pak.load_vmt(&mat_path);
 
             let vmt = if let Ok(Some(pak_vmt)) = pak_vmt {
-                assert_eq!(pak_vmt.shader(), "patch");
-                pak_vmt.patch.get_or_init(|| {
-                    renderer
-                        .misc_dir()
-                        .load_vmt(&VGlobalPath::from(pak_vmt.data["include"].as_str()))
-                        .unwrap()
-                        .map(Clone::clone)
-                });
+                if pak_vmt.shader() == "patch" {
+                    // If this is a patch, link it to the other patch
+                    pak_vmt.patch.get_or_init(|| {
+                        renderer
+                            .misc_dir()
+                            .load_vmt(&VGlobalPath::from(pak_vmt.data["include"].as_str()))
+                            .unwrap()
+                            .map(Clone::clone)
+                    });
+                }
 
                 Some(pak_vmt)
             } else {
@@ -316,10 +318,27 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
         };
 
         let (shader, shader_textures) = match vmt.shader() {
-            "patch" => (shader_tex_envmap.clone(), vec!["$basetexture", "$envmap"]), //normal brushes with lightmap
+            "patch" => match vmt.patch.get().as_ref().unwrap().as_ref().unwrap().shader() {
+                "lightmappedgeneric" => {
+                    (shader_tex_envmap.clone(), vec!["$basetexture", "$envmap"])
+                }
+                "unlittwotexture" => (shader_tex_envmap.clone(), vec!["$basetexture", "$envmap"]),
+                "worldvertextransition" => {
+                    (shader_disp.clone(), vec!["$basetexture2", "$basetexture"])
+                } // displacement - TODO: Include envmap
+
+                x => {
+                    println!(
+                        "Unknown patched shader {x} - Patch:\n {:#?}\n Original:\n {:#?}",
+                        vmt.data,
+                        vmt.patch.get().as_ref().unwrap().as_ref().unwrap().data
+                    );
+                    (shader_lines.clone(), vec![])
+                }
+            }, //normal brushes with lightmap
             "lightmappedgeneric" => (shader_tex.clone(), vec!["$basetexture"]), // normal brushes
-            "unlittwotexture" => (shader_disp.clone(), vec!["$basetexture", "$texture2"]), // screens
-            "unlitgeneric" => (shader_tex.clone(), vec!["$basetexture"]),                  // glass?
+            "unlittwotexture" => (shader_tex.clone(), vec!["$basetexture"]),    // screens
+            "unlitgeneric" => (shader_tex.clone(), vec!["$basetexture"]),       // glass?
             "worldvertextransition" => (shader_disp.clone(), vec!["$basetexture2", "$basetexture"]), // displacement
             x => {
                 println!("Unknown shader {x}");
