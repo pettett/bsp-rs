@@ -1,7 +1,7 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 
 #[derive(Debug)]
-pub struct Texture {
+pub struct VTexture {
     texture: Arc<wgpu::Texture>,
     view: Arc<wgpu::TextureView>,
     sampler: wgpu::Sampler,
@@ -16,7 +16,7 @@ pub struct Texture {
 //    }
 //}
 
-impl Texture {
+impl VTexture {
     pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float; // 1.
 
     pub fn to_imgui(

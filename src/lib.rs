@@ -5,13 +5,13 @@ pub mod camera_controller;
 pub mod gui;
 pub mod shader;
 pub mod state;
-pub mod state_mesh;
-pub mod texture;
 pub mod transform;
 pub mod util;
 pub mod vertex;
+pub mod vmesh;
 pub mod vmt;
 pub mod vpk;
+pub mod vtexture;
 pub mod vtf;
 
 use bevy_ecs::world::World;

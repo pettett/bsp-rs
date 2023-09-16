@@ -8,8 +8,8 @@ use crate::camera_controller::{
     on_key_in, on_mouse_in, on_mouse_mv, update_camera, CameraController, KeyIn, MouseIn, MouseMv,
 };
 use crate::gui::state_imgui::StateImgui;
-use crate::state_mesh::StateMesh;
-use crate::texture::{self, Texture};
+use crate::vmesh::VMesh;
+use crate::vtexture::{self, VTexture};
 
 use crate::vpk::VPKDirectory;
 use bevy_ecs::entity::Entity;
@@ -56,7 +56,7 @@ pub struct StateRenderer {
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
     window: Arc<Window>,
-    depth_texture: Texture,
+    depth_texture: VTexture,
     camera_entity: Entity,
     camera_buffer: wgpu::Buffer,
     camera_bind_group_layout: wgpu::BindGroupLayout,
@@ -132,7 +132,7 @@ impl StateApp {
             //renderer.camera.aspect = new_size.width as f32 / new_size.height as f32;
             renderer.config.width = new_size.width;
             renderer.config.height = new_size.height;
-            renderer.depth_texture = texture::Texture::create_depth_texture(
+            renderer.depth_texture = vtexture::VTexture::create_depth_texture(
                 renderer.device(),
                 renderer.config(),
                 "depth_texture",
@@ -219,7 +219,7 @@ pub fn load_map(
 }
 
 pub fn draw(
-    meshes: Query<(&StateMesh,)>,
+    meshes: Query<(&VMesh,)>,
     cameras: Query<(&CameraUniform,)>,
     mut imgui: NonSendMut<StateImgui>,
     renderer: Res<StateRenderer>,
@@ -399,7 +399,7 @@ impl StateRenderer {
         });
 
         let depth_texture =
-            texture::Texture::create_depth_texture(&device, &config, "depth_texture");
+            vtexture::VTexture::create_depth_texture(&device, &config, "depth_texture");
 
         let texture_dir = Arc::new(VPKDirectory::load(PathBuf::from(TEX_PATH)).unwrap());
         let misc_dir = Arc::new(VPKDirectory::load(PathBuf::from(MISC_PATH)).unwrap());

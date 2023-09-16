@@ -1,8 +1,8 @@
 use crate::{
     bsp::{edges::BSPEdge, header::BSPHeader},
     shader::Shader,
-    texture,
     vertex::{UVVertex, Vertex},
+    vtexture,
 };
 use std::{collections::HashMap, fs::File, io::BufReader, sync::Arc};
 
@@ -13,7 +13,7 @@ use wgpu::{util::DeviceExt, Device};
 
 use crate::state::{StateInstance, StateRenderer};
 #[derive(Component)]
-pub struct StateMesh {
+pub struct VMesh {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     index_format: wgpu::IndexFormat,
@@ -23,7 +23,7 @@ pub struct StateMesh {
     //puffin_ui : puffin_imgui::ProfilerUi,
 }
 
-impl StateMesh {
+impl VMesh {
     pub fn draw<'a>(
         &'a self,
         state: &'a StateRenderer,
@@ -87,7 +87,7 @@ impl StateMesh {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        StateMesh {
+        VMesh {
             vertex_buffer,
             index_buffer,
             num_indices: indices_data.len() as u32,
@@ -155,7 +155,12 @@ impl StateMesh {
         self.index_format = wgpu::IndexFormat::Uint16;
     }
 
-    pub fn load_tex(&mut self, device: &wgpu::Device, bind_index: u32, texture: &texture::Texture) {
+    pub fn load_tex(
+        &mut self,
+        device: &wgpu::Device,
+        bind_index: u32,
+        texture: &vtexture::VTexture,
+    ) {
         self.texture_bind_group.insert(
             bind_index,
             device.create_bind_group(&wgpu::BindGroupDescriptor {

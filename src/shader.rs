@@ -127,7 +127,7 @@ impl Shader {
                         conservative: false,
                     },
                     depth_stencil: Some(wgpu::DepthStencilState {
-                        format: crate::texture::Texture::DEPTH_FORMAT,
+                        format: crate::vtexture::VTexture::DEPTH_FORMAT,
                         depth_write_enabled: true,
                         depth_compare: wgpu::CompareFunction::Less, // 1.
                         stencil: wgpu::StencilState::default(),     // 2.

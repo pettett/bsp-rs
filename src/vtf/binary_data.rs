@@ -9,7 +9,7 @@ use wgpu::{Device, Queue};
 
 use crate::{
     binaries::BinaryData,
-    texture::Texture,
+    vtexture::VTexture,
     vtf::header::{ResourceEntryInfo, VTFHeader, VTFHeader73},
 };
 

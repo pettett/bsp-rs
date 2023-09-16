@@ -12,7 +12,7 @@ use bevy_ecs::{
 use crate::{
     bsp::loader::load_bsp,
     state::{MapChangeEvent, StateRenderer},
-    state_mesh::StateMesh,
+    vmesh::VMesh,
 };
 
 use super::Viewable;
@@ -57,7 +57,7 @@ impl Viewable for MapSelect {
                 let map_path_clone = map_path.clone();
 
                 commands.add(|w: &mut World| {
-                    let mut system_state: SystemState<(Commands, Query<(Entity, &StateMesh)>)> =
+                    let mut system_state: SystemState<(Commands, Query<(Entity, &VMesh)>)> =
                         SystemState::new(w);
 
                     let (mut commands, meshes) = system_state.get(w);

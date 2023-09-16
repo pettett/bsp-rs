@@ -9,9 +9,9 @@ use crate::{
     },
     shader::Shader,
     state::StateRenderer,
-    state_mesh::StateMesh,
     util::v_path::{VGlobalPath, VLocalPath},
     vertex::{UVAlphaVertex, UVVertex, Vertex},
+    vmesh::VMesh,
     vmt::VMT,
     vpk::VPKDirectory,
 };
@@ -239,7 +239,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
         let Ok(high_res) = tex.get_high_res(device, renderer.queue()) else {
             continue;
         };
-        let mut mesh = StateMesh::new_empty(device, shader_tex.clone());
+        let mut mesh = VMesh::new_empty(device, shader_tex.clone());
 
         mesh.from_verts_and_tris(
             device,
@@ -334,7 +334,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
 
             assert_eq!(builder.tris.len() as u16, ((disp_side_len - 1).pow(2)) * 6);
 
-            let mut mesh = StateMesh::new_empty(device, shader_disp.clone());
+            let mut mesh = VMesh::new_empty(device, shader_disp.clone());
 
             mesh.from_verts_and_tris(
                 device,
