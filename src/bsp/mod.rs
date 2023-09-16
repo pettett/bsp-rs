@@ -11,6 +11,7 @@ pub mod plane;
 pub mod textures;
 pub mod vert;
 
+pub use consts::LumpType;
 pub use lump::Lump;
 
 // https://developer.valvesoftware.com/wiki/BSP_(Source)
@@ -149,7 +150,7 @@ mod bsp_tests {
     #[test]
     fn pakfile() {
         let (header, mut buffer) = BSPHeader::load(Path::new(PATH)).unwrap();
-        let pakfile = header.get_lump_header(LumpType::PAKFILE);
+        let pakfile = header.get_lump_header(LumpType::PakFile);
 
         let pakfile_data = pakfile.read_bytes(&mut buffer).unwrap();
 
@@ -177,7 +178,7 @@ mod bsp_tests {
     #[test]
     fn tex_data_string_data() {
         let (header, mut buffer) = BSPHeader::load(Path::new(PATH)).unwrap();
-        let tex_data_string_data = header.get_lump_header(LumpType::TexdataStringData);
+        let tex_data_string_data = header.get_lump_header(LumpType::TexDataStringData);
 
         assert!(tex_data_string_data.file_len <= MAX_MAP_TEXDATA_STRING_DATA);
 
@@ -195,7 +196,7 @@ mod bsp_tests {
         let tex_info = header.get_lump::<BSPTexInfo>(&mut buffer);
         let tex_data = header.get_lump::<BSPTexData>(&mut buffer);
         let tex_data_string_table = header.get_lump::<BSPTexDataStringTable>(&mut buffer);
-        let tex_data_string_data = header.get_lump_header(LumpType::TexdataStringData);
+        let tex_data_string_data = header.get_lump_header(LumpType::TexDataStringData);
 
         // test data relation
         for info in tex_info.iter() {

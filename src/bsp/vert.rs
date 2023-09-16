@@ -10,7 +10,7 @@ impl Lump for Vec3 {
         MAX_MAP_VERTS
     }
     fn lump_type() -> LumpType {
-        LumpType::VERTEXES
+        LumpType::Vertexes
     }
     fn validate(lump: &Box<[Self]>) {
         assert!(lump.len() < MAX_MAP_VERTS);

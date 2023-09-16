@@ -1,16 +1,14 @@
-
 use std::{
     io::{self, BufReader, Read, Seek},
     sync::OnceLock,
 };
 
-
 use stream_unzip::ZipReader;
 
+use crate::binaries::BinaryData;
 use crate::bsp::consts::LumpType;
 use crate::bsp::Lump;
 use crate::vpk::{VPKDirectory, VPKDirectoryEntry, VPKFile, VPKHeader_v2};
-use crate::{binaries::BinaryData};
 
 impl Lump for VPKDirectory {
     fn max() -> usize {
@@ -18,7 +16,7 @@ impl Lump for VPKDirectory {
     }
 
     fn lump_type() -> LumpType {
-        LumpType::PAKFILE
+        LumpType::PakFile
     }
 
     fn validate(_lump: &Box<[Self]>) {}

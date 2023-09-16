@@ -9,8 +9,9 @@ pub trait Vertex {
 pub struct UVVertex {
     pub position: Vec3,
     pub uv: Vec2,
-    pub env_uv: Vec2,
+    pub lightmap_uv: Vec2,
     pub alpha: f32,
+    pub color: Vec3,
 }
 
 impl Vertex for UVVertex {
@@ -42,6 +43,15 @@ impl Vertex for UVVertex {
                         as wgpu::BufferAddress,
                     shader_location: 3,
                     format: wgpu::VertexFormat::Float32,
+                },
+                wgpu::VertexAttribute {
+                    offset: (std::mem::size_of::<Vec3>()
+                        + std::mem::size_of::<Vec2>()
+                        + std::mem::size_of::<Vec2>()
+                        + std::mem::size_of::<f32>())
+                        as wgpu::BufferAddress,
+                    shader_location: 4,
+                    format: wgpu::VertexFormat::Float32x3,
                 },
             ],
         }

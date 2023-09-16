@@ -18,7 +18,7 @@ impl Lump for BSPEdge {
         MAX_MAP_EDGES
     }
     fn lump_type() -> LumpType {
-        LumpType::EDGES
+        LumpType::Edges
     }
     fn validate(lump: &Box<[Self]>) {
         assert!(lump.len() < MAX_MAP_EDGES);
@@ -47,7 +47,7 @@ impl Lump for BSPSurfEdge {
         MAX_MAP_SURFEDGES
     }
     fn lump_type() -> LumpType {
-        LumpType::SURFEDGES
+        LumpType::SurfEdges
     }
     fn validate(lump: &Box<[Self]>) {
         assert!(lump.len() < MAX_MAP_SURFEDGES);

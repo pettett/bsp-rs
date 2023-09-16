@@ -32,7 +32,7 @@ impl Lump for BSPDispInfo {
     }
 
     fn lump_type() -> super::consts::LumpType {
-        LumpType::DISPINFO
+        LumpType::DispInfo
     }
 
     fn validate(_lump: &Box<[Self]>) {}

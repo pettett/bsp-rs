@@ -25,7 +25,7 @@ impl Lump for BSPModel {
     }
 
     fn lump_type() -> super::consts::LumpType {
-        LumpType::MODELS
+        LumpType::Models
     }
 
     fn validate(_lump: &Box<[Self]>) {}

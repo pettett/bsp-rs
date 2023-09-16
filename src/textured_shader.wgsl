@@ -18,11 +18,13 @@ struct VertexInput {
     @location(1) tex_coords: vec2<f32>, 
     @location(2) env_coords: vec2<f32>, 
     @location(3) alpha: f32, 
+    @location(4) color: vec3<f32>, 
 };
 
 struct VertexOutput { 
     @builtin(position) clip_position: vec4<f32>,
 	@location(0) tex_coords : vec2<f32>,
+    @location(1) color: vec3<f32>, 
 };
 
 @vertex
@@ -33,6 +35,7 @@ fn vs_main(
     out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0);
 	//var v = f32(model.vert) * 123.0;
 	out.tex_coords = model.tex_coords;
+	out.color = model.color;
 	return out;
 }
 // Fragment shader
@@ -42,5 +45,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	// if t.a < 0.1{
 	// 	discard;
 	// }
-	return t;
+	return vec4<f32>(in.color, 1.0);
 }

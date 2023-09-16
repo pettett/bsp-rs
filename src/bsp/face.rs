@@ -80,7 +80,7 @@ impl Lump for BSPFace {
         MAX_MAP_FACES
     }
     fn lump_type() -> LumpType {
-        LumpType::FACES
+        LumpType::Faces
     }
     fn validate(lump: &Box<[Self]>) {
         for face in lump.iter() {

@@ -5,6 +5,7 @@ use crate::{
         edges::{BSPEdge, BSPSurfEdge},
         face::BSPFace,
         header::BSPHeader,
+        lightmap::ColorRGBExp32,
         model::BSPModel,
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
@@ -52,24 +53,26 @@ impl MeshBuilder<UVVertex> {
         vertex: Vec3,
         tex_s: Vec4,
         tex_t: Vec4,
-        env_s: Vec4,
-        env_t: Vec4,
+        lightmap_s: Vec4,
+        lightmap_t: Vec4,
         alpha: f32,
+        color: Vec3,
     ) {
         //if !self.tri_map.contains_key(&index) {
         // if not contained, add in and generate uvs
         let tex_u = tex_s.dot(Vec4::from((vertex, 1.0)));
         let tex_v = tex_t.dot(Vec4::from((vertex, 1.0)));
-        let env_u = env_s.dot(Vec4::from((vertex, 1.0)));
-        let env_v = env_t.dot(Vec4::from((vertex, 1.0)));
+        let env_u = lightmap_s.dot(Vec4::from((vertex, 1.0)));
+        let env_v = lightmap_t.dot(Vec4::from((vertex, 1.0)));
 
         //self.tri_map.insert(index, self.verts.len() as u16);
 
         self.verts.push(UVVertex {
             position: vertex,
             uv: vec2(tex_u, tex_v),
-            env_uv: vec2(env_u, env_v),
+            lightmap_uv: vec2(env_u, env_v),
             alpha,
+            color,
         });
         //}
     }
@@ -144,6 +147,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
 
     let infos = header.get_lump::<BSPDispInfo>(&mut buffer);
     let disp_verts = header.get_lump::<BSPDispVert>(&mut buffer);
+    let lighting = header.get_lump::<ColorRGBExp32>(&mut buffer);
 
     for (i_face, face) in faces.iter().enumerate() {
         let tex = tex_info[face.tex_info as usize];
@@ -163,8 +167,16 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
         let tex_s = tex.tex_s / data.width as f32;
         let tex_t = tex.tex_t / data.height as f32;
 
-        let env_s = tex.lightmap_s;
-        let env_t = tex.lightmap_t;
+        let lightmap_s = tex.lightmap_s;
+        let lightmap_t = tex.lightmap_t;
+
+        if face.light_ofs == -1 {
+            continue;
+        }
+        // light_ofs is a byte offset, and these are 4 byte structures
+        assert_eq!(face.light_ofs % 4, 0);
+
+        let first_col = lighting[face.light_ofs as usize / 4];
 
         if face.disp_info != -1 {
             // This is a displacement
@@ -205,7 +217,16 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
 
                     let pos = vert.vec + Vec3::lerp(v0, v1, dx);
 
-                    builder.add_vert(i as u16, pos, tex_s, tex_t, env_s, env_t, vert.alpha);
+                    builder.add_vert(
+                        i as u16,
+                        pos,
+                        tex_s,
+                        tex_t,
+                        lightmap_s,
+                        lightmap_t,
+                        vert.alpha,
+                        first_col.into(),
+                    );
                 }
             }
             let disp_side_len = disp_side_len as u16;
@@ -230,7 +251,16 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
                 let tri = [edge.0, root_edge.0, edge.1];
                 for i in tri {
                     let l = builder.verts.len();
-                    builder.add_vert(i, verts[i as usize], tex_s, tex_t, env_s, env_t, 1.0);
+                    builder.add_vert(
+                        i,
+                        verts[i as usize],
+                        tex_s,
+                        tex_t,
+                        lightmap_s,
+                        lightmap_t,
+                        1.0,
+                        first_col.into(),
+                    );
                     let v = &mut builder.verts[l];
 
                     // The lightmapVecs float array performs a similar mapping of the lightmap samples of the
@@ -238,11 +268,11 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
                     // and then subtracting the [0] and [1] values of LightmapTextureMinsInLuxels for u and v respectively.
                     // LightmapTextureMinsInLuxels is referenced in dface_t;
 
-                    v.env_uv.x -= face.lightmap_texture_mins_in_luxels[0] as f32;
-                    v.env_uv.y -= face.lightmap_texture_mins_in_luxels[1] as f32;
+                    v.lightmap_uv.x += 0.5 - face.lightmap_texture_mins_in_luxels[0] as f32;
+                    v.lightmap_uv.y += 0.5 - face.lightmap_texture_mins_in_luxels[1] as f32;
 
-                    v.env_uv.x /= (face.lightmap_texture_size_in_luxels[0] as f32 + 1.0) * 32.0;
-                    v.env_uv.y /= (face.lightmap_texture_size_in_luxels[1] as f32 + 1.0) * 32.0;
+                    //v.env_uv.x /= (face.lightmap_texture_size_in_luxels[0] as f32 + 1.0);
+                    //v.env_uv.y /= (face.lightmap_texture_size_in_luxels[1] as f32 + 1.0);
                 }
                 builder.push_tri();
             }
@@ -250,13 +280,13 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
     }
 
     println!("Loading BSP Pak...");
-    let pak_header = header.get_lump_header(LumpType::PAKFILE);
+    let pak_header = header.get_lump_header(LumpType::PakFile);
 
     let pak: VPKDirectory = pak_header.read_binary(&mut buffer).unwrap();
 
     println!("Loading BSP Texture strings...");
     let tex_data_string_table = header.get_lump::<BSPTexDataStringTable>(&mut buffer);
-    let tex_data_string_data = header.get_lump_header(LumpType::TexdataStringData);
+    let tex_data_string_data = header.get_lump_header(LumpType::TexDataStringData);
 
     let material_name_map: HashMap<i32, String> = textured_tris
         .iter()

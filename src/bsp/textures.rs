@@ -76,7 +76,7 @@ impl Lump for BSPTexInfo {
         MAX_MAP_TEXINFO
     }
     fn lump_type() -> LumpType {
-        LumpType::TEXINFO
+        LumpType::TexInfo
     }
     fn validate(lump: &Box<[Self]>) {
         assert!(lump.len() < MAX_MAP_TEXINFO);
@@ -111,7 +111,7 @@ impl Lump for BSPTexData {
         MAX_MAP_TEXDATA
     }
     fn lump_type() -> LumpType {
-        LumpType::TEXDATA
+        LumpType::TexData
     }
     fn validate(lump: &Box<[Self]>) {
         assert!(lump.len() < MAX_MAP_TEXINFO);
@@ -157,7 +157,7 @@ impl Lump for BSPTexDataStringTable {
         0
     }
     fn lump_type() -> LumpType {
-        LumpType::TexdataStringTable
+        LumpType::TexDataStringTable
     }
     fn validate(_lump: &Box<[Self]>) {
         println!("Validated dtexdatastringdata_t lump!")

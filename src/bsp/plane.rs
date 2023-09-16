@@ -46,6 +46,6 @@ impl Lump for BSPPlane {
     }
 
     fn lump_type() -> super::consts::LumpType {
-        super::consts::LumpType::PLANES
+        super::consts::LumpType::Places
     }
 }

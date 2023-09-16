@@ -221,7 +221,7 @@ mod vmt_tests {
     fn test_maps() {
         let (header, mut buffer) = BSPHeader::load(Path::new(PATH)).unwrap();
 
-        let pak_header = header.get_lump_header(LumpType::PAKFILE);
+        let pak_header = header.get_lump_header(LumpType::PakFile);
 
         let dir: VPKDirectory = pak_header.read_binary(&mut buffer).unwrap();
 
