@@ -16,9 +16,9 @@ struct VertexInput {
 	//@builtin(vertex_index) vert : u32,
     @location(0) position: vec3<f32>, 
     @location(1) tex_coords: vec2<f32>, 
-	@location(2) env_coords : vec2<f32>,
+    @location(2) env_coords: vec2<f32>, 
+    @location(3) alpha: f32, 
 };
-
 
 struct VertexOutput { 
     @builtin(position) clip_position: vec4<f32>,

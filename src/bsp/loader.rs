@@ -5,6 +5,7 @@ use crate::{
         edges::{BSPEdge, BSPSurfEdge},
         face::BSPFace,
         header::BSPHeader,
+        model::BSPModel,
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
     shader::Shader,
@@ -16,7 +17,7 @@ use crate::{
     vpk::VPKDirectory,
 };
 use bevy_ecs::system::Commands;
-use glam::{vec2, Vec3, Vec4};
+use glam::{vec2, vec3, Vec3, Vec4};
 use rayon::prelude::*;
 use std::{collections::HashMap, path::Path, sync::Arc};
 
@@ -53,6 +54,7 @@ impl MeshBuilder<UVVertex> {
         tex_t: Vec4,
         env_s: Vec4,
         env_t: Vec4,
+        alpha: f32,
     ) {
         //if !self.tri_map.contains_key(&index) {
         // if not contained, add in and generate uvs
@@ -67,6 +69,7 @@ impl MeshBuilder<UVVertex> {
             position: vertex,
             uv: vec2(tex_u, tex_v),
             env_uv: vec2(env_u, env_v),
+            alpha,
         });
         //}
     }
@@ -139,18 +142,23 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
     println!("Loading BSP Faces...");
     let mut textured_tris = HashMap::<i32, MeshBuilder<UVVertex>>::new();
 
-    for face in faces.iter() {
-        if face.disp_info != -1 {
-            // skip displacements
-            continue;
-        }
+    let infos = header.get_lump::<BSPDispInfo>(&mut buffer);
+    let disp_verts = header.get_lump::<BSPDispVert>(&mut buffer);
 
-        let root_edge_index = face.first_edge as usize;
-        let root_edge = surfedges[root_edge_index].get_edge(&edges);
-
+    for (i_face, face) in faces.iter().enumerate() {
         let tex = tex_info[face.tex_info as usize];
-        let texdata = tex.tex_data;
-        let data = tex_data[texdata as usize];
+        let i_texdata = tex.tex_data;
+        let data = tex_data[i_texdata as usize];
+
+        let builder = match textured_tris.get_mut(&i_texdata) {
+            Some(x) => x,
+            None => {
+                textured_tris.insert(i_texdata, Default::default());
+                textured_tris.get_mut(&i_texdata).unwrap()
+            }
+        };
+
+        // TODO: better way to get tex/uv info from faces
 
         let tex_s = tex.tex_s / data.width as f32;
         let tex_t = tex.tex_t / data.height as f32;
@@ -158,35 +166,86 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
         let env_s = tex.lightmap_s;
         let env_t = tex.lightmap_t;
 
-        for i in 1..(face.num_edges as usize) {
-            let edge = surfedges[root_edge_index + i].get_edge(&edges);
+        if face.disp_info != -1 {
+            // This is a displacement
 
-            let builder = match textured_tris.get_mut(&texdata) {
-                Some(x) => x,
-                None => {
-                    textured_tris.insert(texdata, Default::default());
-                    textured_tris.get_mut(&texdata).unwrap()
-                }
-            };
+            let info = infos[face.disp_info as usize];
 
-            let tri = [edge.0, root_edge.0, edge.1];
-            for i in tri {
-                let l = builder.verts.len();
-                builder.add_vert(i, verts[i as usize], tex_s, tex_t, env_s, env_t);
-                let v = &mut builder.verts[l];
+            assert_eq!(info.map_face as usize, i_face);
 
-                // The lightmapVecs float array performs a similar mapping of the lightmap samples of the
-                // texture onto the world. It is the same formula but with lightmapVecs instead of textureVecs,
-                // and then subtracting the [0] and [1] values of LightmapTextureMinsInLuxels for u and v respectively.
-                // LightmapTextureMinsInLuxels is referenced in dface_t;
+            let face_verts = face.get_verts(&edges, &surfedges);
 
-                v.env_uv.x -= face.lightmap_texture_mins_in_luxels[0] as f32;
-                v.env_uv.y -= face.lightmap_texture_mins_in_luxels[1] as f32;
-
-                v.env_uv.x /= (face.lightmap_texture_size_in_luxels[0] as f32 + 1.0) * 32.0;
-                v.env_uv.y /= (face.lightmap_texture_size_in_luxels[1] as f32 + 1.0) * 32.0;
+            let mut corners = [Vec3::ZERO; 4];
+            for i in 0..4 {
+                corners[i] = verts[face_verts[i]];
             }
-            builder.push_tri();
+
+            // TODO: better way to get tex/uv info from faces
+
+            let _c = info.start_position;
+
+            let disp_side_len = (1 << (info.power)) + 1;
+
+            let get_i = |x: usize, y: usize| -> usize { x + disp_side_len * y };
+
+            let old_vert_count = builder.verts.len() as u16;
+
+            for y in 0..disp_side_len {
+                let dy = y as f32 / (disp_side_len as f32 - 1.0);
+
+                let v0 = Vec3::lerp(corners[0], corners[3], dy);
+                let v1 = Vec3::lerp(corners[1], corners[2], dy);
+
+                for x in 0..disp_side_len {
+                    let dx = x as f32 / (disp_side_len as f32 - 1.0);
+
+                    let i = get_i(x, y);
+
+                    let vert = disp_verts[i + info.disp_vert_start as usize];
+
+                    let pos = vert.vec + Vec3::lerp(v0, v1, dx);
+
+                    builder.add_vert(i as u16, pos, tex_s, tex_t, env_s, env_t, vert.alpha);
+                }
+            }
+            let disp_side_len = disp_side_len as u16;
+
+            // Build grid index buffer.
+            for y in 0..(disp_side_len - 1) {
+                for x in 0..(disp_side_len - 1) {
+                    let base = y * disp_side_len + x + old_vert_count;
+                    builder.add_tri([base, base + disp_side_len, base + disp_side_len + 1]);
+                    builder.add_tri([base, base + disp_side_len + 1, base + 1]);
+                }
+            }
+
+            // assert_eq!(builder.tris.len() as u16, ((disp_side_len - 1).pow(2)) * 6);
+        } else {
+            let root_edge_index = face.first_edge as usize;
+            let root_edge = surfedges[root_edge_index].get_edge(&edges);
+
+            for i in 1..(face.num_edges as usize) {
+                let edge = surfedges[root_edge_index + i].get_edge(&edges);
+
+                let tri = [edge.0, root_edge.0, edge.1];
+                for i in tri {
+                    let l = builder.verts.len();
+                    builder.add_vert(i, verts[i as usize], tex_s, tex_t, env_s, env_t, 1.0);
+                    let v = &mut builder.verts[l];
+
+                    // The lightmapVecs float array performs a similar mapping of the lightmap samples of the
+                    // texture onto the world. It is the same formula but with lightmapVecs instead of textureVecs,
+                    // and then subtracting the [0] and [1] values of LightmapTextureMinsInLuxels for u and v respectively.
+                    // LightmapTextureMinsInLuxels is referenced in dface_t;
+
+                    v.env_uv.x -= face.lightmap_texture_mins_in_luxels[0] as f32;
+                    v.env_uv.y -= face.lightmap_texture_mins_in_luxels[1] as f32;
+
+                    v.env_uv.x /= (face.lightmap_texture_size_in_luxels[0] as f32 + 1.0) * 32.0;
+                    v.env_uv.y /= (face.lightmap_texture_size_in_luxels[1] as f32 + 1.0) * 32.0;
+                }
+                builder.push_tri();
+            }
         }
     }
 
@@ -222,7 +281,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
             let pak_vmt = pak.load_vmt(&mat_path);
 
             let vmt = if let Ok(Some(pak_vmt)) = pak_vmt {
-                assert_eq!(pak_vmt.shader, "patch");
+                assert_eq!(pak_vmt.shader(), "patch");
                 pak_vmt.patch.get_or_init(|| {
                     renderer
                         .misc_dir()
@@ -245,7 +304,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
         .collect();
 
     println!("Loading BSP meshes...");
-    let _shader_lines = Arc::new(Shader::new_white_lines::<Vec3>(renderer));
+    let shader_lines = Arc::new(Shader::new_white_lines::<Vec3>(renderer));
     let shader_tex = Arc::new(Shader::new_textured(renderer));
     let shader_tex_envmap = Arc::new(Shader::new_textured_envmap(renderer));
     let shader_disp = Arc::new(Shader::new_displacement(renderer));
@@ -256,48 +315,19 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
             continue;
         };
 
-        let Some(basetex_path) = vmt.get_tex_name() else {
-            println!("Could not find base texture for {:?}", vmt);
-            continue;
-        };
-
-        let Ok(Some(basetex)) =
-            renderer
-                .texture_dir()
-                .load_vtf(&VLocalPath::new("materials", &basetex_path, "vtf"))
-        else {
-            println!("Could not find texture for {:?}", vmt);
-            continue;
-        };
-
-        let envmap_high_res = if let Some(envmap_path) = vmt.get_envmap() {
-            if let Ok(Some(envmap)) =
-                pak.load_vtf(&VLocalPath::new("materials", &envmap_path, "vtf"))
-            {
-                if let Ok(high_res_envmap) = envmap.get_high_res(device, renderer.queue()) {
-                    Some(high_res_envmap)
-                } else {
-                    None
-                }
-            } else {
-                None
+        let (shader, shader_textures) = match vmt.shader() {
+            "patch" => (shader_tex_envmap.clone(), vec!["$basetexture", "$envmap"]), //normal brushes with lightmap
+            "lightmappedgeneric" => (shader_tex.clone(), vec!["$basetexture"]), // normal brushes
+            "unlittwotexture" => (shader_disp.clone(), vec!["$basetexture", "$texture2"]), // screens
+            "unlitgeneric" => (shader_tex.clone(), vec!["$basetexture"]),                  // glass?
+            "worldvertextransition" => (shader_disp.clone(), vec!["$basetexture2", "$basetexture"]), // displacement
+            x => {
+                println!("Unknown shader {x}");
+                (shader_lines.clone(), vec![])
             }
-        } else {
-            None
         };
 
-        let Ok(high_res) = basetex.get_high_res(device, renderer.queue()) else {
-            continue;
-        };
-
-        let mut mesh = VMesh::new_empty(
-            device,
-            if envmap_high_res.is_none() {
-                shader_tex.clone()
-            } else {
-                shader_tex_envmap.clone()
-            },
-        );
+        let mut mesh = VMesh::new_empty(device, shader);
 
         mesh.from_verts_and_tris(
             device,
@@ -306,124 +336,44 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
             builder.tris.len() as u32,
         );
 
-        mesh.load_tex(device, 1, high_res);
-        if let Some(e) = envmap_high_res {
-            mesh.load_tex(device, 2, e);
+        for (i, tex) in shader_textures.iter().enumerate() {
+            let Some(tex_path) = vmt.get(tex) else {
+                println!("Could not find {} texture for {:?}", tex, vmt);
+                continue;
+            };
+
+            let fixed_path = tex_path.replace('\\', "/");
+
+            let vtf_path = VLocalPath::new("materials", &fixed_path, "vtf");
+
+            let vtf = if let Ok(Some(vtf)) = renderer.texture_dir().load_vtf(&vtf_path) {
+                vtf
+            } else {
+                if let Ok(Some(vtf)) = pak.load_vtf(&vtf_path) {
+                    vtf
+                } else {
+                    println!("Could not find vtf for {}:{}", tex, tex_path);
+                    continue;
+                }
+            };
+
+            let high_res = vtf.get_high_res(device, renderer.queue()).as_ref().unwrap();
+            mesh.load_tex(device, i as u32 + 1, high_res);
         }
+
         commands.spawn(mesh);
     }
 
-    // Load displacement data
+    let models = header.get_lump::<BSPModel>(&mut buffer);
 
-    println!("Loading BSP displacements...");
-    let infos = header.get_lump::<BSPDispInfo>(&mut buffer);
-    let disp_verts = header.get_lump::<BSPDispVert>(&mut buffer);
-
-    for info in infos.iter() {
-        // Build a mesh for the vertex
-
-        let face = faces[info.map_face as usize];
-
-        let face_verts = face.get_verts(&edges, &surfedges);
-
-        let mut corners = [Vec3::ZERO; 4];
-        for i in 0..4 {
-            corners[i] = verts[face_verts[i]];
-        }
-
-        // TODO: better way to get tex/uv info from faces
-        let tex = tex_info[face.tex_info as usize];
-        let i_texdata = tex.tex_data;
-        let data = tex_data[i_texdata as usize];
-
-        let s = tex.tex_s / data.width as f32;
-        let t = tex.tex_t / data.height as f32;
-
-        if let Some(vmt) = materials.get(&i_texdata) {
-            let Some(Ok(Some(tex0))) = vmt.get_tex_name().map(|t| {
-                renderer
-                    .texture_dir()
-                    .load_vtf(&VLocalPath::new("materials", &t, "vtf"))
-            }) else {
-                continue;
-            };
-
-            let Some(Ok(Some(tex1))) = vmt.get_tex2_name().map(|t| {
-                renderer
-                    .texture_dir()
-                    .load_vtf(&VLocalPath::new("materials", &t, "vtf"))
-            }) else {
-                continue;
-            };
-
-            let mut builder = MeshBuilder::default();
-
-            let _c = info.start_position;
-
-            let disp_side_len = (1 << (info.power)) + 1;
-
-            let get_i = |x: usize, y: usize| -> usize { x + disp_side_len * y };
-
-            for y in 0..disp_side_len {
-                let dy = y as f32 / (disp_side_len as f32 - 1.0);
-
-                let v0 = Vec3::lerp(corners[0], corners[3], dy);
-                let v1 = Vec3::lerp(corners[1], corners[2], dy);
-
-                for x in 0..disp_side_len {
-                    let dx = x as f32 / (disp_side_len as f32 - 1.0);
-
-                    let i = get_i(x, y);
-
-                    let vert = disp_verts[i + info.disp_vert_start as usize];
-
-                    let pos = vert.vec + Vec3::lerp(v0, v1, dx);
-
-                    builder.add_vert_a(i as u16, pos, s, t, vert.alpha);
-                }
-            }
-            let disp_side_len = disp_side_len as u16;
-
-            // Build grid index buffer.
-            for y in 0..(disp_side_len - 1) {
-                for x in 0..(disp_side_len - 1) {
-                    let base = y * disp_side_len + x;
-                    builder.add_tri([base, base + disp_side_len, base + disp_side_len + 1]);
-                    builder.add_tri([base, base + disp_side_len + 1, base + 1]);
-                }
-            }
-
-            assert_eq!(builder.tris.len() as u16, ((disp_side_len - 1).pow(2)) * 6);
-
-            let mut mesh = VMesh::new_empty(device, shader_disp.clone());
-
-            mesh.from_verts_and_tris(
-                device,
-                bytemuck::cast_slice(&builder.verts),
-                bytemuck::cast_slice(&builder.tris),
-                builder.tris.len() as u32,
-            );
-
-            let Ok(high_res1) = tex0.get_high_res(device, renderer.queue()) else {
-                continue;
-            };
-            let Ok(high_res2) = tex1.get_high_res(device, renderer.queue()) else {
-                continue;
-            };
-            mesh.load_tex(device, 1, high_res1);
-            mesh.load_tex(device, 2, high_res2);
-
-            commands.spawn((mesh,));
-        } else {
-            println!("Missing material for a displacement");
-        }
+    for m in models.iter() {
+        commands.spawn(VMesh::new_box(
+            device,
+            m.mins(),
+            m.maxs(),
+            shader_lines.clone(),
+        ));
     }
-    //state.add_mesh(StateMesh::new_box(
-    //    r,
-    //    vec3(0., 0., 0.),
-    //    vec3(1000., 1000., 1000.),
-    //    shader_lines,
-    //));
 
     //commands.insert_resource(VPK::<0>(pak));
     //renderer.pak = Some(pak);

@@ -10,6 +10,7 @@ pub struct UVVertex {
     pub position: Vec3,
     pub uv: Vec2,
     pub env_uv: Vec2,
+    pub alpha: f32,
 }
 
 impl Vertex for UVVertex {
@@ -24,14 +25,23 @@ impl Vertex for UVVertex {
                     format: wgpu::VertexFormat::Float32x3,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    offset: std::mem::size_of::<Vec3>() as wgpu::BufferAddress,
                     shader_location: 1,
                     format: wgpu::VertexFormat::Float32x2,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 5]>() as wgpu::BufferAddress,
+                    offset: (std::mem::size_of::<Vec3>() + std::mem::size_of::<Vec2>())
+                        as wgpu::BufferAddress,
                     shader_location: 2,
                     format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: (std::mem::size_of::<Vec3>()
+                        + std::mem::size_of::<Vec2>()
+                        + std::mem::size_of::<Vec2>())
+                        as wgpu::BufferAddress,
+                    shader_location: 3,
+                    format: wgpu::VertexFormat::Float32,
                 },
             ],
         }

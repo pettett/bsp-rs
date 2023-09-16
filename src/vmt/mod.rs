@@ -29,7 +29,7 @@ pub enum VMTUnit {
 #[derive(Debug, Default, Clone)]
 pub struct VMT {
     pub source: String, //DEBUG
-    pub shader: String,
+    shader: String,
     pub data: HashMap<String, String>,
     pub patch: OnceLock<Option<Arc<VMT>>>,
 }
@@ -38,25 +38,16 @@ impl VMT {
     pub fn new(source: String, shader: String) -> Self {
         Self {
             source,
-            shader,
+            shader: shader.to_ascii_lowercase(),
             data: Default::default(),
             patch: Default::default(),
         }
     }
 
-    pub fn get_tex_name(&self) -> Option<String> {
-        //TODO: This is just annoying
-
-        match self.get_basetex2().map(|f| f.replace('\\', "/")) {
-            None => self.get_tex2_name(),
-            f => f,
-        }
+    pub fn shader(&self) -> &str {
+        self.shader.as_str()
     }
-    pub fn get_tex2_name(&self) -> Option<String> {
-        //TODO: This is just annoying
 
-        self.get_basetex().map(|f| f.replace('\\', "/"))
-    }
     pub fn get_basetex(&self) -> Option<&str> {
         self.get("$basetexture")
     }

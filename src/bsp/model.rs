@@ -4,11 +4,14 @@ use super::{
     consts::{LumpType, MAX_MAP_MODELS},
     Lump,
 };
+use getset::CopyGetters;
 
 #[repr(C, packed)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, CopyGetters)]
 pub struct BSPModel {
+    #[getset(get_copy = "pub")]
     mins: Vec3,
+    #[getset(get_copy = "pub")]
     maxs: Vec3,
     origin: Vec3,
     headnode: i32,

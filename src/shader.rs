@@ -38,7 +38,7 @@ impl Shader {
         let shader = renderer
             .device()
             .create_shader_module(wgpu::include_wgsl!("displacement.wgsl"));
-        Self::new::<UVAlphaVertex>(renderer, shader, 2, wgpu::PrimitiveTopology::TriangleList)
+        Self::new::<UVVertex>(renderer, shader, 2, wgpu::PrimitiveTopology::TriangleList)
     }
     pub fn new_white_lines<V: Vertex + bytemuck::Pod>(renderer: &StateRenderer) -> Self {
         let shader = renderer
