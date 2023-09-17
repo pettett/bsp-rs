@@ -14,6 +14,12 @@
 - [ ] convert lightmap data from storage array to texture atlas
 - [ ] environment map reflections
 - [ ] global renderer configs (lighting only, textures, faces, etc)
+- [x] Half Life 2
+- [ ] Half Life 2 Ep 1
+    - [ ] Weird lightmap data
+- [ ] Half Life 2 Ep 2
 - [x] Portal
 - [ ] Portal 2
+    - [ ] VMT files changed slightly
+    - [ ] No lightmap data?
 - [ ] TF2
