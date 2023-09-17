@@ -1,6 +1,5 @@
 pub mod assets;
 pub mod binaries;
-pub mod bsp;
 pub mod camera;
 pub mod camera_controller;
 pub mod game_data;
@@ -10,10 +9,6 @@ pub mod transform;
 pub mod util;
 pub mod v;
 pub mod vertex;
-pub mod vmt;
-pub mod vpk;
-pub mod vtf;
-pub mod vtx;
 
 use bevy_ecs::world::World;
 use state::StateApp;

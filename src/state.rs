@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::bsp::loader::load_bsp;
+use crate::assets::bsp::loader::load_bsp;
 use crate::camera::update_view_proj;
 use crate::camera_controller::{
     on_key_in, on_mouse_in, on_mouse_mv, update_camera, KeyIn, MouseIn, MouseMv,

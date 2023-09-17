@@ -51,7 +51,7 @@ mod bsp_tests {
     use bytemuck::Zeroable;
     use glam::Vec3;
 
-    use crate::bsp::consts::{num_disp_power_verts, MAX_MAP_TEXDATA_STRING_DATA};
+    use crate::assets::bsp::consts::{num_disp_power_verts, MAX_MAP_TEXDATA_STRING_DATA};
 
     use super::{
         consts::LumpType,

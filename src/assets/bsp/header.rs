@@ -1,4 +1,4 @@
-use crate::bsp::consts::HEADER_LUMPS;
+use crate::assets::bsp::consts::HEADER_LUMPS;
 use std::{
     fmt,
     fs::File,
@@ -8,7 +8,7 @@ use std::{
     slice,
 };
 
-use crate::bsp::consts::LumpType;
+use crate::assets::bsp::consts::LumpType;
 use bytemuck::Zeroable;
 
 use super::lump::{BSPLump, Lump};

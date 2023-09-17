@@ -5,10 +5,10 @@ use std::{
 
 use stream_unzip::ZipReader;
 
+use crate::assets::bsp::consts::LumpType;
+use crate::assets::bsp::Lump;
+use crate::assets::vpk::{VPKDirectory, VPKDirectoryEntry, VPKFile};
 use crate::binaries::BinaryData;
-use crate::bsp::consts::LumpType;
-use crate::bsp::Lump;
-use crate::vpk::{VPKDirectory, VPKDirectoryEntry, VPKFile, VPKHeaderV2};
 
 use super::VPKHeaderV1;
 

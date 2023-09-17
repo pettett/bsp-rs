@@ -1,4 +1,4 @@
-use crate::{binaries::BinaryData};
+use crate::binaries::BinaryData;
 
 use super::consts::ImageFormat;
 

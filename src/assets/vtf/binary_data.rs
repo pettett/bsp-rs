@@ -4,11 +4,11 @@ use std::{
 };
 
 use crate::{
+    assets::vtf::header::{ResourceEntryInfo, VTFHeader, VTFHeader73},
     binaries::BinaryData,
-    vtf::header::{ResourceEntryInfo, VTFHeader, VTFHeader73},
 };
 
-use super::{consts::ImageFormat, VTF};
+use crate::assets::vtf::{consts::ImageFormat, VTF};
 
 impl BinaryData for VTF {
     fn read<R: Read + Seek>(

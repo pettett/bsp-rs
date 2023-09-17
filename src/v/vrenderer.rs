@@ -1,4 +1,4 @@
-use std::{num::NonZeroU32, path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use bevy_ecs::{
     entity::Entity,
@@ -8,12 +8,11 @@ use bevy_ecs::{
 use wgpu::util::DeviceExt;
 
 use crate::{
-    bsp::lightmap::LightingData,
+    assets::bsp::lightmap::LightingData,
     camera::{Camera, CameraUniform},
     camera_controller::CameraController,
     gui::state_imgui::StateImgui,
     state::StateInstance,
-    vpk::VPKDirectory,
 };
 
 use super::{VMesh, VTexture};

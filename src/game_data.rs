@@ -5,7 +5,7 @@ use std::{
 
 use bevy_ecs::system::Resource;
 
-use crate::{util::v_path::VPath, vmt::VMT, vpk::VPKDirectory, vtf::VTF};
+use crate::{assets::vpk::VPKDirectory, assets::vtf::VTF, assets::VMT, util::v_path::VPath};
 #[derive(Resource)]
 pub struct GameData {
     path: PathBuf,

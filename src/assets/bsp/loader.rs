@@ -1,5 +1,5 @@
 use crate::{
-    bsp::{
+    assets::bsp::{
         consts::LumpType,
         displacement::{BSPDispInfo, BSPDispVert},
         edges::{BSPEdge, BSPSurfEdge},
@@ -9,12 +9,11 @@ use crate::{
         model::BSPModel,
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
+    assets::{vpk::VPKDirectory, VMT},
     game_data::GameData,
     util::v_path::{VGlobalPath, VLocalPath},
     v::{vrenderer::VRenderer, vshader::VShader, VMesh},
     vertex::{UVAlphaVertex, UVVertex, Vertex},
-    vmt::VMT,
-    vpk::VPKDirectory,
 };
 use bevy_ecs::system::Commands;
 use glam::{ivec3, vec2, vec3, IVec3, Vec3, Vec4};

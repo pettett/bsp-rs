@@ -3,8 +3,8 @@ use std::{fmt, sync::OnceLock};
 use wgpu::{Device, Queue};
 
 use crate::{
+    assets::vtf::header::{VTFHeader, VTFHeader73},
     v::VTexture,
-    vtf::header::{VTFHeader, VTFHeader73},
 };
 
 use super::consts::ImageFormat;

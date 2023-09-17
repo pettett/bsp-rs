@@ -176,10 +176,10 @@ impl BinaryData for VMT {
 
 #[cfg(test)]
 mod vmt_tests {
-    use crate::bsp::consts::LumpType;
-    use crate::bsp::header::BSPHeader;
-    use crate::vmt::{consume_vmt, remove_comments};
-    use crate::vpk::VPKDirectory;
+    use crate::assets::bsp::consts::LumpType;
+    use crate::assets::bsp::header::BSPHeader;
+    use crate::assets::vmt::{consume_vmt, remove_comments};
+    use crate::assets::vpk::VPKDirectory;
     use std::collections::HashSet;
     use std::path::{Path, PathBuf};
 

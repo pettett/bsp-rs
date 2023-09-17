@@ -24,7 +24,6 @@
 //     maxPackFile: number;
 // }
 
-pub mod file;
 pub mod gui;
 pub mod pak;
 
@@ -36,7 +35,9 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use crate::{binaries::BinaryData, util::v_path::VPath, vmt::VMT, vtf::VTF};
+use crate::{binaries::BinaryData, util::v_path::VPath};
+
+use super::{VMT, VTF};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]

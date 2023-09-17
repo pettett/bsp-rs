@@ -15,7 +15,7 @@ pub fn main() {
         // system_state.get(&world) provides read-only versions of your system parameters instead.
         let (mut commands, renderer, game_data) = system_state.get(state.world());
 
-        bsp_explorer::bsp::loader::load_bsp(
+        bsp_explorer::assets::bsp::loader::load_bsp(
             game_data.starter_map(),
             &mut commands,
             &game_data,

@@ -1,4 +1,4 @@
-use crate::bsp::consts::MAX_DISP_CORNER_NEIGHBORS;
+use crate::assets::bsp::consts::MAX_DISP_CORNER_NEIGHBORS;
 use bytemuck::{Pod, Zeroable};
 use flagset::flags;
 use glam::Vec3;

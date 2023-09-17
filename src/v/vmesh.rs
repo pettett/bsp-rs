@@ -1,5 +1,5 @@
 use crate::{
-    bsp::{edges::BSPEdge, header::BSPHeader, lightmap::LightingData},
+    assets::bsp::{edges::BSPEdge, header::BSPHeader, lightmap::LightingData},
     vertex::{UVVertex, Vertex},
 };
 use std::{collections::HashMap, fs::File, io::BufReader, sync::Arc};

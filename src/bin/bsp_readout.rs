@@ -1,4 +1,4 @@
-use bsp_explorer::bsp::{
+use bsp_explorer::assets::bsp::{
     edges::{BSPEdge, BSPSurfEdge},
     face::BSPFace,
     header::BSPHeader,
