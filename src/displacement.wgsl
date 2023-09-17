@@ -76,9 +76,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 	var col = mix(second_col, first_col, fracts.x);
 
-	return vec4<f32>(col.rgb, 1.0);
 
+    var tex_blend = mix(textureSample(t_diffuse0, s_diffuse0, in.tex_coords), textureSample(t_diffuse1, s_diffuse1, in.tex_coords) , alpha);
 
-    //return  textureSample(t_diffuse0, s_diffuse0, in.tex_coords) * (1.0-alpha) + 
-	//		textureSample(t_diffuse1, s_diffuse1, in.tex_coords) * alpha;
+	return vec4<f32>(col.rgb * tex_blend.rgb, 1.0);
+
 }

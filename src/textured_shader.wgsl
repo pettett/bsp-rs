@@ -76,6 +76,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	var second_col = mix(lighting[bottom_0], lighting[bottom_1], fracts.y);
 
 	var col = mix(second_col, first_col, fracts.x);
-
-	return vec4<f32>(col.rgb, 1.0);
+	var ambient = vec3<f32>(0.2,0.2,0.2);
+					
+	return vec4<f32>(col.rgb * t.rgb, 1.0);
 }

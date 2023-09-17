@@ -262,6 +262,11 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
 
     header.validate();
 
+    {
+        let v = header.version;
+        println!("Loaded BSP File version {v}");
+    }
+
     //let mut mesh = StateMesh::new(renderer, wgpu::PrimitiveTopology::TriangleList);
     //mesh.load_glb_mesh(instance.clone());
     //state.add_mesh(mesh);
