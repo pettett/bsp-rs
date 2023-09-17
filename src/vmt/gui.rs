@@ -1,7 +1,7 @@
 use bevy_ecs::system::Commands;
 use imgui::TableFlags;
 
-use crate::{gui::Viewable, state::StateRenderer};
+use crate::{gui::Viewable, v::vrenderer::VRenderer};
 
 use super::VMT;
 
@@ -9,7 +9,7 @@ impl Viewable for VMT {
     fn gui_view(
         &self,
         ui: &imgui::Ui,
-        _renderer: &StateRenderer,
+        _renderer: &VRenderer,
         _ui_renderer: &mut imgui_wgpu::Renderer,
         _commands: &mut Commands,
     ) {

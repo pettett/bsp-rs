@@ -5,22 +5,21 @@ use crate::{
         edges::{BSPEdge, BSPSurfEdge},
         face::BSPFace,
         header::BSPHeader,
-        lightmap::ColorRGBExp32,
+        lightmap::{ColorRGBExp32, LightingData},
         model::BSPModel,
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
-    shader::Shader,
-    state::StateRenderer,
     util::v_path::{VGlobalPath, VLocalPath},
+    v::{vrenderer::VRenderer, vshader::VShader, VMesh},
     vertex::{UVAlphaVertex, UVVertex, Vertex},
-    vmesh::VMesh,
     vmt::VMT,
     vpk::VPKDirectory,
 };
 use bevy_ecs::system::Commands;
-use glam::{vec2, vec3, Vec3, Vec4};
+use glam::{vec2, Vec3, Vec4};
 use rayon::prelude::*;
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{collections::HashMap, num::NonZeroU32, path::Path, sync::Arc};
+use wgpu::util::DeviceExt;
 
 #[derive(Default)]
 struct MeshBuilder<V: Vertex + Default> {
@@ -107,7 +106,7 @@ impl<V: Vertex + Default> MeshBuilder<V> {
     }
 }
 
-pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
+pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
     println!("Loading BSP File...");
 
     let device = renderer.device();
@@ -149,6 +148,8 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
     let disp_verts = header.get_lump::<BSPDispVert>(&mut buffer);
     let lighting = header.get_lump::<ColorRGBExp32>(&mut buffer);
 
+    let lighting_cols: Vec<Vec3> = lighting.iter().map(|&x| x.into()).collect();
+
     for (i_face, face) in faces.iter().enumerate() {
         let tex = tex_info[face.tex_info as usize];
         let i_texdata = tex.tex_data;
@@ -176,7 +177,12 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
         // light_ofs is a byte offset, and these are 4 byte structures
         assert_eq!(face.light_ofs % 4, 0);
 
-        let first_col = lighting[face.light_ofs as usize / 4];
+        let light_base_index = face.light_ofs as usize / 4;
+
+        let first_col = lighting[light_base_index];
+
+        let lightmap_texture_mins_in_luxels = face.lightmap_texture_mins_in_luxels;
+        let lightmap_texture_size_in_luxels = face.lightmap_texture_size_in_luxels + 1;
 
         if face.disp_info != -1 {
             // This is a displacement
@@ -268,13 +274,20 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
                     // and then subtracting the [0] and [1] values of LightmapTextureMinsInLuxels for u and v respectively.
                     // LightmapTextureMinsInLuxels is referenced in dface_t;
 
-                    v.lightmap_uv.x += 0.5 - face.lightmap_texture_mins_in_luxels[0] as f32;
-                    v.lightmap_uv.y += 0.5 - face.lightmap_texture_mins_in_luxels[1] as f32;
-
-                    //v.env_uv.x /= (face.lightmap_texture_size_in_luxels[0] as f32 + 1.0);
-                    //v.env_uv.y /= (face.lightmap_texture_size_in_luxels[1] as f32 + 1.0);
+                    v.lightmap_uv += 0.5 - lightmap_texture_mins_in_luxels.as_vec2();
+                    v.lightmap_uv /= lightmap_texture_size_in_luxels.as_vec2();
                 }
                 builder.push_tri();
+            }
+
+            for x in 0..lightmap_texture_size_in_luxels.x {
+                for y in 0..lightmap_texture_size_in_luxels.y {
+                    let light_index =
+                        (x * (lightmap_texture_size_in_luxels.x) + y) as usize + light_base_index;
+
+                    let tx = x as f32 / lightmap_texture_size_in_luxels.x as f32;
+                    let ty = y as f32 / lightmap_texture_size_in_luxels.y as f32;
+                }
             }
         }
     }
@@ -336,10 +349,10 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
         .collect();
 
     println!("Loading BSP meshes...");
-    let shader_lines = Arc::new(Shader::new_white_lines::<Vec3>(renderer));
-    let shader_tex = Arc::new(Shader::new_textured(renderer));
-    let shader_tex_envmap = Arc::new(Shader::new_textured_envmap(renderer));
-    let shader_disp = Arc::new(Shader::new_displacement(renderer));
+    let shader_lines = Arc::new(VShader::new_white_lines::<Vec3>(renderer));
+    let shader_tex = Arc::new(VShader::new_textured(renderer));
+    let shader_tex_envmap = Arc::new(VShader::new_textured_envmap(renderer));
+    let shader_disp = Arc::new(VShader::new_displacement(renderer));
 
     for (tex, builder) in &textured_tris {
         let Some(vmt) = materials.get(tex) else {
@@ -424,6 +437,42 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &StateRenderer) {
         ));
     }
 
+    // Create a lighting buffer for use in all shaders
+
+    let lighting_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Lighting Buffer"),
+        contents: bytemuck::cast_slice(&lighting_cols[..]),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
+    let lighting_bind_group_layout: wgpu::BindGroupLayout =
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: Some(NonZeroU32::new(lighting_cols.len() as u32).unwrap()),
+            }],
+            label: Some("lighting_bind_group_layout"),
+        });
+
+    let lighting_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &lighting_bind_group_layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: lighting_buffer.as_entire_binding(),
+        }],
+        label: Some("lighting_bind_group"),
+    });
+
     //commands.insert_resource(VPK::<0>(pak));
-    //renderer.pak = Some(pak);
+    commands.insert_resource(LightingData {
+        lighting_buffer,
+        lighting_bind_group_layout,
+        lighting_bind_group,
+    });
 }

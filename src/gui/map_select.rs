@@ -10,8 +10,8 @@ use bevy_ecs::{
 };
 
 use crate::{
-    state::{MapChangeEvent, StateRenderer},
-    vmesh::VMesh,
+    state::MapChangeEvent,
+    v::{vrenderer::VRenderer, VMesh},
 };
 
 use super::Viewable;
@@ -45,7 +45,7 @@ impl Viewable for MapSelect {
     fn gui_view(
         &self,
         ui: &imgui::Ui,
-        _renderer: &StateRenderer,
+        _renderer: &VRenderer,
         _ui_renderer: &mut imgui_wgpu::Renderer,
         commands: &mut Commands,
     ) {

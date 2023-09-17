@@ -1,3 +1,5 @@
+use glam::IVec2;
+
 use super::{
     consts::{LumpType, MAX_MAP_FACES},
     edges::{BSPEdge, BSPSurfEdge},
@@ -50,9 +52,9 @@ pub struct BSPFace {
     /// face area in units^2
     pub area: f32,
     /// texture lighting info
-    pub lightmap_texture_mins_in_luxels: [i32; 2],
+    pub lightmap_texture_mins_in_luxels: IVec2,
     /// texture lighting info
-    pub lightmap_texture_size_in_luxels: [i32; 2],
+    pub lightmap_texture_size_in_luxels: IVec2,
     ///OrigFace is the index of the original face which was split to produce this face.
     pub orig_face: i32,
     /// NumPrims and firstPrimID are related to the drawing of "Non-polygonal primitives" (see below).

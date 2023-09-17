@@ -3,20 +3,19 @@ pub mod bsp;
 pub mod camera;
 pub mod camera_controller;
 pub mod gui;
-pub mod shader;
 pub mod state;
 pub mod transform;
 pub mod util;
+pub mod v;
 pub mod vertex;
-pub mod vmesh;
 pub mod vmt;
 pub mod vpk;
-pub mod vtexture;
 pub mod vtf;
 
 use bevy_ecs::world::World;
-use state::{StateApp, StateRenderer};
+use state::StateApp;
 
+use v::vrenderer::VRenderer;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -32,7 +31,7 @@ where
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     let mut world = World::default();
 
-    let renderer = StateRenderer::new(window, &mut world).await;
+    let renderer = VRenderer::new(window, &mut world).await;
 
     let mut state = StateApp::new(world, renderer).await;
 

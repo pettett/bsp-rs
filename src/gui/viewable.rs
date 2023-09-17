@@ -2,13 +2,13 @@ use bevy_ecs::system::Commands;
 use imgui::Ui;
 use imgui_wgpu::Renderer;
 
-use crate::state::StateRenderer;
+use crate::v::vrenderer::VRenderer;
 
 pub trait Viewable {
     fn gui_view(
         &self,
         ui: &Ui,
-        renderer: &StateRenderer,
+        renderer: &VRenderer,
         ui_renderer: &mut Renderer,
         commands: &mut Commands,
     );

@@ -1,54 +1,47 @@
-use crate::{
-    state::StateRenderer,
-    vertex::{UVAlphaVertex, UVVertex, Vertex},
-};
+use crate::vertex::{UVVertex, Vertex};
 
-pub struct Shader {
+use super::vrenderer::VRenderer;
+
+pub struct VShader {
     render_pipeline: wgpu::RenderPipeline,
     texture_bind_group_layouts: Vec<wgpu::BindGroupLayout>,
 }
 
-impl Shader {
+impl VShader {
     pub fn texture_bind_group_layout(&self, i: u32) -> Option<&wgpu::BindGroupLayout> {
         self.texture_bind_group_layouts.get(i as usize - 1)
     }
 
-    pub fn draw<'a>(
-        &'a self,
-        _state: &'a StateRenderer,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        _output: &wgpu::SurfaceTexture,
-        _view: &wgpu::TextureView,
-    ) {
+    pub fn draw<'a>(&'a self, _state: &'a VRenderer, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_pipeline(&self.render_pipeline);
     }
-    pub fn new_textured(renderer: &StateRenderer) -> Self {
+    pub fn new_textured(renderer: &VRenderer) -> Self {
         let shader = renderer
             .device()
-            .create_shader_module(wgpu::include_wgsl!("textured_shader.wgsl"));
+            .create_shader_module(wgpu::include_wgsl!("../textured_shader.wgsl"));
         Self::new::<UVVertex>(renderer, shader, 1, wgpu::PrimitiveTopology::TriangleList)
     }
-    pub fn new_textured_envmap(renderer: &StateRenderer) -> Self {
+    pub fn new_textured_envmap(renderer: &VRenderer) -> Self {
         let shader = renderer
             .device()
-            .create_shader_module(wgpu::include_wgsl!("textured_shader_envmap.wgsl"));
+            .create_shader_module(wgpu::include_wgsl!("../textured_shader_envmap.wgsl"));
         Self::new::<UVVertex>(renderer, shader, 2, wgpu::PrimitiveTopology::TriangleList)
     }
-    pub fn new_displacement(renderer: &StateRenderer) -> Self {
+    pub fn new_displacement(renderer: &VRenderer) -> Self {
         let shader = renderer
             .device()
-            .create_shader_module(wgpu::include_wgsl!("displacement.wgsl"));
+            .create_shader_module(wgpu::include_wgsl!("../displacement.wgsl"));
         Self::new::<UVVertex>(renderer, shader, 2, wgpu::PrimitiveTopology::TriangleList)
     }
-    pub fn new_white_lines<V: Vertex + bytemuck::Pod>(renderer: &StateRenderer) -> Self {
+    pub fn new_white_lines<V: Vertex + bytemuck::Pod>(renderer: &VRenderer) -> Self {
         let shader = renderer
             .device()
-            .create_shader_module(wgpu::include_wgsl!("solid_white.wgsl"));
+            .create_shader_module(wgpu::include_wgsl!("../solid_white.wgsl"));
         Self::new::<V>(renderer, shader, 0, wgpu::PrimitiveTopology::LineList)
     }
 
     pub fn new<V: Vertex + bytemuck::Pod>(
-        renderer: &StateRenderer,
+        renderer: &VRenderer,
         shader: wgpu::ShaderModule,
         textures: usize,
         topology: wgpu::PrimitiveTopology,
@@ -133,7 +126,7 @@ impl Shader {
                         conservative: false,
                     },
                     depth_stencil: Some(wgpu::DepthStencilState {
-                        format: crate::vtexture::VTexture::DEPTH_FORMAT,
+                        format: crate::v::VTexture::DEPTH_FORMAT,
                         depth_write_enabled: true,
                         depth_compare: wgpu::CompareFunction::Less, // 1.
                         stencil: wgpu::StencilState::default(),     // 2.

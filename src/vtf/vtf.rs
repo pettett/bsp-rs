@@ -1,12 +1,9 @@
-use std::{
-    fmt,
-    sync::OnceLock,
-};
+use std::{fmt, sync::OnceLock};
 
 use wgpu::{Device, Queue};
 
 use crate::{
-    vtexture::VTexture,
+    v::VTexture,
     vtf::header::{VTFHeader, VTFHeader73},
 };
 

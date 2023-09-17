@@ -1,7 +1,7 @@
 use bevy_ecs::system::Commands;
 use imgui_wgpu::Renderer;
 
-use crate::{gui::Viewable, state::StateRenderer};
+use crate::{gui::Viewable, v::vrenderer::VRenderer};
 
 use super::{VPKDirectory, VPKDirectoryTree};
 
@@ -31,7 +31,7 @@ impl Viewable for VPKDirectory {
     fn gui_view(
         &self,
         ui: &imgui::Ui,
-        renderer: &StateRenderer,
+        renderer: &VRenderer,
         ui_renderer: &mut imgui_wgpu::Renderer,
         commands: &mut Commands,
     ) {
@@ -45,16 +45,20 @@ impl Viewable for VPKDirectory {
 
                                 match ext.as_str() {
                                     "vmt" => match data.load_vmt(&self) {
-                                        Ok(Some(vmt)) => vmt.gui_view(ui, renderer, ui_renderer, commands),
+                                        Ok(Some(vmt)) => {
+                                            vmt.gui_view(ui, renderer, ui_renderer, commands)
+                                        }
                                         Ok(None) => ui.text("No Material"),
                                         Err(e) => ui.text(format!("Error loading Material: {}", e)),
                                     },
                                     "vtf" => match data.load_vtf(&self) {
-                                        Ok(Some(vtf)) => vtf.gui_view(ui, renderer, ui_renderer, commands),
+                                        Ok(Some(vtf)) => {
+                                            vtf.gui_view(ui, renderer, ui_renderer, commands)
+                                        }
                                         Ok(None) => ui.text("No Texture"),
                                         Err(e) => ui.text(format!("Error loading Texture: {}", e)),
                                     },
-                                    _ => ui.text("Unknown format")
+                                    _ => ui.text("Unknown format"),
                                 }
                             }
                         }

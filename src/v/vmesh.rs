@@ -1,24 +1,22 @@
 use crate::{
-    bsp::{edges::BSPEdge, header::BSPHeader},
-    shader::Shader,
+    bsp::{edges::BSPEdge, header::BSPHeader, lightmap::LightingData},
     vertex::{UVVertex, Vertex},
-    vtexture,
 };
 use std::{collections::HashMap, fs::File, io::BufReader, sync::Arc};
 
 use bevy_ecs::component::Component;
 use glam::{vec3, Vec3};
 
-use wgpu::{util::DeviceExt};
+use wgpu::util::DeviceExt;
 
-use crate::state::{StateRenderer};
+use super::{vrenderer::VRenderer, vshader::VShader, VTexture};
 #[derive(Component)]
 pub struct VMesh {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     index_format: wgpu::IndexFormat,
     texture_bind_group: HashMap<u32, wgpu::BindGroup>,
-    shader: Arc<Shader>,
+    shader: Arc<VShader>,
     num_indices: u32,
     //puffin_ui : puffin_imgui::ProfilerUi,
 }
@@ -26,14 +24,13 @@ pub struct VMesh {
 impl VMesh {
     pub fn draw<'a>(
         &'a self,
-        state: &'a StateRenderer,
+        state: &'a VRenderer,
         render_pass: &mut wgpu::RenderPass<'a>,
-        _output: &wgpu::SurfaceTexture,
-        _view: &wgpu::TextureView,
+        lighting: &LightingData,
     ) {
         // 1.
 
-        self.shader.draw(state, render_pass, _output, _view);
+        self.shader.draw(state, render_pass);
 
         render_pass.set_bind_group(0, state.camera_bind_group(), &[]);
 
@@ -47,7 +44,7 @@ impl VMesh {
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
     }
 
-    pub fn new_box(device: &wgpu::Device, min: Vec3, max: Vec3, shader: Arc<Shader>) -> Self {
+    pub fn new_box(device: &wgpu::Device, min: Vec3, max: Vec3, shader: Arc<VShader>) -> Self {
         Self::new(
             device,
             &[
@@ -66,14 +63,14 @@ impl VMesh {
             shader,
         )
     }
-    pub fn new_empty(device: &wgpu::Device, shader: Arc<Shader>) -> Self {
+    pub fn new_empty(device: &wgpu::Device, shader: Arc<VShader>) -> Self {
         Self::new::<UVVertex>(device, &[], &[], shader)
     }
     pub fn new<V: Vertex + bytemuck::Pod>(
         device: &wgpu::Device,
         verts_data: &[V],
         indices_data: &[u16],
-        shader: Arc<Shader>,
+        shader: Arc<VShader>,
     ) -> Self {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
@@ -155,12 +152,7 @@ impl VMesh {
         self.index_format = wgpu::IndexFormat::Uint16;
     }
 
-    pub fn load_tex(
-        &mut self,
-        device: &wgpu::Device,
-        bind_index: u32,
-        texture: &vtexture::VTexture,
-    ) {
+    pub fn load_tex(&mut self, device: &wgpu::Device, bind_index: u32, texture: &VTexture) {
         self.texture_bind_group.insert(
             bind_index,
             device.create_bind_group(&wgpu::BindGroupDescriptor {

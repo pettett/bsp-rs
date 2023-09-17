@@ -1,6 +1,14 @@
+use bevy_ecs::system::Resource;
 use glam::{vec3, Vec3};
 
 use super::{consts::MAX_MAP_LIGHTING, Lump, LumpType};
+
+#[derive(Resource)]
+pub struct LightingData {
+    pub lighting_buffer: wgpu::Buffer,
+    pub lighting_bind_group_layout: wgpu::BindGroupLayout,
+    pub lighting_bind_group: wgpu::BindGroup,
+}
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]

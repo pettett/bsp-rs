@@ -1,17 +1,14 @@
 use bevy_ecs::system::{Commands, ResMut, SystemState};
-use bsp_explorer::{
-    state::StateRenderer,
-};
-use std::{path::Path};
+use std::path::Path;
 
-use bsp_explorer::{run};
+use bsp_explorer::{run, v::vrenderer::VRenderer};
 
 pub fn main() {
     println!("Starting...");
     pollster::block_on(run(|state| {
         // Construct a `SystemState` struct, passing in a tuple of `SystemParam`
         // as if you were writing an ordinary system.
-        let mut system_state: SystemState<(Commands, ResMut<StateRenderer>)> =
+        let mut system_state: SystemState<(Commands, ResMut<VRenderer>)> =
             SystemState::new(state.world_mut());
 
         // Use system_state.get_mut(&mut world) and unpack your system parameters into variables!

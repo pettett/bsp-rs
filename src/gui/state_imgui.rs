@@ -1,15 +1,12 @@
 use std::{sync::Arc, time::Instant};
 
-use bevy_ecs::system::{Commands};
+use bevy_ecs::system::Commands;
 use imgui::{Condition, FontSource};
 use imgui_wgpu::{Renderer, RendererConfig};
 
 use winit::{event::Event, window::Window};
 
-use crate::{
-    gui::Viewable,
-    state::{State, StateRenderer},
-};
+use crate::{gui::Viewable, v::vrenderer::VRenderer};
 
 use super::map_select::MapSelect;
 
@@ -37,7 +34,7 @@ impl WindowState {
     pub fn draw_menu(
         &mut self,
         ui: &imgui::Ui,
-        _renderer: &StateRenderer,
+        _renderer: &VRenderer,
         _ui_renderer: &mut Renderer,
     ) {
         ui.checkbox(self.view.gui_label(), &mut self.opened);
@@ -45,7 +42,7 @@ impl WindowState {
     pub fn draw_window(
         &mut self,
         ui: &imgui::Ui,
-        renderer: &StateRenderer,
+        renderer: &VRenderer,
         ui_renderer: &mut Renderer,
         commands: &mut Commands,
     ) {
@@ -66,7 +63,7 @@ impl WindowState {
 impl StateImgui {
     pub fn render_pass(
         &mut self,
-        renderer: &StateRenderer,
+        renderer: &VRenderer,
         encoder: &mut wgpu::CommandEncoder,
         _output: &wgpu::SurfaceTexture,
         view: &wgpu::TextureView,
@@ -123,7 +120,7 @@ impl StateImgui {
         }
     }
 
-    pub fn init(renderer: &StateRenderer) -> Self {
+    pub fn init(renderer: &VRenderer) -> Self {
         // Set up dear imgui
         let mut imgui = imgui::Context::create();
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
