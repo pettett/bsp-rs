@@ -302,7 +302,12 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
     let mut lighting_cols: Vec<Vec4> = lighting.iter().map(|&x| x.into()).collect();
 
     if lighting_cols.len() == 0 {
-        lighting_cols.push(Vec4::ONE);
+        let entries = 500;
+
+        println!("Failure loading lightmap, replacing with {entries} Vec4::ONE entries");
+
+        println!("Example face:\n {:#?}", faces[0]);
+        lighting_cols = vec![Vec4::ONE; entries];
     }
 
     println!("Loading BSP Faces...");
@@ -339,7 +344,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
 
     println!("Loading BSP Materials...");
     let materials: HashMap<i32, &Arc<VMT>> = textured_tris
-        .par_iter()
+        .iter()
         .filter_map(|(tex, _tris)| {
             let Some(mat_name) = material_name_map.get(tex) else {
                 return None;
@@ -352,9 +357,13 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
                 if pak_vmt.shader() == "patch" {
                     // If this is a patch, link it to the other patch
                     pak_vmt.patch.get_or_init(|| {
-                        game_data
-                            .load_vmt(&VGlobalPath::from(pak_vmt.data["include"].as_str()))
-                            .map(Clone::clone)
+                        if let Some(include) = pak_vmt.data.get("include") {
+                            game_data
+                                .load_vmt(&VGlobalPath::from(include.as_str()))
+                                .map(Clone::clone)
+                        } else {
+                            None
+                        }
                     });
                 }
 
@@ -384,19 +393,25 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         };
 
         let (shader, shader_textures) = match vmt.shader() {
-            "patch" => match vmt.patch.get().as_ref().unwrap().as_ref().unwrap().shader() {
-                "lightmappedgeneric" => (shader_tex.clone(), vec!["$basetexture"]),
-                "unlittwotexture" => (shader_tex.clone(), vec!["$basetexture"]),
-                "worldvertextransition" => {
-                    (shader_disp.clone(), vec!["$basetexture2", "$basetexture"])
-                } // displacement - TODO: Include envmap
+            "patch" => match vmt.patch.get() {
+                Some(Some(vmt_patch)) => match vmt_patch.shader() {
+                    "lightmappedgeneric" => (shader_tex.clone(), vec!["$basetexture"]),
+                    "unlittwotexture" => (shader_tex.clone(), vec!["$basetexture"]),
+                    "worldvertextransition" => {
+                        (shader_disp.clone(), vec!["$basetexture2", "$basetexture"])
+                    } // displacement - TODO: Include envmap
 
-                x => {
-                    println!(
-                        "Unknown patched shader {x} - Patch:\n {:#?}\n Original:\n {:#?}",
-                        vmt.data,
-                        vmt.patch.get().as_ref().unwrap().as_ref().unwrap().data
-                    );
+                    x => {
+                        println!(
+                            "Unknown patched shader {x} - Patch:\n {:#?}\n Original:\n {:#?}",
+                            vmt.data,
+                            vmt.patch.get().as_ref().unwrap().as_ref().unwrap().data
+                        );
+                        (shader_lines.clone(), vec![])
+                    }
+                },
+                _ => {
+                    println!("ERROR: No patch vmt");
                     (shader_lines.clone(), vec![])
                 }
             }, //normal brushes with lightmap
@@ -405,7 +420,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
             "unlitgeneric" => (shader_tex.clone(), vec!["$basetexture"]),       // glass?
             "worldvertextransition" => (shader_disp.clone(), vec!["$basetexture2", "$basetexture"]), // displacement
             x => {
-                println!("Unknown shader {x} on {vmt:#?}");
+                println!("Unknown shader {x}");
                 (shader_lines.clone(), vec![])
             }
         };
@@ -420,14 +435,16 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         );
         let mut all_success = true;
         for (i, tex) in shader_textures.iter().enumerate() {
-            let Some(tex_path) = vmt.get(tex) else {
-                println!("ERROR: Could not find {} texture for {:?}", tex, vmt);
-                continue;
+            let tex_path = {
+                let Some(tex_path) = vmt.get(tex) else {
+                    println!("ERROR: Could not find {} texture for {:?}", tex, vmt);
+                    continue;
+                };
+
+                tex_path.replace('\\', "/")
             };
 
-            let fixed_path = tex_path.replace('\\', "/");
-
-            let vtf_path = VLocalPath::new("materials", &fixed_path, "vtf");
+            let vtf_path = VLocalPath::new("materials", &tex_path, "vtf");
 
             let vtf = if let Some(vtf) = game_data.load_vtf(&vtf_path) {
                 vtf
@@ -435,7 +452,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
                 if let Ok(Some(vtf)) = pak.load_vtf(&vtf_path) {
                     vtf
                 } else {
-                    println!("ERROR: Could not find vtf for {}:{}", tex, tex_path);
+                    println!("ERROR: Could not find vtf for {}: <{}>", tex, tex_path);
                     continue;
                 }
             };

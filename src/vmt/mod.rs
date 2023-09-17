@@ -105,12 +105,11 @@ fn consume_line(data: &mut &str) -> Result<(), ()> {
 }
 
 fn consume_string(data: &mut &str) -> Result<String, ()> {
-    let next = data.find('"').ok_or(())? + 1;
-    let after = data[next..].find('"').ok_or(())?;
+    let after = data.find(char::is_whitespace).ok_or(())?;
 
-    let str = data[next..next + after].to_owned();
+    let str = data[..after].trim().trim_matches('"').to_ascii_lowercase();
 
-    *data = &data[next + after + 1..];
+    *data = &data[after + 1..];
 
     return Ok(str);
 }
@@ -120,7 +119,10 @@ fn consume_word(data: &mut &str) -> Result<String, ()> {
 
     let after = data[next..].find(&['"', ' ', '\n']).ok_or(())?;
 
-    let str = data[next..next + after].to_owned();
+    let str = data[next..next + after]
+        .trim()
+        .trim_matches('"')
+        .to_ascii_lowercase();
 
     *data = &data[next + after + 1..];
 
@@ -140,9 +142,7 @@ fn consume_vmt(data: &mut &str) -> Result<VMT, ()> {
         let s2 = consume_string(&mut line_data);
 
         match (s1, s2) {
-            (Ok(mut s1), Ok(mut s2)) => {
-                s1.make_ascii_lowercase();
-                s2.make_ascii_lowercase();
+            (Ok(s1), Ok(s2)) => {
                 vmt.data.insert(s1, s2);
             }
             _ => {}
