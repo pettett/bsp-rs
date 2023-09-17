@@ -9,7 +9,7 @@ pub struct VShader {
 
 impl VShader {
     pub fn texture_bind_group_layout(&self, i: u32) -> Option<&wgpu::BindGroupLayout> {
-        self.texture_bind_group_layouts.get(i as usize - 1)
+        self.texture_bind_group_layouts.get(i as usize)
     }
 
     pub fn draw<'a>(&'a self, _state: &'a VRenderer, render_pass: &mut wgpu::RenderPass<'a>) {
@@ -78,6 +78,7 @@ impl VShader {
 
         let mut bind_group_layouts = Vec::new();
         bind_group_layouts.push(renderer.camera_bind_group_layout());
+        bind_group_layouts.push(&renderer.lighting_bind_group_layout);
         for t in &texture_bind_group_layouts {
             bind_group_layouts.push(t)
         }

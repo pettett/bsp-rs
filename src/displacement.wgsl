@@ -6,14 +6,14 @@ struct CameraUniform {
 @group(0) @binding(0) // 1.
 var<uniform> camera: CameraUniform;
 
-@group(1) @binding(0)
+@group(2) @binding(0)
 var t_diffuse0: texture_2d<f32>;
-@group(1)@binding(1)
+@group(2)@binding(1)
 var s_diffuse0: sampler;
 
-@group(2) @binding(0)
+@group(3) @binding(0)
 var t_diffuse1: texture_2d<f32>;
-@group(2)@binding(1)
+@group(3)@binding(1)
 var s_diffuse1: sampler;
 
 struct VertexInput {

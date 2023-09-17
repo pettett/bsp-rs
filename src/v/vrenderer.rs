@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{num::NonZeroU32, path::PathBuf, sync::Arc};
 
 use bevy_ecs::{
     entity::Entity,
@@ -35,6 +35,7 @@ pub struct VRenderer {
     camera_bind_group_layout: wgpu::BindGroupLayout,
     camera_bind_group: wgpu::BindGroup,
 
+    pub lighting_bind_group_layout: wgpu::BindGroupLayout,
     texture_dir: Arc<VPKDirectory>,
     misc_dir: Arc<VPKDirectory>,
 }
@@ -226,7 +227,20 @@ impl VRenderer {
         let camera_entity = world
             .spawn((camera, CameraController::new(10.), camera_uniform))
             .id();
-
+        let lighting_bind_group_layout: wgpu::BindGroupLayout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+                label: Some("lighting_bind_group_layout"),
+            });
         Self {
             window: Arc::new(window),
             instance: Arc::new(StateInstance::new(surface, device, queue)),
@@ -236,6 +250,7 @@ impl VRenderer {
             camera_entity,
             depth_texture,
             camera_buffer,
+            lighting_bind_group_layout,
             camera_bind_group,
             texture_dir,
             misc_dir,

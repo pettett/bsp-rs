@@ -26,16 +26,17 @@ impl VMesh {
         &'a self,
         state: &'a VRenderer,
         render_pass: &mut wgpu::RenderPass<'a>,
-        lighting: &LightingData,
+        lighting: &'a LightingData,
     ) {
         // 1.
 
         self.shader.draw(state, render_pass);
 
         render_pass.set_bind_group(0, state.camera_bind_group(), &[]);
+        render_pass.set_bind_group(1, &lighting.lighting_bind_group, &[]);
 
         for (i, tex) in &self.texture_bind_group {
-            render_pass.set_bind_group(*i, tex, &[]);
+            render_pass.set_bind_group(*i + 2, tex, &[]);
         }
 
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));

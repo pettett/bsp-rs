@@ -16,7 +16,7 @@ use crate::{
     vpk::VPKDirectory,
 };
 use bevy_ecs::system::Commands;
-use glam::{vec2, Vec3, Vec4};
+use glam::{vec2, vec3, Vec3, Vec4};
 use rayon::prelude::*;
 use std::{collections::HashMap, num::NonZeroU32, path::Path, sync::Arc};
 use wgpu::util::DeviceExt;
@@ -148,7 +148,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
     let disp_verts = header.get_lump::<BSPDispVert>(&mut buffer);
     let lighting = header.get_lump::<ColorRGBExp32>(&mut buffer);
 
-    let lighting_cols: Vec<Vec3> = lighting.iter().map(|&x| x.into()).collect();
+    let lighting_cols: Vec<Vec4> = lighting.iter().map(|&x| x.into()).collect();
 
     for (i_face, face) in faces.iter().enumerate() {
         let tex = tex_info[face.tex_info as usize];
@@ -183,6 +183,12 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
 
         let lightmap_texture_mins_in_luxels = face.lightmap_texture_mins_in_luxels;
         let lightmap_texture_size_in_luxels = face.lightmap_texture_size_in_luxels + 1;
+
+        let light_data = vec3(
+            light_base_index as f32,
+            lightmap_texture_size_in_luxels.x as f32,
+            0.0,
+        );
 
         if face.disp_info != -1 {
             // This is a displacement
@@ -224,14 +230,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
                     let pos = vert.vec + Vec3::lerp(v0, v1, dx);
 
                     builder.add_vert(
-                        i as u16,
-                        pos,
-                        tex_s,
-                        tex_t,
-                        lightmap_s,
-                        lightmap_t,
-                        vert.alpha,
-                        first_col.into(),
+                        i as u16, pos, tex_s, tex_t, lightmap_s, lightmap_t, vert.alpha, light_data,
                     );
                 }
             }
@@ -265,7 +264,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
                         lightmap_s,
                         lightmap_t,
                         1.0,
-                        first_col.into(),
+                        light_data,
                     );
                     let v = &mut builder.verts[l];
 
@@ -275,19 +274,9 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
                     // LightmapTextureMinsInLuxels is referenced in dface_t;
 
                     v.lightmap_uv += 0.5 - lightmap_texture_mins_in_luxels.as_vec2();
-                    v.lightmap_uv /= lightmap_texture_size_in_luxels.as_vec2();
+                    //v.lightmap_uv /= lightmap_texture_size_in_luxels.as_vec2();
                 }
                 builder.push_tri();
-            }
-
-            for x in 0..lightmap_texture_size_in_luxels.x {
-                for y in 0..lightmap_texture_size_in_luxels.y {
-                    let light_index =
-                        (x * (lightmap_texture_size_in_luxels.x) + y) as usize + light_base_index;
-
-                    let tx = x as f32 / lightmap_texture_size_in_luxels.x as f32;
-                    let ty = y as f32 / lightmap_texture_size_in_luxels.y as f32;
-                }
             }
         }
     }
@@ -397,7 +386,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
             bytemuck::cast_slice(&builder.tris),
             builder.tris.len() as u32,
         );
-
+        let mut all_success = true;
         for (i, tex) in shader_textures.iter().enumerate() {
             let Some(tex_path) = vmt.get(tex) else {
                 println!("Could not find {} texture for {:?}", tex, vmt);
@@ -419,11 +408,16 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
                 }
             };
 
-            let high_res = vtf.get_high_res(device, renderer.queue()).as_ref().unwrap();
-            mesh.load_tex(device, i as u32 + 1, high_res);
+            if let Ok(high_res) = vtf.get_high_res(device, renderer.queue()) {
+                mesh.load_tex(device, i as u32, high_res);
+            } else {
+                all_success = false;
+                break;
+            }
         }
-
-        commands.spawn(mesh);
+        if all_success {
+            commands.spawn(mesh);
+        }
     }
 
     let models = header.get_lump::<BSPModel>(&mut buffer);
@@ -442,26 +436,11 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
     let lighting_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Lighting Buffer"),
         contents: bytemuck::cast_slice(&lighting_cols[..]),
-        usage: wgpu::BufferUsages::UNIFORM,
+        usage: wgpu::BufferUsages::STORAGE,
     });
 
-    let lighting_bind_group_layout: wgpu::BindGroupLayout =
-        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: Some(NonZeroU32::new(lighting_cols.len() as u32).unwrap()),
-            }],
-            label: Some("lighting_bind_group_layout"),
-        });
-
     let lighting_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &lighting_bind_group_layout,
+        layout: &renderer.lighting_bind_group_layout,
         entries: &[wgpu::BindGroupEntry {
             binding: 0,
             resource: lighting_buffer.as_entire_binding(),
@@ -472,7 +451,6 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
     //commands.insert_resource(VPK::<0>(pak));
     commands.insert_resource(LightingData {
         lighting_buffer,
-        lighting_bind_group_layout,
         lighting_bind_group,
     });
 }

@@ -7,8 +7,11 @@ struct CameraUniform {
 var<uniform> camera: CameraUniform;
 
 @group(1) @binding(0)
+var<storage, read> lighting: array<vec3<f32>>;
+
+@group(2) @binding(0)
 var t_diffuse: texture_2d<f32>;
-@group(1)@binding(1)
+@group(2) @binding(1)
 var s_diffuse: sampler;
 
 
@@ -47,5 +50,27 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	// if t.a < 0.1{
 	// 	discard;
 	// }
-	return vec4<f32>(in.env_coords, 0.0, 1.0);
+
+	var width = i32(in.color.y);
+	var first_light = i32(in.color.x);
+
+	var bottom_coord_x = floor(in.env_coords.x);
+	var bottom_coord_y = floor(in.env_coords.y);
+	var top_coord_x = ceil(in.env_coords.x);
+	var top_coord_y = ceil(in.env_coords.y);
+
+	var fracts = fract(in.env_coords);
+
+	var top_0 = first_light + i32(bottom_coord_x) * width + i32(bottom_coord_y);
+	var top_1 = first_light + i32(top_coord_x) * width + i32(bottom_coord_y);
+
+	var bottom_0 = first_light + i32(bottom_coord_x) * width + i32(top_coord_y);
+	var bottom_1 = first_light + i32(top_coord_x) * width + i32(top_coord_y);
+
+	var first_col = mix(lighting[top_0], lighting[top_1], fracts.x);
+	var second_col = mix(lighting[bottom_0], lighting[bottom_1], fracts.x);
+
+	var col = mix(first_col, second_col, fracts.y);
+
+	return vec4<f32>(col.rgb, 1.0);
 }

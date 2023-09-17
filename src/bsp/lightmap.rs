@@ -1,12 +1,11 @@
 use bevy_ecs::system::Resource;
-use glam::{vec3, Vec3};
+use glam::{vec3, vec4, Vec3, Vec4};
 
 use super::{consts::MAX_MAP_LIGHTING, Lump, LumpType};
 
 #[derive(Resource)]
 pub struct LightingData {
     pub lighting_buffer: wgpu::Buffer,
-    pub lighting_bind_group_layout: wgpu::BindGroupLayout,
     pub lighting_bind_group: wgpu::BindGroup,
 }
 
@@ -25,6 +24,16 @@ impl From<ColorRGBExp32> for Vec3 {
             (value.r as f32).powi(value.exponent.into()) / 255.0,
             (value.g as f32).powi(value.exponent.into()) / 255.0,
             (value.b as f32).powi(value.exponent.into()) / 255.0,
+        )
+    }
+}
+impl From<ColorRGBExp32> for Vec4 {
+    fn from(value: ColorRGBExp32) -> Self {
+        vec4(
+            (value.r as f32).powi(value.exponent.into()) / 255.0,
+            (value.g as f32).powi(value.exponent.into()) / 255.0,
+            (value.b as f32).powi(value.exponent.into()) / 255.0,
+            1.0,
         )
     }
 }
