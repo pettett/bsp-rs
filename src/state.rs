@@ -1,10 +1,11 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::bsp::loader::load_bsp;
 use crate::camera::update_view_proj;
 use crate::camera_controller::{
     on_key_in, on_mouse_in, on_mouse_mv, update_camera, KeyIn, MouseIn, MouseMv,
 };
+use crate::game_data::{Game, GameData};
 use crate::gui::state_imgui::StateImgui;
 use crate::v::VTexture;
 
@@ -67,7 +68,22 @@ impl StateApp {
     /// Creating some of the wgpu types requires async code
     /// https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#state-new
     pub async fn new(mut world: World, renderer: VRenderer) -> Self {
-        world.insert_non_send_resource(StateImgui::init(&renderer));
+        let game_data = GameData::load_game(
+            Game::Portal,
+            Path::new("D:\\Program Files (x86)\\Steam\\steamapps\\common\\Portal").to_owned(),
+        );
+
+        // state.world_mut().insert_resource(GameData::load_game(
+        //     bsp_explorer::game_data::Game::Portal2,
+        //     Path::new("D:\\Program Files (x86)\\Steam\\steamapps\\common\\Portal 2").to_owned(),
+        // ));
+        // state.world_mut().insert_resource(GameData::load_game(
+        //     bsp_explorer::game_data::Game::HalfLife2,
+        //     Path::new("D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half Life 2").to_owned(),
+        // ));
+
+        world.insert_non_send_resource(StateImgui::init(&game_data, &renderer));
+        world.insert_resource(game_data);
         world.insert_resource(renderer);
         let mut schedule = Schedule::default();
 
@@ -192,8 +208,9 @@ pub fn load_map(
     mut events: EventReader<MapChangeEvent>,
     mut commands: Commands,
     renderer: Res<VRenderer>,
+    game_data: Res<GameData>,
 ) {
     for e in events.iter() {
-        load_bsp(&e.0, &mut commands, &renderer)
+        load_bsp(&e.0, &mut commands, &game_data, &renderer)
     }
 }

@@ -8,7 +8,9 @@ use stream_unzip::ZipReader;
 use crate::binaries::BinaryData;
 use crate::bsp::consts::LumpType;
 use crate::bsp::Lump;
-use crate::vpk::{VPKDirectory, VPKDirectoryEntry, VPKFile, VPKHeader_v2};
+use crate::vpk::{VPKDirectory, VPKDirectoryEntry, VPKFile, VPKHeaderV2};
+
+use super::VPKHeaderV1;
 
 impl Lump for VPKDirectory {
     fn max() -> usize {
@@ -37,10 +39,13 @@ impl BinaryData for VPKDirectory {
         // at the end.
         zip_reader.finish();
 
-        let mut vpk = VPKDirectory::new(VPKHeader_v2::pak_header());
+        let mut vpk = VPKDirectory::new(VPKHeaderV1::pak_header(), None);
 
         for e in zip_reader.drain_entries() {
-            let filename_sep = e.header().filename.rfind('/').unwrap();
+            let Some(filename_sep) = e.header().filename.rfind('/') else {
+                println!("Cannot work with {:?}", e.header().filename);
+                continue;
+            };
             let ext_sep = e.header().filename.find('.').unwrap();
 
             let ext = e.header().filename[ext_sep + 1..].to_owned();

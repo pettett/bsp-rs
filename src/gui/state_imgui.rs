@@ -6,7 +6,11 @@ use imgui_wgpu::{Renderer, RendererConfig};
 
 use winit::{event::Event, window::Window};
 
-use crate::{gui::Viewable, v::vrenderer::VRenderer};
+use crate::{
+    game_data::{self, GameData},
+    gui::Viewable,
+    v::vrenderer::VRenderer,
+};
 
 use super::map_select::MapSelect;
 
@@ -120,7 +124,7 @@ impl StateImgui {
         }
     }
 
-    pub fn init(renderer: &VRenderer) -> Self {
+    pub fn init(game_data: &GameData, renderer: &VRenderer) -> Self {
         // Set up dear imgui
         let mut imgui = imgui::Context::create();
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
@@ -169,6 +173,15 @@ impl StateImgui {
         //let dx1_data = dir.load_vtf("materials/metal/metalfloor001a.vtf").unwrap();
 
         let last_cursor = None;
+        let mut windows = Vec::<WindowState>::new();
+
+        for d in game_data.dirs() {
+            windows.push(WindowState::new(d.clone()));
+        }
+
+        windows.push(WindowState::new(Arc::new(
+            MapSelect::new(game_data.maps()).unwrap(),
+        )));
 
         Self {
             imgui,
@@ -176,16 +189,7 @@ impl StateImgui {
             last_frame: Instant::now(),
             platform,
             renderer: imgui_renderer,
-            windows: vec![
-                WindowState::new(renderer.misc_dir().clone()),
-                WindowState::new(renderer.texture_dir().clone()),
-                WindowState::new(Arc::new(
-                    MapSelect::new(
-                        "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\",
-                    )
-                    .unwrap(),
-                )),
-            ],
+            windows,
         }
     }
 }

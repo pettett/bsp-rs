@@ -9,6 +9,7 @@ use crate::{
         model::BSPModel,
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
+    game_data::GameData,
     util::v_path::{VGlobalPath, VLocalPath},
     v::{vrenderer::VRenderer, vshader::VShader, VMesh},
     vertex::{UVAlphaVertex, UVVertex, Vertex},
@@ -119,7 +120,8 @@ fn build_meshes(
 
         let light_base_index = face.light_ofs as usize / 4;
 
-        let first_col = lighting[light_base_index];
+        // Ensure we have the data
+        lighting[light_base_index];
 
         let lightmap_texture_mins_in_luxels = face.lightmap_texture_mins_in_luxels;
         let lightmap_texture_size_in_luxels = face.lightmap_texture_size_in_luxels + 1;
@@ -253,12 +255,12 @@ impl<V: Vertex + Default> MeshBuilder<V> {
     }
 }
 
-pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
-    println!("Loading BSP File...");
-
+pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, renderer: &VRenderer) {
     let device = renderer.device();
+    let map_path = game_data.maps().join(map);
+    println!("Loading BSP File {:?}...", map_path);
 
-    let (header, mut buffer) = BSPHeader::load(map).unwrap();
+    let (header, mut buffer) = BSPHeader::load(&map_path).unwrap();
 
     header.validate();
 
@@ -346,17 +348,15 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
                 if pak_vmt.shader() == "patch" {
                     // If this is a patch, link it to the other patch
                     pak_vmt.patch.get_or_init(|| {
-                        renderer
-                            .misc_dir()
+                        game_data
                             .load_vmt(&VGlobalPath::from(pak_vmt.data["include"].as_str()))
-                            .unwrap()
                             .map(Clone::clone)
                     });
                 }
 
                 Some(pak_vmt)
             } else {
-                renderer.misc_dir().load_vmt(&mat_path).unwrap()
+                game_data.load_vmt(&mat_path)
             };
 
             if let Some(vmt) = vmt {
@@ -425,7 +425,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
 
             let vtf_path = VLocalPath::new("materials", &fixed_path, "vtf");
 
-            let vtf = if let Ok(Some(vtf)) = renderer.texture_dir().load_vtf(&vtf_path) {
+            let vtf = if let Some(vtf) = game_data.load_vtf(&vtf_path) {
                 vtf
             } else {
                 if let Ok(Some(vtf)) = pak.load_vtf(&vtf_path) {

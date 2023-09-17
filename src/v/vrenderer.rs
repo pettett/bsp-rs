@@ -15,11 +15,6 @@ use crate::{
     state::StateInstance,
     vpk::VPKDirectory,
 };
-const TEX_PATH: &str =
-    "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";
-
-const MISC_PATH: &str =
-    "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_misc_dir.vpk";
 
 use super::{VMesh, VTexture};
 
@@ -36,8 +31,6 @@ pub struct VRenderer {
     camera_bind_group: wgpu::BindGroup,
 
     pub lighting_bind_group_layout: wgpu::BindGroupLayout,
-    texture_dir: Arc<VPKDirectory>,
-    misc_dir: Arc<VPKDirectory>,
 }
 
 pub fn draw(
@@ -218,9 +211,6 @@ impl VRenderer {
 
         let depth_texture = VTexture::create_depth_texture(&device, &config, "depth_texture");
 
-        let texture_dir = Arc::new(VPKDirectory::load(PathBuf::from(TEX_PATH)).unwrap());
-        let misc_dir = Arc::new(VPKDirectory::load(PathBuf::from(MISC_PATH)).unwrap());
-
         puffin::set_scopes_on(true); // you may want to control this with a flag
                                      //let  puffin_ui = puffin_imgui::ProfilerUi::default();
 
@@ -252,8 +242,6 @@ impl VRenderer {
             camera_buffer,
             lighting_bind_group_layout,
             camera_bind_group,
-            texture_dir,
-            misc_dir,
         }
     }
 
@@ -276,12 +264,6 @@ impl VRenderer {
         &self.camera_bind_group
     }
 
-    pub fn texture_dir(&self) -> &Arc<VPKDirectory> {
-        &self.texture_dir
-    }
-    pub fn misc_dir(&self) -> &Arc<VPKDirectory> {
-        &self.misc_dir
-    }
     pub fn camera_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         &self.camera_bind_group_layout
     }

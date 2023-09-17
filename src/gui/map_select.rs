@@ -20,11 +20,9 @@ pub struct MapSelect {
     file_names: Vec<PathBuf>,
 }
 impl MapSelect {
-    pub fn new(path: &str) -> io::Result<Self> {
+    pub fn new(root: &Path) -> io::Result<Self> {
         // Get a list of all entries in the folder
-        let entries = fs::read_dir(path)?;
-
-        let root = Path::new(path);
+        let entries = fs::read_dir(root)?;
 
         // Extract the filenames from the directory entries and store them in a vector
         let file_names = entries

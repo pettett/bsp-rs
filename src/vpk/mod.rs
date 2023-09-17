@@ -36,45 +36,43 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use bevy_ecs::system::Resource;
-
 use crate::{binaries::BinaryData, util::v_path::VPath, vmt::VMT, vtf::VTF};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct VPKHeader_v2 {
-    Signature: u32,
+pub struct VPKHeaderV1 {
+    signature: u32,
     // = 0x55aa1234;
-    Version: u32, // = 2;
+    version: u32, // = 2;
 
     // The size, in bytes, of the directory tree
-    TreeSize: u32,
-
-    // How many bytes of file content are stored in this VPK file (0 in CSGO)
-    FileDataSectionSize: u32,
-
-    // The size, in bytes, of the section containing MD5 checksums for external archive content
-    ArchiveMD5SectionSize: u32,
-
-    // The size, in bytes, of the section containing MD5 checksums for content in this file (should always be 48)
-    OtherMD5SectionSize: u32,
-
-    // The size, in bytes, of the section containing the public key and signature. This is either 0 (CSGO & The Ship) or 296 (HL2, HL2:DM, HL2:EP1, HL2:EP2, HL2:LC, TF2, DOD:S & CS:S)
-    SignatureSectionSize: u32,
+    tree_size: u32,
 }
 
-impl BinaryData for VPKHeader_v2 {}
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct VPKHeaderV2 {
+    // How many bytes of file content are stored in this VPK file (0 in CSGO)
+    file_data_section_size: u32,
 
-impl VPKHeader_v2 {
+    // The size, in bytes, of the section containing MD5 checksums for external archive content
+    archive_md5_section_size: u32,
+
+    // The size, in bytes, of the section containing MD5 checksums for content in this file (should always be 48)
+    other_md5_section_size: u32,
+
+    // The size, in bytes, of the section containing the public key and signature. This is either 0 (CSGO & The Ship) or 296 (HL2, HL2:DM, HL2:EP1, HL2:EP2, HL2:LC, TF2, DOD:S & CS:S)
+    signature_section_size: u32,
+}
+
+impl BinaryData for VPKHeaderV1 {}
+impl BinaryData for VPKHeaderV2 {}
+impl VPKHeaderV1 {
     pub fn pak_header() -> Self {
         Self {
-            Signature: 0,
-            Version: 0,
-            TreeSize: 0,
-            FileDataSectionSize: 0,
-            ArchiveMD5SectionSize: 0,
-            OtherMD5SectionSize: 0,
-            SignatureSectionSize: 0,
+            signature: 0,
+            version: 0,
+            tree_size: 0,
         }
     }
 }
@@ -139,7 +137,8 @@ pub enum VPKDirectoryTree {
 
 pub struct VPKDirectory {
     dir_path: PathBuf,
-    header: VPKHeader_v2,
+    header1: VPKHeaderV1,
+    header2: Option<VPKHeaderV2>,
     max_pack_file: u16,
     root: VPKDirectoryTree,
     /// Files map, mapped by extension, then directory, then filename
@@ -192,10 +191,11 @@ impl VPKDirectory {
     pub fn get_root(&self) -> &VPKDirectoryTree {
         &self.root
     }
-    pub fn new(header: VPKHeader_v2) -> Self {
+    pub fn new(header1: VPKHeaderV1, header2: Option<VPKHeaderV2>) -> Self {
         Self {
             dir_path: Default::default(),
-            header: header,
+            header1,
+            header2,
             max_pack_file: 0,
             root: VPKDirectoryTree::Node(HashMap::new()),
             files: Default::default(),
@@ -205,7 +205,18 @@ impl VPKDirectory {
         let file = File::open(&dir_path)?;
         let mut buffer = BufReader::new(file);
 
-        let header = VPKHeader_v2::read(&mut buffer, None)?;
+        let header1 = VPKHeaderV1::read(&mut buffer, None)?;
+        let header2 = if header1.version == 2 {
+            Some(VPKHeaderV2::read(&mut buffer, None)?)
+        } else {
+            None
+        };
+
+        {
+            let v = header1.version;
+            println!("Loading {:?} version {}", dir_path, v);
+        }
+
         let mut root = VPKDirectoryTree::Node(HashMap::new());
         let mut max_pack_file = 0;
         let mut files = HashMap::<String, HashMap<String, HashMap<String, VPKFile>>>::new();
@@ -268,7 +279,8 @@ impl VPKDirectory {
 
         Ok(Self {
             dir_path,
-            header,
+            header1,
+            header2,
             max_pack_file,
             root,
             files,
@@ -385,7 +397,7 @@ mod vpk_tests {
         let file = File::open(PATH).unwrap();
         let mut buffer = BufReader::new(file);
 
-        let header = VPKHeader_v2::read(&mut buffer, None).unwrap();
+        let header = VPKHeaderV2::read(&mut buffer, None).unwrap();
 
         println!("{:?}", header);
     }
