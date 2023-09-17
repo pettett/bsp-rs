@@ -115,8 +115,22 @@ fn consume_string(data: &mut &str) -> Result<String, ()> {
     return Ok(str);
 }
 
+fn consume_word(data: &mut &str) -> Result<String, ()> {
+    let next = if data.find('"').ok_or(())? == 0 { 1 } else { 0 };
+
+    let after = data[next..].find(&['"', ' ', '\n']).ok_or(())?;
+
+    let str = data[next..next + after].to_owned();
+
+    *data = &data[next + after + 1..];
+
+    return Ok(str);
+}
+
 fn consume_vmt(data: &mut &str) -> Result<VMT, ()> {
-    let mut vmt = VMT::new(data.to_owned(), consume_string(data)?);
+    *data = data.trim();
+
+    let mut vmt = VMT::new(data.to_owned(), consume_word(data)?);
 
     loop {
         let mut line_data = view_up_to_line(data);
@@ -169,7 +183,7 @@ mod vmt_tests {
     use std::collections::HashSet;
     use std::path::{Path, PathBuf};
 
-    const PATH: &str = "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_01.bsp";
+    const PATH: &str = "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Portal 2\\portal2\\maps\\sp_a2_laser_intro.bsp";
 
     #[test]
     fn test_decode() {
@@ -201,6 +215,26 @@ mod vmt_tests {
     fn test_misc_dir() {
         let dir = VPKDirectory::load(PathBuf::from(
             "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_misc_dir.vpk",
+        ))
+        .unwrap();
+
+        let mut shaders = HashSet::new();
+
+        for (d, files) in &dir.files["vmt"] {
+            for (_file, data) in files {
+                let Ok(Some(vmt)) = data.load_vmt(&dir) else {
+                    continue;
+                };
+                shaders.insert(vmt.shader.to_ascii_lowercase());
+            }
+        }
+        println!("{:?}", shaders);
+    }
+
+    #[test]
+    fn test_misc_dir_p2() {
+        let dir = VPKDirectory::load(PathBuf::from(
+            "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Portal 2\\portal2\\pak01_dir.vpk",
         ))
         .unwrap();
 

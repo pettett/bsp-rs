@@ -14,3 +14,6 @@
 - [ ] convert lightmap data from storage array to texture atlas
 - [ ] environment map reflections
 - [ ] global renderer configs (lighting only, textures, faces, etc)
+- [x] Portal
+- [ ] Portal 2
+- [ ] TF2

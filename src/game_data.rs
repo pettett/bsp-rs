@@ -62,7 +62,7 @@ impl GameData {
                 dirs: vec![Arc::new(
                     VPKDirectory::load(path.join("portal2\\pak01_dir.vpk")).unwrap(),
                 )],
-                starter_map: Path::new("sp_a2_laser_stairs.bsp"),
+                starter_map: Path::new("sp_a4_laser_platform.bsp"),
                 maps: path.join("portal2\\maps"),
                 path,
             },

@@ -69,8 +69,8 @@ impl StateApp {
     /// https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#state-new
     pub async fn new(mut world: World, renderer: VRenderer) -> Self {
         let game_data = GameData::load_game(
-            Game::Portal,
-            Path::new("D:\\Program Files (x86)\\Steam\\steamapps\\common\\Portal").to_owned(),
+            Game::HalfLife2,
+            Path::new("D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2").to_owned(),
         );
 
         // state.world_mut().insert_resource(GameData::load_game(

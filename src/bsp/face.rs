@@ -15,7 +15,7 @@ use super::{
 ///Both the face and original face arrays are culled; that is, many faces present before compilation of the map (primarily those that face towards the "void" outside the map) are removed from the array.
 
 #[repr(C, packed)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct BSPFace {
     ///The first member plane_num is the plane number, i.e., the index into the plane array that corresponds to
     /// the plane that is aligned with this face in the world.

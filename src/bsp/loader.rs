@@ -84,7 +84,6 @@ fn build_meshes(
     disp_verts: &Box<[BSPDispVert]>,
     tex_info: &Box<[BSPTexInfo]>,
     tex_data: &Box<[BSPTexData]>,
-    lighting: &Box<[ColorRGBExp32]>,
     infos: &Box<[BSPDispInfo]>,
     edges: &Box<[BSPEdge]>,
     surf_edges: &Box<[BSPSurfEdge]>,
@@ -121,7 +120,9 @@ fn build_meshes(
         let light_base_index = face.light_ofs as usize / 4;
 
         // Ensure we have the data
-        lighting[light_base_index];
+        //let Some(lighting) = lighting.get(light_base_index) else {
+        //    panic!("Face has incorrect lighting data:\n {:#?}", face);
+        //};
 
         let lightmap_texture_mins_in_luxels = face.lightmap_texture_mins_in_luxels;
         let lightmap_texture_size_in_luxels = face.lightmap_texture_size_in_luxels + 1;
@@ -280,7 +281,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
     println!("Loading BSP Headers...");
 
     let faces = header.get_lump::<BSPFace>(&mut buffer);
-    let surfedges = header.get_lump::<BSPSurfEdge>(&mut buffer);
+    let surf_edges = header.get_lump::<BSPSurfEdge>(&mut buffer);
     let edges = header.get_lump::<BSPEdge>(&mut buffer);
     let verts = header.get_lump::<Vec3>(&mut buffer);
     let tex_info = header.get_lump::<BSPTexInfo>(&mut buffer);
@@ -298,7 +299,11 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
     let disp_verts = header.get_lump::<BSPDispVert>(&mut buffer);
     let lighting = header.get_lump::<ColorRGBExp32>(&mut buffer);
 
-    let lighting_cols: Vec<Vec4> = lighting.iter().map(|&x| x.into()).collect();
+    let mut lighting_cols: Vec<Vec4> = lighting.iter().map(|&x| x.into()).collect();
+
+    if lighting_cols.len() == 0 {
+        lighting_cols.push(Vec4::ONE);
+    }
 
     println!("Loading BSP Faces...");
     let textured_tris = build_meshes(
@@ -307,10 +312,9 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         &disp_verts,
         &tex_info,
         &tex_data,
-        &lighting,
         &infos,
         &edges,
-        &surfedges,
+        &surf_edges,
     );
 
     println!("Loading BSP Pak...");
@@ -401,7 +405,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
             "unlitgeneric" => (shader_tex.clone(), vec!["$basetexture"]),       // glass?
             "worldvertextransition" => (shader_disp.clone(), vec!["$basetexture2", "$basetexture"]), // displacement
             x => {
-                println!("Unknown shader {x}");
+                println!("Unknown shader {x} on {vmt:#?}");
                 (shader_lines.clone(), vec![])
             }
         };
@@ -417,7 +421,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         let mut all_success = true;
         for (i, tex) in shader_textures.iter().enumerate() {
             let Some(tex_path) = vmt.get(tex) else {
-                println!("Could not find {} texture for {:?}", tex, vmt);
+                println!("ERROR: Could not find {} texture for {:?}", tex, vmt);
                 continue;
             };
 
@@ -431,7 +435,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
                 if let Ok(Some(vtf)) = pak.load_vtf(&vtf_path) {
                     vtf
                 } else {
-                    println!("Could not find vtf for {}:{}", tex, tex_path);
+                    println!("ERROR: Could not find vtf for {}:{}", tex, tex_path);
                     continue;
                 }
             };
