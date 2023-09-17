@@ -16,7 +16,7 @@ use crate::{
     vpk::VPKDirectory,
 };
 use bevy_ecs::system::Commands;
-use glam::{vec2, vec3, Vec3, Vec4};
+use glam::{ivec3, vec2, vec3, IVec3, Vec3, Vec4};
 use rayon::prelude::*;
 use std::{collections::HashMap, num::NonZeroU32, path::Path, sync::Arc};
 use wgpu::util::DeviceExt;
@@ -55,7 +55,7 @@ impl MeshBuilder<UVVertex> {
         lightmap_s: Vec4,
         lightmap_t: Vec4,
         alpha: f32,
-        color: Vec3,
+        color: IVec3,
     ) {
         //if !self.tri_map.contains_key(&index) {
         // if not contained, add in and generate uvs
@@ -124,10 +124,10 @@ fn build_meshes(
         let lightmap_texture_mins_in_luxels = face.lightmap_texture_mins_in_luxels;
         let lightmap_texture_size_in_luxels = face.lightmap_texture_size_in_luxels + 1;
 
-        let light_data = vec3(
-            light_base_index as f32,
-            lightmap_texture_size_in_luxels.x as f32,
-            0.0,
+        let light_data = ivec3(
+            light_base_index as i32,
+            lightmap_texture_size_in_luxels.x,
+            0,
         );
 
         if face.disp_info != -1 {
@@ -376,10 +376,8 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
 
         let (shader, shader_textures) = match vmt.shader() {
             "patch" => match vmt.patch.get().as_ref().unwrap().as_ref().unwrap().shader() {
-                "lightmappedgeneric" => {
-                    (shader_tex_envmap.clone(), vec!["$basetexture", "$envmap"])
-                }
-                "unlittwotexture" => (shader_tex_envmap.clone(), vec!["$basetexture", "$envmap"]),
+                "lightmappedgeneric" => (shader_tex.clone(), vec!["$basetexture"]),
+                "unlittwotexture" => (shader_tex.clone(), vec!["$basetexture"]),
                 "worldvertextransition" => {
                     (shader_disp.clone(), vec!["$basetexture2", "$basetexture"])
                 } // displacement - TODO: Include envmap

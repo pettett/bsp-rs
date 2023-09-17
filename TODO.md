@@ -6,7 +6,10 @@
 - [x] improve material file parsing
 - [ ] Attach materials as a component
 - [ ] load models
-- [ ] stop rendering trigger volumes
-- [ ] respect shader request from material
+- [x] stop rendering trigger volumes
+- [x] respect shader request from material
 - [ ] skybox
 - [ ] 3d skybox
+- [x] lightmap data
+- [ ] convert lightmap data from storage array to texture atlas
+- [ ] environment map reflections

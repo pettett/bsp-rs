@@ -19,25 +19,49 @@ impl VShader {
         let shader = renderer
             .device()
             .create_shader_module(wgpu::include_wgsl!("../textured_shader.wgsl"));
-        Self::new::<UVVertex>(renderer, shader, 1, wgpu::PrimitiveTopology::TriangleList)
+        Self::new::<UVVertex>(
+            renderer,
+            shader,
+            1,
+            wgpu::PrimitiveTopology::TriangleList,
+            "Textured",
+        )
     }
     pub fn new_textured_envmap(renderer: &VRenderer) -> Self {
         let shader = renderer
             .device()
             .create_shader_module(wgpu::include_wgsl!("../textured_shader_envmap.wgsl"));
-        Self::new::<UVVertex>(renderer, shader, 2, wgpu::PrimitiveTopology::TriangleList)
+        Self::new::<UVVertex>(
+            renderer,
+            shader,
+            2,
+            wgpu::PrimitiveTopology::TriangleList,
+            "Textured Envmap",
+        )
     }
     pub fn new_displacement(renderer: &VRenderer) -> Self {
         let shader = renderer
             .device()
             .create_shader_module(wgpu::include_wgsl!("../displacement.wgsl"));
-        Self::new::<UVVertex>(renderer, shader, 2, wgpu::PrimitiveTopology::TriangleList)
+        Self::new::<UVVertex>(
+            renderer,
+            shader,
+            2,
+            wgpu::PrimitiveTopology::TriangleList,
+            "Displacement",
+        )
     }
     pub fn new_white_lines<V: Vertex + bytemuck::Pod>(renderer: &VRenderer) -> Self {
         let shader = renderer
             .device()
             .create_shader_module(wgpu::include_wgsl!("../solid_white.wgsl"));
-        Self::new::<V>(renderer, shader, 0, wgpu::PrimitiveTopology::LineList)
+        Self::new::<V>(
+            renderer,
+            shader,
+            0,
+            wgpu::PrimitiveTopology::LineList,
+            "Line list",
+        )
     }
 
     pub fn new<V: Vertex + bytemuck::Pod>(
@@ -45,10 +69,11 @@ impl VShader {
         shader: wgpu::ShaderModule,
         textures: usize,
         topology: wgpu::PrimitiveTopology,
+        name: &str,
     ) -> Self {
         let mut texture_bind_group_layouts = Vec::new();
 
-        for _i in 0..textures {
+        for i in 0..textures {
             texture_bind_group_layouts.push(renderer.device().create_bind_group_layout(
                 &wgpu::BindGroupLayoutDescriptor {
                     entries: &[
@@ -71,7 +96,7 @@ impl VShader {
                             count: None,
                         },
                     ],
-                    label: Some("texture_bind_group_layout"),
+                    label: Some(&format!("{} texture {}", name, i)),
                 },
             ));
         }
@@ -87,7 +112,7 @@ impl VShader {
             renderer
                 .device()
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("Render Pipeline Layout"),
+                    label: Some(name),
                     bind_group_layouts: &bind_group_layouts[..],
                     push_constant_ranges: &[],
                 });
@@ -96,7 +121,7 @@ impl VShader {
             renderer
                 .device()
                 .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("Render Pipeline"),
+                    label: Some(name),
                     layout: Some(&render_pipeline_layout),
                     vertex: wgpu::VertexState {
                         module: &shader,

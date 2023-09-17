@@ -1,4 +1,4 @@
-use glam::{Vec2, Vec3};
+use glam::{IVec3, Vec2, Vec3};
 
 pub trait Vertex {
     fn desc() -> wgpu::VertexBufferLayout<'static>;
@@ -11,7 +11,7 @@ pub struct UVVertex {
     pub uv: Vec2,
     pub lightmap_uv: Vec2,
     pub alpha: f32,
-    pub color: Vec3,
+    pub color: IVec3,
 }
 
 impl Vertex for UVVertex {
@@ -51,7 +51,7 @@ impl Vertex for UVVertex {
                         + std::mem::size_of::<f32>())
                         as wgpu::BufferAddress,
                     shader_location: 4,
-                    format: wgpu::VertexFormat::Float32x3,
+                    format: wgpu::VertexFormat::Sint32x3,
                 },
             ],
         }

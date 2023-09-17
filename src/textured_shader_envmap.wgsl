@@ -25,7 +25,7 @@ struct VertexInput {
     @location(1) tex_coords: vec2<f32>, 
     @location(2) env_coords: vec2<f32>, 
     @location(3) alpha: f32, 
-    @location(4) color: vec3<f32>, 
+    @location(4) @interpolate(flat) color: vec3<i32>, 
 };
 
 
@@ -33,7 +33,7 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
 	@location(0) tex_coords : vec2<f32>,
 	@location(1) env_coords : vec2<f32>,
-	@location(2) color : vec3<f32>,
+	@location(2) @interpolate(flat) color : vec3<i32>,
 };
 
 
@@ -76,16 +76,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 	var fracts = fract(in.env_coords);
 
-	var top_0 = first_light + i32(bottom_coord_x) * width + i32(bottom_coord_y);
-	var top_1 = first_light + i32(top_coord_x) * width + i32(bottom_coord_y);
+	var top_1 = first_light + i32(bottom_coord_x) * width + i32(bottom_coord_y);
+	var top_0 = first_light + i32(top_coord_x) * width + i32(bottom_coord_y);
 
-	var bottom_0 = first_light + i32(bottom_coord_x) * width + i32(top_coord_y);
-	var bottom_1 = first_light + i32(top_coord_x) * width + i32(top_coord_y);
+	var bottom_1 = first_light + i32(bottom_coord_x) * width + i32(top_coord_y);
+	var bottom_0 = first_light + i32(top_coord_x) * width + i32(top_coord_y);
 
-	var first_col = mix(lighting[top_0], lighting[top_1], fracts.x);
-	var second_col = mix(lighting[bottom_0], lighting[bottom_1], fracts.x);
+	var first_col = mix(lighting[top_0], lighting[top_1], fracts.y);
+	var second_col = mix(lighting[bottom_0], lighting[bottom_1], fracts.y);
 
-	var col = mix(first_col, second_col, fracts.y);
+	var col = mix(second_col, first_col, fracts.x);
 
-	return vec4<f32>(integer_to_rgb(&first_light), 1.0);
+	return vec4<f32>(col.rgb, 1.0);
 }
