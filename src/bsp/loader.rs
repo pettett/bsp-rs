@@ -76,6 +76,153 @@ impl MeshBuilder<UVVertex> {
         //}
     }
 }
+
+fn build_meshes(
+    faces: Box<[BSPFace]>,
+    verts: &Box<[Vec3]>,
+    disp_verts: &Box<[BSPDispVert]>,
+    tex_info: &Box<[BSPTexInfo]>,
+    tex_data: &Box<[BSPTexData]>,
+    lighting: &Box<[ColorRGBExp32]>,
+    infos: &Box<[BSPDispInfo]>,
+    edges: &Box<[BSPEdge]>,
+    surf_edges: &Box<[BSPSurfEdge]>,
+) -> HashMap<i32, MeshBuilder<UVVertex>> {
+    let mut textured_tris = HashMap::<i32, MeshBuilder<UVVertex>>::new();
+
+    for (i_face, face) in faces.iter().enumerate() {
+        let tex = tex_info[face.tex_info as usize];
+        let i_texdata = tex.tex_data;
+        let data = tex_data[i_texdata as usize];
+
+        let builder = match textured_tris.get_mut(&i_texdata) {
+            Some(x) => x,
+            None => {
+                textured_tris.insert(i_texdata, Default::default());
+                textured_tris.get_mut(&i_texdata).unwrap()
+            }
+        };
+
+        // TODO: better way to get tex/uv info from faces
+
+        let tex_s = tex.tex_s / data.width as f32;
+        let tex_t = tex.tex_t / data.height as f32;
+
+        let lightmap_s = tex.lightmap_s;
+        let lightmap_t = tex.lightmap_t;
+
+        if face.light_ofs == -1 {
+            continue;
+        }
+        // light_ofs is a byte offset, and these are 4 byte structures
+        assert_eq!(face.light_ofs % 4, 0);
+
+        let light_base_index = face.light_ofs as usize / 4;
+
+        let first_col = lighting[light_base_index];
+
+        let lightmap_texture_mins_in_luxels = face.lightmap_texture_mins_in_luxels;
+        let lightmap_texture_size_in_luxels = face.lightmap_texture_size_in_luxels + 1;
+
+        let light_data = vec3(
+            light_base_index as f32,
+            lightmap_texture_size_in_luxels.x as f32,
+            0.0,
+        );
+
+        if face.disp_info != -1 {
+            // This is a displacement
+
+            let info = infos[face.disp_info as usize];
+
+            assert_eq!(info.map_face as usize, i_face);
+
+            let face_verts = face.get_verts(edges, surf_edges);
+
+            let mut corners = [Vec3::ZERO; 4];
+            for i in 0..4 {
+                corners[i] = verts[face_verts[i]];
+            }
+
+            // TODO: better way to get tex/uv info from faces
+
+            let _c = info.start_position;
+
+            let disp_side_len = (1 << (info.power)) + 1;
+
+            let get_i = |x: usize, y: usize| -> usize { x + disp_side_len * y };
+
+            let old_vert_count = builder.verts.len() as u16;
+
+            for y in 0..disp_side_len {
+                let dy = y as f32 / (disp_side_len as f32 - 1.0);
+
+                let v0 = Vec3::lerp(corners[0], corners[3], dy);
+                let v1 = Vec3::lerp(corners[1], corners[2], dy);
+
+                for x in 0..disp_side_len {
+                    let dx = x as f32 / (disp_side_len as f32 - 1.0);
+
+                    let i = get_i(x, y);
+
+                    let vert = disp_verts[i + info.disp_vert_start as usize];
+
+                    let pos = vert.vec + Vec3::lerp(v0, v1, dx);
+
+                    builder.add_vert(
+                        i as u16, pos, tex_s, tex_t, lightmap_s, lightmap_t, vert.alpha, light_data,
+                    );
+                }
+            }
+            let disp_side_len = disp_side_len as u16;
+
+            // Build grid index buffer.
+            for y in 0..(disp_side_len - 1) {
+                for x in 0..(disp_side_len - 1) {
+                    let base = y * disp_side_len + x + old_vert_count;
+                    builder.add_tri([base, base + disp_side_len, base + disp_side_len + 1]);
+                    builder.add_tri([base, base + disp_side_len + 1, base + 1]);
+                }
+            }
+
+            // assert_eq!(builder.tris.len() as u16, ((disp_side_len - 1).pow(2)) * 6);
+        } else {
+            let root_edge_index = face.first_edge as usize;
+            let root_edge = surf_edges[root_edge_index].get_edge(edges);
+
+            for i in 1..(face.num_edges as usize) {
+                let edge = surf_edges[root_edge_index + i].get_edge(edges);
+
+                let tri = [edge.0, root_edge.0, edge.1];
+                for i in tri {
+                    let l = builder.verts.len();
+                    builder.add_vert(
+                        i,
+                        verts[i as usize],
+                        tex_s,
+                        tex_t,
+                        lightmap_s,
+                        lightmap_t,
+                        1.0,
+                        light_data,
+                    );
+                    let v = &mut builder.verts[l];
+
+                    // The lightmapVecs float array performs a similar mapping of the lightmap samples of the
+                    // texture onto the world. It is the same formula but with lightmapVecs instead of textureVecs,
+                    // and then subtracting the [0] and [1] values of LightmapTextureMinsInLuxels for u and v respectively.
+                    // LightmapTextureMinsInLuxels is referenced in dface_t;
+
+                    v.lightmap_uv -= lightmap_texture_mins_in_luxels.as_vec2();
+                    //v.lightmap_uv /= lightmap_texture_size_in_luxels.as_vec2();
+                }
+                builder.push_tri();
+            }
+        }
+    }
+    textured_tris
+}
+
 impl<V: Vertex + Default> MeshBuilder<V> {
     pub fn push_tri(&mut self) {
         for i in 0..3u16 {
@@ -140,146 +287,24 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, renderer: &VRenderer) {
 
     //let mut tris = Vec::<u16>::new();
     // for now, filter by texture of first face
-
-    println!("Loading BSP Faces...");
-    let mut textured_tris = HashMap::<i32, MeshBuilder<UVVertex>>::new();
-
     let infos = header.get_lump::<BSPDispInfo>(&mut buffer);
     let disp_verts = header.get_lump::<BSPDispVert>(&mut buffer);
     let lighting = header.get_lump::<ColorRGBExp32>(&mut buffer);
 
     let lighting_cols: Vec<Vec4> = lighting.iter().map(|&x| x.into()).collect();
 
-    for (i_face, face) in faces.iter().enumerate() {
-        let tex = tex_info[face.tex_info as usize];
-        let i_texdata = tex.tex_data;
-        let data = tex_data[i_texdata as usize];
-
-        let builder = match textured_tris.get_mut(&i_texdata) {
-            Some(x) => x,
-            None => {
-                textured_tris.insert(i_texdata, Default::default());
-                textured_tris.get_mut(&i_texdata).unwrap()
-            }
-        };
-
-        // TODO: better way to get tex/uv info from faces
-
-        let tex_s = tex.tex_s / data.width as f32;
-        let tex_t = tex.tex_t / data.height as f32;
-
-        let lightmap_s = tex.lightmap_s;
-        let lightmap_t = tex.lightmap_t;
-
-        if face.light_ofs == -1 {
-            continue;
-        }
-        // light_ofs is a byte offset, and these are 4 byte structures
-        assert_eq!(face.light_ofs % 4, 0);
-
-        let light_base_index = face.light_ofs as usize / 4;
-
-        let first_col = lighting[light_base_index];
-
-        let lightmap_texture_mins_in_luxels = face.lightmap_texture_mins_in_luxels;
-        let lightmap_texture_size_in_luxels = face.lightmap_texture_size_in_luxels + 1;
-
-        let light_data = vec3(
-            light_base_index as f32,
-            lightmap_texture_size_in_luxels.x as f32,
-            0.0,
-        );
-
-        if face.disp_info != -1 {
-            // This is a displacement
-
-            let info = infos[face.disp_info as usize];
-
-            assert_eq!(info.map_face as usize, i_face);
-
-            let face_verts = face.get_verts(&edges, &surfedges);
-
-            let mut corners = [Vec3::ZERO; 4];
-            for i in 0..4 {
-                corners[i] = verts[face_verts[i]];
-            }
-
-            // TODO: better way to get tex/uv info from faces
-
-            let _c = info.start_position;
-
-            let disp_side_len = (1 << (info.power)) + 1;
-
-            let get_i = |x: usize, y: usize| -> usize { x + disp_side_len * y };
-
-            let old_vert_count = builder.verts.len() as u16;
-
-            for y in 0..disp_side_len {
-                let dy = y as f32 / (disp_side_len as f32 - 1.0);
-
-                let v0 = Vec3::lerp(corners[0], corners[3], dy);
-                let v1 = Vec3::lerp(corners[1], corners[2], dy);
-
-                for x in 0..disp_side_len {
-                    let dx = x as f32 / (disp_side_len as f32 - 1.0);
-
-                    let i = get_i(x, y);
-
-                    let vert = disp_verts[i + info.disp_vert_start as usize];
-
-                    let pos = vert.vec + Vec3::lerp(v0, v1, dx);
-
-                    builder.add_vert(
-                        i as u16, pos, tex_s, tex_t, lightmap_s, lightmap_t, vert.alpha, light_data,
-                    );
-                }
-            }
-            let disp_side_len = disp_side_len as u16;
-
-            // Build grid index buffer.
-            for y in 0..(disp_side_len - 1) {
-                for x in 0..(disp_side_len - 1) {
-                    let base = y * disp_side_len + x + old_vert_count;
-                    builder.add_tri([base, base + disp_side_len, base + disp_side_len + 1]);
-                    builder.add_tri([base, base + disp_side_len + 1, base + 1]);
-                }
-            }
-
-            // assert_eq!(builder.tris.len() as u16, ((disp_side_len - 1).pow(2)) * 6);
-        } else {
-            let root_edge_index = face.first_edge as usize;
-            let root_edge = surfedges[root_edge_index].get_edge(&edges);
-
-            for i in 1..(face.num_edges as usize) {
-                let edge = surfedges[root_edge_index + i].get_edge(&edges);
-
-                let tri = [edge.0, root_edge.0, edge.1];
-                for i in tri {
-                    let l = builder.verts.len();
-                    builder.add_vert(
-                        i,
-                        verts[i as usize],
-                        tex_s,
-                        tex_t,
-                        lightmap_s,
-                        lightmap_t,
-                        1.0,
-                        light_data,
-                    );
-                    let v = &mut builder.verts[l];
-
-                    // The lightmapVecs float array performs a similar mapping of the lightmap samples of the
-                    // texture onto the world. It is the same formula but with lightmapVecs instead of textureVecs,
-                    // and then subtracting the [0] and [1] values of LightmapTextureMinsInLuxels for u and v respectively.
-                    // LightmapTextureMinsInLuxels is referenced in dface_t;
-
-                    v.lightmap_uv += 0.5 - lightmap_texture_mins_in_luxels.as_vec2();
-                    //v.lightmap_uv /= lightmap_texture_size_in_luxels.as_vec2();
-                }
-                builder.push_tri();
-            }
-        }
-    }
+    println!("Loading BSP Faces...");
+    let textured_tris = build_meshes(
+        faces,
+        &verts,
+        &disp_verts,
+        &tex_info,
+        &tex_data,
+        &lighting,
+        &infos,
+        &edges,
+        &surfedges,
+    );
 
     println!("Loading BSP Pak...");
     let pak_header = header.get_lump_header(LumpType::PakFile);

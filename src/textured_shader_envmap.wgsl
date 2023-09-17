@@ -20,7 +20,7 @@ var t_envmap: texture_2d<f32>;
 var s_envmap: sampler;
 
 struct VertexInput {
-	//@builtin(vertex_index) vert : u32,
+	//@builtin(vertex_index) vert : i32,
     @location(0) position: vec3<f32>, 
     @location(1) tex_coords: vec2<f32>, 
     @location(2) env_coords: vec2<f32>, 
@@ -35,6 +35,15 @@ struct VertexOutput {
 	@location(1) env_coords : vec2<f32>,
 	@location(2) color : vec3<f32>,
 };
+
+
+fn integer_to_rgb(integer : ptr<function, i32>) -> vec3<f32>{
+    var red = 		f32((*integer * 109 + 47) % 269) / 269.0;
+    var green =  	f32((*integer * 83 + 251) % 127) / 127.0;
+    var blue =  	f32((*integer * 251 + 83) % 293) / 293.0;
+    return vec3<f32>(red, green, blue);
+}
+
 
 @vertex
 fn vs_main(
@@ -78,5 +87,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 	var col = mix(first_col, second_col, fracts.y);
 
-	return vec4<f32>(col.rgb, 1.0);
+	return vec4<f32>(integer_to_rgb(&first_light), 1.0);
 }
