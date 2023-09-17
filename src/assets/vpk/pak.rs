@@ -68,6 +68,7 @@ impl BinaryData for VPKDirectory {
                     preload: Some(e.compressed_data().to_vec()),
                     vtf: OnceLock::new(),
                     vmt: OnceLock::new(),
+                    mdl: OnceLock::new(),
                 },
             )
         }

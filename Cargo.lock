@@ -341,6 +341,7 @@ dependencies = [
  "bytemuck",
  "crate",
  "env_logger",
+ "fixedstr",
  "flagset",
  "getset",
  "glam",
@@ -807,6 +808,12 @@ name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
+
+[[package]]
+name = "fixedstr"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4849199a181b0916f04bbba595c0a8d617ebad10d76be969de615a0650b1e5d8"
 
 [[package]]
 name = "flagset"

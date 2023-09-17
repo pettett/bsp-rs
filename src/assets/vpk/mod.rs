@@ -37,7 +37,7 @@ use std::{
 
 use crate::{binaries::BinaryData, util::v_path::VPath};
 
-use super::{VMT, VTF};
+use super::{mdl::MDL, VMT, VTF};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -108,6 +108,7 @@ pub struct VPKFile {
     preload: Option<Vec<u8>>,
     vtf: OnceLock<Option<Arc<VTF>>>,
     vmt: OnceLock<Option<Arc<VMT>>>,
+    mdl: OnceLock<Option<Arc<MDL>>>,
 }
 
 impl VPKFile {
@@ -117,6 +118,10 @@ impl VPKFile {
 
     pub fn load_vtf(&self, vpk: &VPKDirectory) -> io::Result<Option<&Arc<VTF>>> {
         self.load_file(vpk, |f| &f.vtf)
+    }
+
+    pub fn load_mdl(&self, vpk: &VPKDirectory) -> io::Result<Option<&Arc<MDL>>> {
+        self.load_file(vpk, |f| &f.mdl)
     }
 
     fn load_file<'a, T: BinaryData, F: FnOnce(&'a VPKFile) -> &'a OnceLock<Option<Arc<T>>>>(
@@ -270,6 +275,7 @@ impl VPKDirectory {
                             preload,
                             vtf: OnceLock::new(),
                             vmt: OnceLock::new(),
+                            mdl: OnceLock::new(),
                         },
                     );
 
