@@ -1,4 +1,5 @@
 use std::{
+    fmt::Debug,
     io::{self, BufRead, BufReader, Read, Seek},
     marker::PhantomData,
     mem,
@@ -13,7 +14,6 @@ use self::mdl_headers::{mstudiobodyparts_t, mstudiotexture_t};
 
 pub mod mdl;
 pub mod mdl_headers;
-pub mod vertex;
 pub mod vtx;
 pub mod vvd;
 
@@ -28,7 +28,7 @@ pub struct BinOffset {
 }
 
 impl BinOffset {
-    fn seek_start<R: Read + Seek>(
+    pub fn seek_start<R: Read + Seek>(
         &self,
         buffer: &mut BufReader<R>,
         start: i64,
@@ -55,7 +55,28 @@ impl BinOffset {
 
         Ok(String::from_utf8(data).unwrap())
     }
+    //TODO: choose name
+    pub fn read_array_f<
+        T: Sized + bytemuck::Zeroable + bytemuck::Pod + BinaryData + Debug,
+        R: Read + Seek,
+    >(
+        &self,
+        buffer: &mut BufReader<R>,
+        start: i64,
+        pos: &mut i64,
+        count: usize,
+    ) -> io::Result<Box<[T]>> {
+        self.seek_start(buffer, start, pos)?;
 
+        //let mut b = [0, 0, 0, 0];
+        //buffer.read_exact(&mut b)?;
+        //println!("{b:?}");
+
+        let b = T::read_array(buffer, count, None)?;
+
+        *pos += (count * mem::size_of::<T>()) as i64;
+        Ok(b)
+    }
     pub fn read_array<T: Sized + BinaryData, R: Read + Seek>(
         &self,
         buffer: &mut BufReader<R>,
@@ -70,13 +91,13 @@ impl BinOffset {
         //println!("{b:?}");
 
         let mut v = Vec::new();
-        v.reserve(self.index as usize);
+        v.reserve_exact(self.index as usize);
 
         for _ in 0..count {
             v.push((*pos, T::read(buffer, None)?));
-            *pos += mem::size_of::<T>() as i64;
         }
 
+        *pos += count as i64 * mem::size_of::<T>() as i64;
         Ok(v)
     }
 }
@@ -138,6 +159,7 @@ mod mdl_tests {
 
         println!("{:#?}", vtx);
     }
+
     #[test]
     fn test_single_vvd_misc_dir() {
         let dir = VPKDirectory::load(PathBuf::from(
@@ -145,12 +167,21 @@ mod mdl_tests {
         ))
         .unwrap();
 
-        let Ok(Some(vvd)) = dir.load_vvd(&VGlobalPath::from("models/props_c17/bench01a.dx90.vtx"))
-        else {
-            panic!()
-        };
+        let vvd = dir.load_vvd(&VGlobalPath::from("models/props_c17/bench01a.vvd"));
 
-        println!("{:?}", vvd);
+        match vvd {
+            Ok(Some(vvd)) => {
+                for t in vvd.tangents.iter() {
+                    assert!(t.w == 0.0 || t.w == -1.0 || t.w == 1.0)
+                }
+                println!("Tangents all good!");
+                for t in vvd.verts.iter() {
+                    println!("{:#?}", t);
+                }
+            }
+            Ok(None) => panic!(),
+            Err(x) => println!("{x}"),
+        }
     }
 
     #[test]
@@ -164,11 +195,11 @@ mod mdl_tests {
         else {
             panic!()
         };
-        let Ok(Some(mdl)) = dir.load_mdl(&VGlobalPath::from("models/props_c17/bench01a.dx90.vtx"))
+        let Ok(Some(mdl)) = dir.load_mdl(&VGlobalPath::from("models/props_c17/bench01a.mdl"))
         else {
             panic!()
         };
-        let Ok(Some(vvd)) = dir.load_vvd(&VGlobalPath::from("models/props_c17/bench01a.dx90.vtx"))
+        let Ok(Some(vvd)) = dir.load_vvd(&VGlobalPath::from("models/props_c17/bench01a.vdd"))
         else {
             panic!()
         };

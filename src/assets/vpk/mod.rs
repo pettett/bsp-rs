@@ -105,7 +105,6 @@ struct VPKDirectoryEntry {
 
 impl BinaryData for VPKDirectoryEntry {}
 
-#[derive(Debug)]
 pub struct VPKFile {
     entry: VPKDirectoryEntry,
     preload: Option<Vec<u8>>,
