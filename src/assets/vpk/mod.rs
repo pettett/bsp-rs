@@ -108,34 +108,35 @@ impl BinaryData for VPKDirectoryEntry {}
 pub struct VPKFile {
     entry: VPKDirectoryEntry,
     preload: Option<Vec<u8>>,
-    vtf: OnceLock<Option<Arc<VTF>>>,
-    vmt: OnceLock<Option<Arc<VMT>>>,
-    mdl: OnceLock<Option<Arc<MDL>>>,
-    vvd: OnceLock<Option<Arc<VVD>>>,
-    vtx: OnceLock<Option<Arc<VTX>>>,
+    vtf: OnceLock<io::Result<Arc<VTF>>>,
+    vmt: OnceLock<io::Result<Arc<VMT>>>,
+    mdl: OnceLock<io::Result<Arc<MDL>>>,
+    vvd: OnceLock<io::Result<Arc<VVD>>>,
+    vtx: OnceLock<io::Result<Arc<VTX>>>,
 }
 
 impl VPKFile {
-    pub fn load_vmt(&self, vpk: &VPKDirectory) -> io::Result<Option<&Arc<VMT>>> {
+    pub fn load_vmt(&self, vpk: &VPKDirectory) -> io::Result<&Arc<VMT>> {
         self.load_file(vpk, |f| &f.vmt)
     }
 
-    pub fn load_vtf(&self, vpk: &VPKDirectory) -> io::Result<Option<&Arc<VTF>>> {
+    pub fn load_vtf(&self, vpk: &VPKDirectory) -> io::Result<&Arc<VTF>> {
         self.load_file(vpk, |f| &f.vtf)
     }
 
-    pub fn load_mdl(&self, vpk: &VPKDirectory) -> io::Result<Option<&Arc<MDL>>> {
+    pub fn load_mdl(&self, vpk: &VPKDirectory) -> io::Result<&Arc<MDL>> {
         self.load_file(vpk, |f| &f.mdl)
     }
 
-    fn load_file<'a, T: BinaryData, F: FnOnce(&'a VPKFile) -> &'a OnceLock<Option<Arc<T>>>>(
+    fn load_file<'a, T: BinaryData, F: FnOnce(&'a VPKFile) -> &'a OnceLock<io::Result<Arc<T>>>>(
         &'a self,
         vpk: &VPKDirectory,
         get_cell: F,
-    ) -> io::Result<Option<&'a Arc<T>>> {
-        Ok(get_cell(self)
-            .get_or_init(|| vpk.load_file::<T>(self).map(|f| Arc::new(f)))
-            .as_ref())
+    ) -> io::Result<&'a Arc<T>> {
+        match get_cell(self).get_or_init(|| vpk.load_file::<T>(self).map(|f| Arc::new(f))) {
+            Ok(x) => Ok(x),
+            Err(x) => Err(io::Error::new(x.kind(), "")),
+        }
     }
 }
 
@@ -300,32 +301,32 @@ impl VPKDirectory {
         })
     }
 
-    pub fn load_vtf(&self, path: &dyn VPath) -> io::Result<Option<&Arc<VTF>>> {
+    pub fn load_vtf(&self, path: &dyn VPath) -> io::Result<&Arc<VTF>> {
         self.load_file_once(path, |f| &f.vtf)
     }
 
     /// Load material from global path (materials/x/y.vmt)
-    pub fn load_vmt(&self, path: &dyn VPath) -> io::Result<Option<&Arc<VMT>>> {
+    pub fn load_vmt(&self, path: &dyn VPath) -> io::Result<&Arc<VMT>> {
         self.load_file_once(path, |f| &f.vmt)
     }
-    pub fn load_mdl(&self, path: &dyn VPath) -> io::Result<Option<&Arc<MDL>>> {
+    pub fn load_mdl(&self, path: &dyn VPath) -> io::Result<&Arc<MDL>> {
         self.load_file_once(path, |f| &f.mdl)
     }
-    pub fn load_vvd(&self, path: &dyn VPath) -> io::Result<Option<&Arc<VVD>>> {
+    pub fn load_vvd(&self, path: &dyn VPath) -> io::Result<&Arc<VVD>> {
         self.load_file_once(path, |f| &f.vvd)
     }
-    pub fn load_vtx(&self, path: &dyn VPath) -> io::Result<Option<&Arc<VTX>>> {
+    pub fn load_vtx(&self, path: &dyn VPath) -> io::Result<&Arc<VTX>> {
         self.load_file_once(path, |f| &f.vtx)
     }
     pub fn load_file_once<
         'a,
         T: BinaryData,
-        F: FnOnce(&'a VPKFile) -> &'a OnceLock<Option<Arc<T>>>,
+        F: FnOnce(&'a VPKFile) -> &'a OnceLock<io::Result<Arc<T>>>,
     >(
         &'a self,
         path: &dyn VPath,
         get_cell: F,
-    ) -> io::Result<Option<&'a Arc<T>>> {
+    ) -> io::Result<&'a Arc<T>> {
         let ext_files = self.files.get(path.ext()).ok_or(io::Error::new(
             io::ErrorKind::InvalidInput,
             format!("Extension {} not present", path.ext()),
@@ -348,7 +349,7 @@ impl VPKDirectory {
         file_data.load_file(self, get_cell)
     }
 
-    fn load_file<F: BinaryData>(&self, file_data: &VPKFile) -> Option<F> {
+    fn load_file<F: BinaryData>(&self, file_data: &VPKFile) -> io::Result<F> {
         if let Some(preload) = &file_data.preload {
             // Load from preload data
             //TODO: delete preload data after
@@ -356,7 +357,7 @@ impl VPKDirectory {
             let c = Cursor::new(preload);
             let mut buffer = BufReader::new(c);
 
-            F::read(&mut buffer, Some(preload.len())).ok()
+            F::read(&mut buffer, Some(preload.len()))
         } else {
             // Attempt to load
             let index = file_data.entry.ArchiveIndex;
@@ -369,14 +370,9 @@ impl VPKDirectory {
             let file = File::open(header_pak_path).unwrap();
             let mut buffer = BufReader::new(file);
             // seek and load
-            if buffer
-                .seek_relative(file_data.entry.EntryOffset as i64)
-                .is_ok()
-            {
-                F::read(&mut buffer, Some(file_data.entry.EntryLength as usize)).ok()
-            } else {
-                None
-            }
+            buffer.seek_relative(file_data.entry.EntryOffset as i64)?;
+
+            F::read(&mut buffer, Some(file_data.entry.EntryLength as usize))
         }
     }
 }

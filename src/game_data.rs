@@ -25,7 +25,7 @@ pub enum Game {
 impl GameData {
     pub fn load_vmt(&self, path: &dyn VPath) -> Option<&Arc<VMT>> {
         for d in &self.dirs {
-            if let Ok(Some(vmt)) = d.load_vmt(path) {
+            if let Ok(vmt) = d.load_vmt(path) {
                 return Some(vmt);
             }
         }
@@ -34,7 +34,7 @@ impl GameData {
 
     pub fn load_vtf(&self, path: &dyn VPath) -> Option<&Arc<VTF>> {
         for d in &self.dirs {
-            if let Ok(Some(vtf)) = d.load_vtf(path) {
+            if let Ok(vtf) = d.load_vtf(path) {
                 return Some(vtf);
             }
         }

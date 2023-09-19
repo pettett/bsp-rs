@@ -28,7 +28,7 @@ pub trait BinaryData {
         _max_size: Option<usize>,
     ) -> io::Result<Box<[Self]>>
     where
-        Self: Sized + bytemuck::Zeroable + bytemuck::Pod + Debug,
+        Self: Sized + bytemuck::Zeroable + bytemuck::Pod,
     {
         let mut header = bytemuck::zeroed_slice_box(count);
 

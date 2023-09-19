@@ -39,7 +39,6 @@ mod vtf_tests {
             .load_vtf(&Into::<VGlobalPath>::into(
                 "materials/metal/metalfence001a.vtf",
             ))
-            .unwrap()
             .unwrap();
         println!("{:?}", data.header());
     }

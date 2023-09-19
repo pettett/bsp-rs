@@ -352,7 +352,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
             let mat_path = VLocalPath::new("materials", mat_name, "vmt");
             let pak_vmt = pak.load_vmt(&mat_path);
 
-            let vmt = if let Ok(Some(pak_vmt)) = pak_vmt {
+            let vmt = if let Ok(pak_vmt) = pak_vmt {
                 if pak_vmt.shader() == "patch" {
                     // If this is a patch, link it to the other patch
                     pak_vmt.patch.get_or_init(|| {
@@ -448,11 +448,12 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
             let vtf = if let Some(vtf) = game_data.load_vtf(&vtf_path) {
                 vtf
             } else {
-                if let Ok(Some(vtf)) = pak.load_vtf(&vtf_path) {
-                    vtf
-                } else {
-                    println!("ERROR: Could not find vtf for {}: <{}>", tex, tex_path);
-                    continue;
+                match pak.load_vtf(&vtf_path) {
+                    Ok(vtf) => vtf,
+                    Err(x) => {
+                        println!("ERROR: {x} Could not find vtf for {tex}: <{tex_path}>");
+                        continue;
+                    }
                 }
             };
 

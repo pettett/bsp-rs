@@ -57,7 +57,7 @@ impl BinOffset {
     }
     //TODO: choose name
     pub fn read_array_f<
-        T: Sized + bytemuck::Zeroable + bytemuck::Pod + BinaryData + Debug,
+        T: Sized + bytemuck::Zeroable + bytemuck::Pod + BinaryData,
         R: Read + Seek,
     >(
         &self,
@@ -95,9 +95,9 @@ impl BinOffset {
 
         for _ in 0..count {
             v.push((*pos, T::read(buffer, None)?));
+            *pos += mem::size_of::<T>() as i64;
         }
 
-        *pos += count as i64 * mem::size_of::<T>() as i64;
         Ok(v)
     }
 }
@@ -121,7 +121,17 @@ impl<T: Sized + BinaryData> BinArray<T> {
         self.offset.read_array(buffer, start, pos, self.count)
     }
 }
-
+impl<T: Sized + BinaryData + bytemuck::Pod> BinArray<T> {
+    pub fn read_f<R: Read + Seek>(
+        &self,
+        buffer: &mut BufReader<R>,
+        start: i64,
+        pos: &mut i64,
+    ) -> io::Result<Box<[T]>> {
+        self.offset
+            .read_array_f(buffer, start, pos, self.count as usize)
+    }
+}
 #[cfg(test)]
 mod mdl_tests {
     use crate::{assets::vpk::VPKDirectory, util::v_path::VGlobalPath};
@@ -137,7 +147,7 @@ mod mdl_tests {
         .unwrap();
         for (d, files) in &dir.files["mdl"] {
             for (_file, data) in files {
-                let Ok(Some(mdl)) = data.load_mdl(&dir) else {
+                let Ok(mdl) = data.load_mdl(&dir) else {
                     continue;
                 };
                 assert!(mdl.header.version < 100);
@@ -152,11 +162,9 @@ mod mdl_tests {
         ))
         .unwrap();
 
-        let Ok(Some(vtx)) = dir.load_vtx(&VGlobalPath::from("models/props_c17/bench01a.dx90.vtx"))
-        else {
-            panic!()
-        };
-
+        let vtx = dir
+            .load_vtx(&VGlobalPath::from("models/props_c17/bench01a.dx90.vtx"))
+            .unwrap();
         println!("{:#?}", vtx);
     }
 
@@ -167,20 +175,16 @@ mod mdl_tests {
         ))
         .unwrap();
 
-        let vvd = dir.load_vvd(&VGlobalPath::from("models/props_c17/bench01a.vvd"));
+        let vvd = dir
+            .load_vvd(&VGlobalPath::from("models/props_c17/bench01a.vvd"))
+            .unwrap();
 
-        match vvd {
-            Ok(Some(vvd)) => {
-                for t in vvd.tangents.iter() {
-                    assert!(t.w == 0.0 || t.w == -1.0 || t.w == 1.0)
-                }
-                println!("Tangents all good!");
-                for t in vvd.verts.iter() {
-                    println!("{:#?}", t);
-                }
-            }
-            Ok(None) => panic!(),
-            Err(x) => println!("{x}"),
+        for t in vvd.tangents.iter() {
+            assert!(t.w == 0.0 || t.w == -1.0 || t.w == 1.0)
+        }
+        println!("Tangents all good!");
+        for t in vvd.verts.iter() {
+            println!("{:#?}", t);
         }
     }
 
@@ -191,18 +195,25 @@ mod mdl_tests {
         ))
         .unwrap();
 
-        let Ok(Some(vtx)) = dir.load_vtx(&VGlobalPath::from("models/props_c17/bench01a.dx90.vtx"))
-        else {
+        let Ok(vtx) = dir.load_vtx(&VGlobalPath::from("models/props_c17/bench01a.dx90.vtx")) else {
             panic!()
         };
-        let Ok(Some(mdl)) = dir.load_mdl(&VGlobalPath::from("models/props_c17/bench01a.mdl"))
-        else {
+        let Ok(mdl) = dir.load_mdl(&VGlobalPath::from("models/props_c17/bench01a.mdl")) else {
             panic!()
         };
-        let Ok(Some(vvd)) = dir.load_vvd(&VGlobalPath::from("models/props_c17/bench01a.vdd"))
-        else {
+        let Ok(vvd) = dir.load_vvd(&VGlobalPath::from("models/props_c17/bench01a.vdd")) else {
             panic!()
         };
+
+        let lod0 = &vtx.body.0[0].0[0];
+
+        for m in &lod0.0 {
+            for ms in &m.0 {
+                for sg in &ms.0 {
+                    println!("{:?}", sg.indices);
+                }
+            }
+        }
     }
 
     // #[test]

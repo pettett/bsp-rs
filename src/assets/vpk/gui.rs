@@ -45,17 +45,15 @@ impl Viewable for VPKDirectory {
 
                                 match ext.as_str() {
                                     "vmt" => match data.load_vmt(&self) {
-                                        Ok(Some(vmt)) => {
+                                        Ok(vmt) => {
                                             vmt.gui_view(ui, renderer, ui_renderer, commands)
                                         }
-                                        Ok(None) => ui.text("No Material"),
                                         Err(e) => ui.text(format!("Error loading Material: {}", e)),
                                     },
                                     "vtf" => match data.load_vtf(&self) {
-                                        Ok(Some(vtf)) => {
+                                        Ok(vtf) => {
                                             vtf.gui_view(ui, renderer, ui_renderer, commands)
                                         }
-                                        Ok(None) => ui.text("No Texture"),
                                         Err(e) => ui.text(format!("Error loading Texture: {}", e)),
                                     },
                                     _ => ui.text("Unknown format"),

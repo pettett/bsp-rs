@@ -227,7 +227,7 @@ mod vmt_tests {
 
         for (d, files) in &dir.files["vmt"] {
             for (_file, data) in files {
-                let Ok(Some(vmt)) = data.load_vmt(&dir) else {
+                let Ok(vmt) = data.load_vmt(&dir) else {
                     continue;
                 };
                 shaders.insert(vmt.shader.to_ascii_lowercase());
@@ -247,7 +247,7 @@ mod vmt_tests {
 
         for (d, files) in &dir.files["vmt"] {
             for (_file, data) in files {
-                let Ok(Some(vmt)) = data.load_vmt(&dir) else {
+                let Ok(vmt) = data.load_vmt(&dir) else {
                     continue;
                 };
                 shaders.insert(vmt.shader.to_ascii_lowercase());
@@ -267,7 +267,7 @@ mod vmt_tests {
         for (d, files) in &dir.files["vmt"] {
             println!("DIR: {}", d);
             for (_file, data) in files {
-                let Ok(Some(vmt)) = data.load_vmt(&dir) else {
+                let Ok(vmt) = data.load_vmt(&dir) else {
                     continue;
                 };
                 println!("{:?}", vmt.data);
