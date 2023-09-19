@@ -105,11 +105,16 @@ fn consume_line(data: &mut &str) -> Result<(), ()> {
 }
 
 fn consume_string(data: &mut &str) -> Result<String, ()> {
-    let after = data.find(char::is_whitespace).ok_or(())?;
+    *data = data.trim();
+    let str = if let Some(after) = data.find(char::is_whitespace) {
+        let str = data[..after].trim().trim_matches('"').to_ascii_lowercase();
 
-    let str = data[..after].trim().trim_matches('"').to_ascii_lowercase();
+        *data = &data[after + 1..];
 
-    *data = &data[after + 1..];
+        str
+    } else {
+        data.trim().trim_matches('"').to_ascii_lowercase()
+    };
 
     return Ok(str);
 }

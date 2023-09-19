@@ -21,6 +21,12 @@
 
 // To get the latest header for specific game, please use the studio.h file in the Valve's SDK instead.
 
+use std::{
+    io::{self, BufRead, BufReader, Read, Seek, SeekFrom},
+    marker::PhantomData,
+    mem,
+};
+
 use fixedstr::zstr;
 use glam::Vec3;
 
@@ -28,15 +34,68 @@ use crate::binaries::BinaryData;
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug)]
-pub struct MDLArray {
-    pub count: i32,
-    pub offset: i32,
+pub struct MDLOffset {
+    pub index: i32,
 }
 
-#[repr(C)]
+impl MDLOffset {
+    pub fn read_str<R: Read + Seek>(
+        &self,
+        buffer: &mut BufReader<R>,
+        start: i64,
+        pos: &mut i64,
+    ) -> io::Result<String> {
+        buffer.seek_relative((self.index as i64 + start) - *pos)?;
+        *pos += self.index as i64 + start;
+
+        //let mut b = [0, 0, 0, 0];
+        //buffer.read_exact(&mut b)?;
+        //println!("{b:?}");
+        let mut data = Default::default();
+
+        *pos += buffer.read_until(0, &mut data)? as i64;
+
+        Ok(String::from_utf8(data).unwrap())
+    }
+}
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug)]
+pub struct MDLArray<T: Sized + BinaryData> {
+    pub count: i32,
+    pub offset: i32,
+    _p: PhantomData<T>,
+}
+
+impl<T: Sized + BinaryData> MDLArray<T> {
+    pub fn read<R: Read + Seek>(
+        &self,
+        buffer: &mut BufReader<R>,
+        pos: &mut i64,
+    ) -> io::Result<Vec<(i64, T)>> {
+        buffer.seek_relative(self.offset as i64 - *pos)?;
+        *pos = self.offset as i64;
+
+        //let mut b = [0, 0, 0, 0];
+        //buffer.read_exact(&mut b)?;
+        //println!("{b:?}");
+
+        let mut v = Vec::new();
+        v.reserve(self.count as usize);
+
+        for _ in 0..self.count {
+            v.push((*pos, T::read(buffer, None)?));
+            *pos += mem::size_of::<T>() as i64;
+        }
+
+        Ok(v)
+    }
+}
+
+#[repr(C, packed)]
 #[derive(Copy, Clone, Debug)]
 pub struct MDLHeader {
-    pub id: i32,        // Model format ID, such as "IDST" (0x49 0x44 0x53 0x54)
+    pub id: [u8; 4],    // Model format ID, such as "IDST" (0x49 0x44 0x53 0x54)
     pub version: i32,   // Format version number, such as 48 (0x30,0x00,0x00,0x00)
     pub checksum: i32,  // This has to be the same in the phy and vtx files to load!
     pub name: zstr<64>, // The internal name of the model, padding with null bytes.
@@ -64,31 +123,31 @@ pub struct MDLHeader {
      * Note that indexes/counts are not always paired and ordered consistently.
      */
     // mstudiobone_t
-    pub bone: MDLArray, // Number of data sections (of type mstudiobone_t)
+    pub bone: MDLArray<mstudionill_t>, // Number of data sections (of type mstudiobone_t)
 
     // mstudiobonecontroller_t
-    pub bonecontroller: MDLArray,
+    pub bonecontroller: MDLArray<mstudionill_t>,
 
     // mstudiohitboxset_t
-    pub hitbox: MDLArray,
+    pub hitbox: MDLArray<mstudionill_t>,
 
     // mstudioanimdesc_t
-    pub localanim: MDLArray,
+    pub localanim: MDLArray<mstudionill_t>,
 
     // mstudioseqdesc_t
-    pub localseq: MDLArray,
+    pub localseq: MDLArray<mstudionill_t>,
 
     pub activitylistversion: i32, // ??
     pub eventsindexed: i32,       // ??
 
     // VMT texture filenames
     // mstudiotexture_t
-    pub texture: MDLArray,
+    pub texture: MDLArray<mstudiotexture_t>,
 
     // This offset points to a series of i32s.
     // Each i32 value, in turn, is an offset relative to the start of this header/the-file,
     // At which there is a null-terminated string.
-    pub texturedir: MDLArray,
+    pub texturedir: MDLArray<mstudionill_t>,
 
     // Each skin-family assigns a texture-id to a skin location
     pub skinreference_count: i32,
@@ -96,37 +155,36 @@ pub struct MDLHeader {
     pub skinreference_index: i32,
 
     // mstudiobodyparts_t
-    pub bodypart: MDLArray,
+    pub bodypart: MDLArray<mstudiobodyparts_t>,
 
     // Local attachment points
     // mstudioattachment_t
-    pub attachment: MDLArray,
+    pub attachment: MDLArray<mstudionill_t>,
 
     // Node values appear to be single bytes, while their names are null-terminated strings.
-    pub localnode_count: i32,
-    pub localnode_index: i32,
-    pub localnode_name_index: i32,
+    pub localnode: MDLArray<mstudionill_t>,
+    pub localnode_name_index: MDLOffset,
 
     // mstudioflexdesc_t
-    pub flexdesc: MDLArray,
+    pub flexdesc: MDLArray<mstudionill_t>,
 
     // mstudioflexcontroller_t
-    pub flexcontroller: MDLArray,
+    pub flexcontroller: MDLArray<mstudionill_t>,
 
     // mstudioflexrule_t
-    pub flexrules: MDLArray,
+    pub flexrules: MDLArray<mstudionill_t>,
 
     // IK probably referse to inverse kinematics
     // mstudioikchain_t
-    pub ikchain: MDLArray,
+    pub ikchain: MDLArray<mstudionill_t>,
 
     // Information about any "mouth" on the model for speech animation
     // More than one sounds pretty creepy.
     // mstudiomouth_t
-    pub mouths: MDLArray,
+    pub mouths: MDLArray<mstudionill_t>,
 
     // mstudioposeparamdesc_t
-    pub localposeparam: MDLArray,
+    pub localposeparam: MDLArray<mstudionill_t>,
 
     /*
      * For anyone trying to follow along, as of this writing,
@@ -134,16 +192,16 @@ pub struct MDLHeader {
      * from the start of the file.
      */
     // Surface property value (single null-terminated string)
-    pub surfaceprop_index: i32,
+    pub surfaceprop_index: MDLOffset,
 
     // Unusual: In this one index comes first, then count.
     // Key-value data is a series of strings. If you can't find
     // what you're i32erested in, check the associated PHY file as well.
-    pub keyvalue_index: MDLArray,
+    pub keyvalue_index: MDLArray<mstudionill_t>,
 
     // More inverse-kinematics
     // mstudioiklock_t
-    pub iklock: MDLArray,
+    pub iklock: MDLArray<mstudionill_t>,
 
     pub mass: f32,     // Mass of object (4-bytes)
     pub contents: i32, // ??
@@ -151,15 +209,14 @@ pub struct MDLHeader {
     // Other models can be referenced for re-used sequences and animations
     // (See also: The $includemodel QC option.)
     // mstudiomodelgroup_t
-    pub includemodel: MDLArray,
+    pub includemodel: MDLArray<mstudionill_t>,
 
     pub virtual_model: i32, // Placeholder for mutable-void*
     // Note that the SDK only compiles as 32-bit, so an i32 and a pointer are the same size (4 bytes)
 
     // mstudioanimblock_t
-    pub animblocks_name_index: i32,
-    pub animblocks_count: i32,
-    pub animblocks_index: i32,
+    pub animblocks_name_index: MDLOffset,
+    pub animblocks: MDLArray<mstudionill_t>,
 
     pub animblock_model: i32, // Placeholder for mutable-void*
 
@@ -182,7 +239,7 @@ pub struct MDLHeader {
     unused1: i32, // ??
 
     // mstudioflexcontrollerui_t
-    pub flexcontrollerui: MDLArray,
+    pub flexcontrollerui: MDLArray<mstudionill_t>,
 
     pub vertAnimFixedpointScale: f32, // ??
     unused2: i32,
@@ -204,6 +261,72 @@ pub struct MDLHeader {
 
 impl BinaryData for MDLHeader {}
 unsafe impl bytemuck::Zeroable for MDLHeader {}
+
+// body part index
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug)]
+pub struct mstudiobodyparts_t {
+    pub name_index: u32, // index into models array
+    pub nummodels: u32,
+    pub base: u32,
+    pub modelindex: u32,
+}
+
+impl BinaryData for mstudiobodyparts_t {}
+unsafe impl bytemuck::Zeroable for mstudiobodyparts_t {}
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug)]
+pub struct mstudiotexture_t {
+    // Number of bytes past the beginning of this structure
+    // where the first character of the texture name can be found.
+    pub name_offset: MDLOffset, // Offset for null-terminated string
+    flags: i32,
+
+    used: i32,   // Padding?
+    unused: i32, // Padding.
+
+    material: i32,        // Placeholder for IMaterial
+    client_material: i32, // Placeholder for void*
+
+    unused2: [i32; 10], // Final padding
+                        // Struct is 64 bytes long
+}
+
+impl BinaryData for mstudiotexture_t {}
+unsafe impl bytemuck::Zeroable for mstudiotexture_t {}
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug)]
+pub struct mstudiomodel_t {
+    name: zstr<64>,
+    t: i32,
+    boundingradius: f32,
+    nummeshes: i32,
+    meshindex: i32,
+    numvertices: i32,   // number of unique vertices/normals/texcoords
+    vertexindex: i32,   // vertex Vector
+    tangentsindex: i32, // tangents Vector
+    numattachments: i32,
+    attachmentindex: i32,
+    numeyeballs: i32,
+    eyeballindex: i32,
+    pVertexData: i32,
+    // base of external vertex data stores
+    pTangentData: i32,
+    unused: [i32; 8], // remove as appropriate
+}
+
+impl BinaryData for mstudiomodel_t {}
+unsafe impl bytemuck::Zeroable for mstudiomodel_t {}
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug)]
+pub struct mstudionill_t;
+
+impl BinaryData for mstudionill_t {}
+unsafe impl bytemuck::Zeroable for mstudionill_t {}
 
 // Known flags Name 	Position 	Details
 // STUDIOHDR_FLAGS_AUTOGENERATED_HITBOX 	0 	This flag is set if no hitbox information was specified
