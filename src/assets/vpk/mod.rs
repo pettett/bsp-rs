@@ -37,7 +37,10 @@ use std::{
 
 use crate::{binaries::BinaryData, util::v_path::VPath};
 
-use super::{mdl::StudioModel, VMT, VTF};
+use super::{
+    studio::{vtx::VTX, vvd::VVD, MDL},
+    VMT, VTF,
+};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -108,7 +111,9 @@ pub struct VPKFile {
     preload: Option<Vec<u8>>,
     vtf: OnceLock<Option<Arc<VTF>>>,
     vmt: OnceLock<Option<Arc<VMT>>>,
-    mdl: OnceLock<Option<Arc<StudioModel>>>,
+    mdl: OnceLock<Option<Arc<MDL>>>,
+    vvd: OnceLock<Option<Arc<VVD>>>,
+    vtx: OnceLock<Option<Arc<VTX>>>,
 }
 
 impl VPKFile {
@@ -120,7 +125,7 @@ impl VPKFile {
         self.load_file(vpk, |f| &f.vtf)
     }
 
-    pub fn load_mdl(&self, vpk: &VPKDirectory) -> io::Result<Option<&Arc<StudioModel>>> {
+    pub fn load_mdl(&self, vpk: &VPKDirectory) -> io::Result<Option<&Arc<MDL>>> {
         self.load_file(vpk, |f| &f.mdl)
     }
 
@@ -276,6 +281,8 @@ impl VPKDirectory {
                             vtf: OnceLock::new(),
                             vmt: OnceLock::new(),
                             mdl: OnceLock::new(),
+                            vvd: OnceLock::new(),
+                            vtx: OnceLock::new(),
                         },
                     );
 
@@ -302,10 +309,15 @@ impl VPKDirectory {
     pub fn load_vmt(&self, path: &dyn VPath) -> io::Result<Option<&Arc<VMT>>> {
         self.load_file_once(path, |f| &f.vmt)
     }
-    pub fn load_mdl(&self, path: &dyn VPath) -> io::Result<Option<&Arc<StudioModel>>> {
+    pub fn load_mdl(&self, path: &dyn VPath) -> io::Result<Option<&Arc<MDL>>> {
         self.load_file_once(path, |f| &f.mdl)
     }
-
+    pub fn load_vvd(&self, path: &dyn VPath) -> io::Result<Option<&Arc<VVD>>> {
+        self.load_file_once(path, |f| &f.vvd)
+    }
+    pub fn load_vtx(&self, path: &dyn VPath) -> io::Result<Option<&Arc<VTX>>> {
+        self.load_file_once(path, |f| &f.vtx)
+    }
     pub fn load_file_once<
         'a,
         T: BinaryData,

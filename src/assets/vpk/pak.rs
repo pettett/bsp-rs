@@ -69,6 +69,8 @@ impl BinaryData for VPKDirectory {
                     vtf: OnceLock::new(),
                     vmt: OnceLock::new(),
                     mdl: OnceLock::new(),
+                    vvd: OnceLock::new(),
+                    vtx: OnceLock::new(),
                 },
             )
         }

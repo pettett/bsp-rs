@@ -54,9 +54,102 @@
 // File Structure
 // Header
 
+use std::mem;
+
+use crate::binaries::BinaryData;
+
+use super::BinArray;
+
+#[derive(Clone, Debug)]
+
+pub struct VTX {
+    header: FileHeader,
+    data: Vec<Vec<Vec<Vec<Vec<VTXStripGroupHeader>>>>>,
+}
+
+impl BinaryData for VTX {
+    fn read<R: std::io::Read + std::io::Seek>(
+        buffer: &mut std::io::BufReader<R>,
+        max_size: Option<usize>,
+    ) -> std::io::Result<Self>
+    where
+        Self: Sized,
+    {
+        let header = FileHeader::read(buffer, None)?;
+
+        let mut pos = mem::size_of::<FileHeader>() as i64;
+
+        let b = header.body_parts.read(buffer, 0, &mut pos)?;
+
+        let mut data: Vec<Vec<Vec<Vec<Vec<VTXStripGroupHeader>>>>> = Default::default();
+
+        println!("{:?}", b);
+        // I'm honestly not sure if I need any of this.
+        for (i0, p) in &b {
+            let mds = p.models.read(buffer, *i0, &mut pos)?;
+            println!("{:?}", mds);
+
+            let mut datai0: Vec<Vec<Vec<Vec<VTXStripGroupHeader>>>> = Default::default();
+
+            for (i1, md) in &mds {
+                let l = md.lods.read(buffer, *i1, &mut pos)?;
+                println!("{:?}", l);
+
+                let mut datai1: Vec<Vec<Vec<VTXStripGroupHeader>>> = Default::default();
+
+                for (i2, lod) in &l {
+                    let me = lod.meshes.read(buffer, *i2, &mut pos)?;
+                    println!("{:?}", me);
+
+                    let mut datai2: Vec<Vec<VTXStripGroupHeader>> = Default::default();
+
+                    for (i3, m) in &me {
+                        let sgs = m.strip_groups.read(buffer, *i3, &mut pos)?;
+                        println!("{:?}", sgs);
+
+                        let mut datai3: Vec<VTXStripGroupHeader> = Default::default();
+
+                        for (i4, sg) in &sgs {
+                            let mut datai4 = VTXStripGroupHeader {
+                                strips: Default::default(),
+                            };
+
+                            let shs = sg.strip_groups.read(buffer, *i4, &mut pos)?;
+
+                            for (i5, sh) in &shs {
+                                datai4.strips.push(VTXStrip { header: sh.clone() });
+                            }
+
+                            println!("{:?}", shs);
+
+                            datai3.push(datai4);
+                        }
+                        datai2.push(datai3);
+                    }
+                    datai1.push(datai2);
+                }
+                datai0.push(datai1);
+            }
+            data.push(datai0);
+        }
+
+        Ok(Self { header, data })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct VTXStripGroupHeader {
+    strips: Vec<VTXStrip>,
+}
+
+#[derive(Clone, Debug)]
+pub struct VTXStrip {
+    header: StripHeader,
+}
+
 // this structure is in <mod folder>/src/public/optimize.h
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, bytemuck::Zeroable)]
 struct FileHeader {
     // file version as defined by OPTIMIZED_MODEL_FILE_VERSION (currently 7)
     version: i32,
@@ -76,10 +169,10 @@ struct FileHeader {
     material_replacement_list_offset: i32,
 
     //Defines the size and location of the body part array
-    num_body_parts: i32,
-    body_part_offset: i32,
+    body_parts: BinArray<BodyPartHeader>,
 }
 
+impl BinaryData for FileHeader {}
 // This is the header structure for the current VERSION7 .vtx file
 // Body array
 
@@ -95,9 +188,9 @@ struct FileHeader {
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
 struct BodyPartHeader {
     //Model array
-    num_models: i32,
-    model_offset: i32,
+    models: BinArray<ModelHeader>,
 }
+impl BinaryData for BodyPartHeader {}
 
 // Model array
 
@@ -113,9 +206,9 @@ struct BodyPartHeader {
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
 struct ModelHeader {
     //LOD mesh array
-    num_lods: i32, //This is also specified in FileHeader
-    lod_offset: i32,
+    lods: BinArray<ModelLODHeader>,
 }
+impl BinaryData for ModelHeader {}
 
 // LOD Mesh Array
 
@@ -129,11 +222,11 @@ struct ModelHeader {
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
 struct ModelLODHeader {
     //Mesh array
-    num_meshes: i32,
-    mesh_offset: i32,
+    meshes: BinArray<MeshHeader>,
     switch_point: f32,
 }
 
+impl BinaryData for ModelLODHeader {}
 // Mesh array
 
 // The mesh array is a list of MeshHeader objects.
@@ -149,11 +242,11 @@ struct ModelLODHeader {
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
 struct MeshHeader {
-    num_strip_groups: i32,
-    strip_group_header_offset: i32,
+    strip_groups: BinArray<StripGroupHeader>,
     flags: u8,
 }
 
+impl BinaryData for MeshHeader {}
 // Strip Group Array
 
 // The strip group array is a list of StripGroupHeader objects.
@@ -175,14 +268,11 @@ struct MeshHeader {
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
 struct StripGroupHeader {
     // These are the arrays of all verts and indices for this mesh.  strips index into this.
-    num_verts: i32,
-    vert_offset: i32,
+    verts: BinArray<Vertex>,
 
-    num_indices: i32,
-    index_offset: i32,
+    indices: BinArray<Index>,
 
-    num_strips: i32,
-    strip_offset: i32,
+    strip_groups: BinArray<StripHeader>,
 
     flags: u8,
 
@@ -192,6 +282,7 @@ struct StripGroupHeader {
     topology_offset: i32,
 }
 
+impl BinaryData for StripGroupHeader {}
 // MDL versions 49 and above (found in
 
 // Counter-Strike: Global Offensive) have an extra two i32 fields (totaling 8 bytes). This is not reflected in the VTX header version, which remains at 7.
@@ -240,6 +331,7 @@ struct StripHeader {
     topology_offset: i32,
 }
 
+impl BinaryData for StripHeader {}
 // Like in StripGroupHeader, the last eight bytes/two i32 fields are present if the MDL file's header shows version 49 or higher. Presumably, (
 // Todo:
 // Verify
@@ -263,6 +355,12 @@ struct Vertex {
     bone_id: [i8; 3],
 }
 
+impl BinaryData for Vertex {}
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+struct Index(u16);
+impl BinaryData for Index {}
 // origMeshVertID defines the index of this vertex that is to be read from the linked .VVD file's vertex array
 // Note:
 // This value needs to be added to the total vertices read, since it is relative to the mesh and won't work as an absolute key.
