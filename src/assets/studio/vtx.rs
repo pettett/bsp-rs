@@ -63,17 +63,21 @@ use super::BinArray;
 #[derive(Clone, Debug)]
 
 pub struct VTX {
-    pub header: FileHeader,
-    pub body: Vec<BodyPart>,
+    pub header: VTXFileHeader,
+    pub body: Vec<VTXBodyPart>,
 }
-#[derive(Clone, Default, Debug)]
-pub struct BodyPart(pub Vec<Model>);
-#[derive(Clone, Default, Debug)]
-pub struct Model(pub Vec<ModelLOD>);
-#[derive(Clone, Default, Debug)]
-pub struct ModelLOD(pub Vec<Mesh>);
-#[derive(Clone, Default, Debug)]
-pub struct Mesh(pub Vec<VTXStripGroupHeader>);
+
+#[derive(Clone, Debug)]
+pub struct VTXBodyPart(pub Vec<VTXModel>);
+#[derive(Clone, Debug)]
+pub struct VTXModel(pub Vec<VTXModelLOD>);
+#[derive(Clone, Debug)]
+pub struct VTXModelLOD(pub Vec<VTXMesh>);
+#[derive(Clone, Debug)]
+pub struct VTXMesh {
+    pub flags: u8,
+    pub strip_groups: Vec<VTXStripGroupHeader>,
+}
 
 impl BinaryData for VTX {
     fn read<R: std::io::Read + std::io::Seek>(
@@ -83,43 +87,50 @@ impl BinaryData for VTX {
     where
         Self: Sized,
     {
-        let header = FileHeader::read(buffer, None)?;
+        let header = VTXFileHeader::read(buffer, None)?;
 
-        let mut pos = mem::size_of::<FileHeader>() as i64;
+        let mut pos = mem::size_of::<VTXFileHeader>() as i64;
 
-        let mut body = Vec::<BodyPart>::new();
+        let mut body = Vec::<VTXBodyPart>::new();
         let body_part_headers = header.body_parts.read(buffer, 0, &mut pos)?;
 
         //    println!("{:?}", b);
         // I'm honestly not sure if I need any of this.
-        for (i, p) in &body_part_headers {
-            let model_headers = p.models.read(buffer, *i, &mut pos)?;
+        for (i, p) in body_part_headers {
+            let model_headers = p.models.read(buffer, i, &mut pos)?;
             //    println!("{:?}", mds);
 
-            let mut body_part = BodyPart::default();
+            let mut body_part = VTXBodyPart { 0: Vec::default() };
 
-            for (i, model_header) in &model_headers {
-                let model_lod_headers = model_header.lods.read(buffer, *i, &mut pos)?;
+            for (i, model_header) in model_headers {
+                let model_lod_headers = model_header.lods.read(buffer, i, &mut pos)?;
                 //    println!("{:?}", l);
 
-                let mut model = Model::default();
+                let mut model = VTXModel { 0: Vec::default() };
 
-                for (i, model_lod_header) in &model_lod_headers {
+                for (i, model_lod_header) in model_lod_headers {
                     //println!("{:?}", me);
 
-                    let mut model_lod = ModelLOD::default();
+                    let mut model_lod = VTXModelLOD { 0: Vec::default() };
 
-                    let mesh_headers = model_lod_header.meshes.read(buffer, *i, &mut pos)?;
+                    let mesh_headers = model_lod_header.meshes.read(buffer, i, &mut pos)?;
 
-                    for (i, mesh_header) in &mesh_headers {
-                        let sgs = mesh_header.strip_groups.read(buffer, *i, &mut pos)?;
+                    for (i, mesh_header) in mesh_headers {
+                        let sgs = mesh_header.strip_groups.read(buffer, i, &mut pos)?;
                         //println!("{:?}", sgs);
 
-                        let mut mesh = Mesh::default();
+                        let mut mesh = VTXMesh {
+                            flags: mesh_header.flags,
+                            strip_groups: Vec::default(),
+                        };
 
                         for (i, sg) in &sgs {
-                            let indices = sg.indices.read_f(buffer, *i, &mut pos)?;
+                            let mut indices = sg.indices.read_f(buffer, *i, &mut pos)?;
                             let verts = sg.verts.read_f(buffer, *i, &mut pos)?;
+
+                            // for i in indices.iter_mut() {
+                            //     *i += 1000;
+                            // }
 
                             //let indices = bytemuck::zeroed_slice_box(1);
                             //println!("{:?}", indices);
@@ -140,7 +151,7 @@ impl BinaryData for VTX {
 
                             //println!("{:?}", shs);
 
-                            mesh.0.push(strip_group_header);
+                            mesh.strip_groups.push(strip_group_header);
                         }
                         model_lod.0.push(mesh);
                     }
@@ -171,7 +182,7 @@ pub struct VTXStrip {
 // this structure is in <mod folder>/src/public/optimize.h
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug, bytemuck::Zeroable)]
-pub struct FileHeader {
+pub struct VTXFileHeader {
     // file version as defined by OPTIMIZED_MODEL_FILE_VERSION (currently 7)
     pub version: i32,
 
@@ -193,7 +204,7 @@ pub struct FileHeader {
     body_parts: BinArray<BodyPartHeader>,
 }
 
-impl BinaryData for FileHeader {}
+impl BinaryData for VTXFileHeader {}
 // This is the header structure for the current VERSION7 .vtx file
 // Body array
 
@@ -243,8 +254,8 @@ impl BinaryData for ModelHeader {}
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
 struct ModelLODHeader {
     //Mesh array
-    meshes: BinArray<MeshHeader>,
-    pub switch_point: f32,
+    meshes: BinArray<VTXMeshHeader>,
+    switch_point: f32,
 }
 
 impl BinaryData for ModelLODHeader {}
@@ -262,12 +273,12 @@ impl BinaryData for ModelLODHeader {}
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
-struct MeshHeader {
+struct VTXMeshHeader {
     strip_groups: BinArray<StripGroupHeader>,
     pub flags: u8,
 }
 
-impl BinaryData for MeshHeader {}
+impl BinaryData for VTXMeshHeader {}
 // Strip Group Array
 
 // The strip group array is a list of StripGroupHeader objects.

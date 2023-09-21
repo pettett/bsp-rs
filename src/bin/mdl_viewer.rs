@@ -49,7 +49,7 @@ pub fn main() {
 
         let lod0 = &vtx.body[0].0[0].0[0];
 
-        let verts: Vec<UVAlphaVertex> = vvd
+        let verts = vvd
             .verts
             .iter()
             .map(|v| UVAlphaVertex {
@@ -57,19 +57,24 @@ pub fn main() {
                 uv: v.uv,
                 alpha: 1.0,
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         let shader_tex = Arc::new(VShader::new_triangle_strip::<UVAlphaVertex>(&renderer));
+
         'outer: for m in &lod0.0 {
-            println!("Mesh");
-            for strip_group in &m.0 {
+            println!("Mesh {:?}", m.header);
+
+            for strip_group in &m.strip_groups {
                 println!("{:?}", strip_group.head.flags);
 
                 for s in &strip_group.strips {
                     let ind_start = s.header.index_offset as usize;
                     let ind_count = s.header.num_indices as usize;
 
-                    println!("{ind_start} {ind_count}");
+                    println!(
+                        "S {ind_start} E {ind_count} S 0 E {}",
+                        strip_group.indices.len()
+                    );
 
                     let m = VMesh::new(
                         renderer.device(),
