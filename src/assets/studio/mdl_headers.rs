@@ -35,7 +35,6 @@ use crate::binaries::BinaryData;
 use super::{BinArray, BinOffset};
 
 #[repr(C, packed)]
-#[derive(Clone, Debug)]
 pub struct MDLHeader {
     pub id: [u8; 4],    // Model format ID, such as "IDST" (0x49 0x44 0x53 0x54)
     pub version: i32,   // Format version number, such as 48 (0x30,0x00,0x00,0x00)
@@ -239,7 +238,6 @@ pub struct mstudiotexture_t {
 impl BinaryData for mstudiotexture_t {}
 
 #[repr(C, packed)]
-#[derive(Debug)]
 pub struct mstudiomodel_t {
     pub name: zstr<64>,
     pub t: i32,

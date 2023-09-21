@@ -7,25 +7,23 @@ use crate::{
 
 use super::mdl_headers::{self, mstudiobodyparts_t, mstudiotexture_t};
 
-#[derive(Debug)]
 pub struct MDL {
     pub header: mdl_headers::MDLHeader,
     pub body: Vec<MDLBodyPart>,
     pub text: Vec<(i64, mstudiotexture_t)>,
 }
 
-#[derive(Debug)]
 pub struct MDLBodyPart {
     pub name: String,
     pub head: mstudiobodyparts_t,
     pub models: Vec<MDLModel>,
 }
-#[derive(Debug)]
+
 pub struct MDLModel {
     pub head: mstudiomodel_t,
     pub meshes: Vec<MDLMesh>,
 }
-#[derive(Debug)]
+
 pub struct MDLMesh {
     pub head: mstudiomesh_t,
 }

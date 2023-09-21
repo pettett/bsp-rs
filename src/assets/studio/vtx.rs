@@ -60,23 +60,20 @@ use crate::binaries::BinaryData;
 
 use super::BinArray;
 
-#[derive(Clone, Debug)]
-
 pub struct VTX {
     pub header: VTXFileHeader,
     pub body: Vec<VTXBodyPart>,
 }
 
-#[derive(Clone, Debug)]
 pub struct VTXBodyPart(pub Vec<VTXModel>);
-#[derive(Clone, Debug)]
+
 pub struct VTXModel(pub Vec<VTXModelLOD>);
-#[derive(Clone, Debug)]
+
 pub struct VTXModelLOD(pub Vec<VTXMesh>);
-#[derive(Clone, Debug)]
+
 pub struct VTXMesh {
     pub flags: u8,
-    pub strip_groups: Vec<VTXStripGroupHeader>,
+    pub strip_groups: Vec<VTXStripGroup>,
 }
 
 impl BinaryData for VTX {
@@ -116,7 +113,8 @@ impl BinaryData for VTX {
                     let mesh_headers = model_lod_header.meshes.read(buffer, i, &mut pos)?;
 
                     for (i, mesh_header) in mesh_headers {
-                        let sgs = mesh_header.strip_groups.read(buffer, i, &mut pos)?;
+                        let strip_group_headers =
+                            mesh_header.strip_groups.read(buffer, i, &mut pos)?;
                         //println!("{:?}", sgs);
 
                         let mut mesh = VTXMesh {
@@ -124,9 +122,10 @@ impl BinaryData for VTX {
                             strip_groups: Vec::default(),
                         };
 
-                        for (i, sg) in &sgs {
-                            let mut indices = sg.indices.read_f(buffer, *i, &mut pos)?;
-                            let verts = sg.verts.read_f(buffer, *i, &mut pos)?;
+                        for (i, strip_group_header) in strip_group_headers {
+                            let mut indices =
+                                strip_group_header.indices.read_f(buffer, i, &mut pos)?;
+                            let verts = strip_group_header.verts.read_f(buffer, i, &mut pos)?;
 
                             // for i in indices.iter_mut() {
                             //     *i += 1000;
@@ -134,24 +133,21 @@ impl BinaryData for VTX {
 
                             //let indices = bytemuck::zeroed_slice_box(1);
                             //println!("{:?}", indices);
-                            let mut strip_group_header = VTXStripGroupHeader {
+                            let shs = strip_group_header.strip_groups.read(buffer, i, &mut pos)?;
+                            let mut strip_group = VTXStripGroup {
                                 indices,
                                 verts,
-                                head: sg.clone(),
+                                head: strip_group_header,
                                 strips: Default::default(),
                             };
 
-                            let shs = sg.strip_groups.read(buffer, *i, &mut pos)?;
-
-                            for (i, sh) in &shs {
-                                strip_group_header
-                                    .strips
-                                    .push(VTXStrip { header: sh.clone() });
+                            for (i, sh) in shs {
+                                strip_group.strips.push(VTXStrip { header: sh });
                             }
 
                             //println!("{:?}", shs);
 
-                            mesh.strip_groups.push(strip_group_header);
+                            mesh.strip_groups.push(strip_group);
                         }
                         model_lod.0.push(mesh);
                     }
@@ -166,22 +162,21 @@ impl BinaryData for VTX {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct VTXStripGroupHeader {
+pub struct VTXStripGroup {
     pub head: StripGroupHeader,
     pub strips: Vec<VTXStrip>,
     pub indices: Box<[u16]>,
     pub verts: Box<[VTXVertex]>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct VTXStrip {
     pub header: StripHeader,
 }
 
 // this structure is in <mod folder>/src/public/optimize.h
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, bytemuck::Zeroable)]
+#[derive(bytemuck::Zeroable)]
 pub struct VTXFileHeader {
     // file version as defined by OPTIMIZED_MODEL_FILE_VERSION (currently 7)
     pub version: i32,
@@ -217,7 +212,7 @@ impl BinaryData for VTXFileHeader {}
 // Since this value is in the header it can be interpreted as an absolute location
 // BodyPartHeader
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+#[derive(bytemuck::Zeroable)]
 struct BodyPartHeader {
     //Model array
     models: BinArray<ModelHeader>,
@@ -235,7 +230,7 @@ impl BinaryData for BodyPartHeader {}
 
 // // This maps one to one with models in the mdl file.
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+#[derive(bytemuck::Zeroable)]
 struct ModelHeader {
     //LOD mesh array
     lods: BinArray<ModelLODHeader>,
@@ -251,7 +246,7 @@ impl BinaryData for ModelHeader {}
 
 // ModelLODHeader
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+#[derive(bytemuck::Zeroable)]
 struct ModelLODHeader {
     //Mesh array
     meshes: BinArray<VTXMeshHeader>,
@@ -272,7 +267,7 @@ impl BinaryData for ModelLODHeader {}
 // MeshHeader
 
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+#[derive(bytemuck::Zeroable)]
 struct VTXMeshHeader {
     strip_groups: BinArray<StripGroupHeader>,
     pub flags: u8,
@@ -297,7 +292,7 @@ impl BinaryData for VTXMeshHeader {}
 // StripGroupHeader
 
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+#[derive(bytemuck::Zeroable)]
 pub struct StripGroupHeader {
     // These are the arrays of all verts and indices for this mesh.  strips index into this.
     verts: BinArray<VTXVertex>,
@@ -352,7 +347,7 @@ unsafe impl bytemuck::Zeroable for OptimizeStripFlags {}
 
 // // A strip is a piece of a stripgroup which is divided by bones
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+#[derive(Debug, bytemuck::Zeroable)]
 pub struct StripHeader {
     pub num_indices: i32,
     pub index_offset: i32,

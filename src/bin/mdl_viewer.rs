@@ -62,7 +62,7 @@ pub fn main() {
         let shader_tex = Arc::new(VShader::new_triangle_strip::<UVAlphaVertex>(&renderer));
 
         'outer: for m in &lod0.0 {
-            println!("Mesh {:?}", m.header);
+            println!("Mesh {:?}", m.flags);
 
             for strip_group in &m.strip_groups {
                 println!("{:?}", strip_group.head.flags);

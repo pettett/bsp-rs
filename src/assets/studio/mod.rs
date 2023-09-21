@@ -107,7 +107,7 @@ impl BinOffset {
 
 /// Struct of (count, offset) for reading an array of items from an mdl
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+#[derive(Debug, bytemuck::Zeroable)]
 pub struct BinArray<T: Sized + BinaryData> {
     pub count: u32,
     pub offset: BinOffset,
@@ -168,7 +168,6 @@ mod mdl_tests {
         let vtx = dir
             .load_vtx(&VGlobalPath::from("models/props_c17/bench01a.dx90.vtx"))
             .unwrap();
-        println!("{:#?}", vtx);
     }
 
     #[test]
@@ -216,8 +215,6 @@ mod mdl_tests {
                 //println!("{:?}", sg.indices);
             }
         }
-
-        println!("{:#?}", mdl);
     }
 
     // #[test]
