@@ -1,43 +1,51 @@
-use std::{io::Seek, mem};
-
+use super::BinOffset;
 use crate::binaries::BinaryData;
+use glam::{Vec2, Vec3, Vec4};
+use std::{io::Seek, mem};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
-pub struct vertexFileHeader_t {
-    id: i32,                     // MODEL_VERTEX_FILE_ID
-    version: i32,                // MODEL_VERTEX_FILE_VERSION
-    checksum: i32,               // same as studiohdr_t, ensures sync
-    numLODs: u32,                // num of valid lods
-    numLODVertexes: [i32; 8],    // num verts for desired root lod
-    numFixups: i32,              // num of vertexFileFixup_t
-    fixupTableStart: BinOffset,  // offset from base to fixup table
-    vertexDataStart: BinOffset,  // offset from base to vertex block
-    tangentDataStart: BinOffset, // offset from base to tangent block
+pub struct VertexFileHeader {
+    id: i32,                       // MODEL_VERTEX_FILE_ID
+    version: i32,                  // MODEL_VERTEX_FILE_VERSION
+    checksum: i32,                 // same as studiohdr_t, ensures sync
+    num_lods: u32,                 // num of valid lods
+    num_lod_vertexes: [i32; 8],    // num verts for desired root lod
+    num_fixups: u32,               // num of vertexFileFixup_t
+    fixup_table_start: BinOffset,  // offset from base to fixup table
+    vertex_data_start: BinOffset,  // offset from base to vertex block
+    tangent_data_start: BinOffset, // offset from base to tangent block
 }
-use glam::{Vec2, Vec3, Vec4};
-
-use super::BinOffset;
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable, bytemuck::Pod)]
 pub struct ModelVertex {
-    bone_weight: Vec3,
-    bone_id: [u8; 3],
-    num_bones: u8,
-    pos: Vec3,
-    norm: Vec3,
-    uv: Vec2,
+    pub bone_weight: Vec3,
+    pub bone_id: [u8; 3],
+    pub num_bones: u8,
+    pub pos: Vec3,
+    pub norm: Vec3,
+    pub uv: Vec2,
+}
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, bytemuck::Zeroable, bytemuck::Pod)]
+pub struct VVDFixup {
+    pub lod: i32,
+    pub src: i32,
+    pub count: i32,
 }
 
 impl BinaryData for ModelVertex {}
-impl BinaryData for vertexFileHeader_t {}
+impl BinaryData for VertexFileHeader {}
+impl BinaryData for VVDFixup {}
 
 #[repr(C, packed)]
 pub struct VVD {
-    pub header: vertexFileHeader_t,
+    pub header: VertexFileHeader,
     pub verts: Box<[ModelVertex]>,
     pub tangents: Box<[Vec4]>,
+    pub fixups: Box<[VVDFixup]>,
 }
 
 impl BinaryData for VVD {
@@ -49,28 +57,32 @@ impl BinaryData for VVD {
         Self: Sized,
     {
         let s = buffer.stream_position()?;
-        let header = vertexFileHeader_t::read(buffer, None)?;
+        let header = VertexFileHeader::read(buffer, None)?;
 
-        let mut pos = mem::size_of::<vertexFileHeader_t>() as i64;
+        let mut pos = mem::size_of::<VertexFileHeader>() as i64;
 
-        let total_verts = header.numLODVertexes[0] as usize;
-
-        header.tangentDataStart.seek_start(buffer, 0, &mut pos)?;
+        let total_verts = header.num_lod_vertexes[0] as usize;
 
         let tangents: Box<[Vec4]> = header
-            .tangentDataStart
+            .tangent_data_start
             .read_array_f(buffer, 0, &mut pos, total_verts)
             .unwrap();
 
         let verts: Box<[ModelVertex]> = header
-            .vertexDataStart
+            .vertex_data_start
             .read_array_f(buffer, 0, &mut pos, total_verts)
+            .unwrap();
+
+        let fixups: Box<[VVDFixup]> = header
+            .fixup_table_start
+            .read_array_f(buffer, 0, &mut pos, header.num_fixups as usize)
             .unwrap();
 
         Ok(Self {
             header,
             verts,
             tangents,
+            fixups,
         })
     }
 }

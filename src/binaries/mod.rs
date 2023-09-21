@@ -32,11 +32,13 @@ pub trait BinaryData {
     {
         let mut header = bytemuck::zeroed_slice_box(count);
 
-        unsafe {
-            let size = count * mem::size_of::<Self>();
-            let slice = slice::from_raw_parts_mut(&mut header[0] as *mut _ as *mut u8, size);
-            // `read_exact()` comes from `Read` impl for `&[u8]`
-            buffer.read_exact(slice)?;
+        if count > 0 {
+            unsafe {
+                let size = count * mem::size_of::<Self>();
+                let slice = slice::from_raw_parts_mut(&mut header[0] as *mut _ as *mut u8, size);
+                // `read_exact()` comes from `Read` impl for `&[u8]`
+                buffer.read_exact(slice)?;
+            }
         }
 
         Ok(header)

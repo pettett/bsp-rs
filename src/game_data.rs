@@ -1,11 +1,18 @@
 use std::{
+    io,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use bevy_ecs::system::Resource;
 
-use crate::{assets::vpk::VPKDirectory, assets::vtf::VTF, assets::VMT, util::v_path::VPath};
+use crate::{
+    assets::vpk::VPKDirectory,
+    assets::VMT,
+    assets::{vpk::VPKFile, vtf::VTF},
+    binaries::BinaryData,
+    util::v_path::VPath,
+};
 #[derive(Resource)]
 pub struct GameData {
     path: PathBuf,
@@ -40,6 +47,20 @@ impl GameData {
         }
         None
     }
+
+    pub fn load<'a, T: BinaryData + 'a, F: Fn(&'a VPKFile) -> &'a OnceLock<io::Result<Arc<T>>>>(
+        &'a self,
+        path: &dyn VPath,
+        get_cell: F,
+    ) -> Option<&'a Arc<T>> {
+        for d in &self.dirs {
+            if let Ok(vtf) = d.load_file_once(path, &get_cell) {
+                return Some(vtf);
+            }
+        }
+        None
+    }
+
     pub fn load_game(game: Game) -> Self {
         let path =
             Path::new("D:\\Program Files (x86)\\Steam\\steamapps\\common").join(match game {

@@ -26,23 +26,6 @@
 		{
 			"type": "lldb",
 			"request": "launch",
-			"name": "Debug executable 'control_renderer'",
-			"cargo": {
-				"args": [
-					"build",
-					"--bin=control_renderer",
-					"--package=bsp-explorer"
-				],
-				"filter": {
-					"name": "control_renderer",
-					"kind": "bin"
-				}
-			},
-			"args": [],
-			"cwd": "${workspaceFolder}"
-		},	{
-			"type": "lldb",
-			"request": "launch",
 			"name": "Debug executable 'bsp_readout'",
 			"cargo": {
 				"args": [
@@ -52,6 +35,43 @@
 				],
 				"filter": {
 					"name": "bsp_readout",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in executable 'bsp_readout'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=bsp_readout",
+					"--package=bsp-explorer"
+				],
+				"filter": {
+					"name": "bsp_readout",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'control_renderer'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=control_renderer",
+					"--package=bsp-explorer"
+				],
+				"filter": {
+					"name": "control_renderer",
 					"kind": "bin"
 				}
 			},
@@ -71,6 +91,43 @@
 				],
 				"filter": {
 					"name": "control_renderer",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'mdl_viewer'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=mdl_viewer",
+					"--package=bsp-explorer"
+				],
+				"filter": {
+					"name": "mdl_viewer",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in executable 'mdl_viewer'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=mdl_viewer",
+					"--package=bsp-explorer"
+				],
+				"filter": {
+					"name": "mdl_viewer",
 					"kind": "bin"
 				}
 			},

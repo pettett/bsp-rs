@@ -64,6 +64,19 @@ impl VShader {
         )
     }
 
+    pub fn new_triangle_strip<V: Vertex + bytemuck::Pod>(renderer: &VRenderer) -> Self {
+        let shader = renderer
+            .device()
+            .create_shader_module(wgpu::include_wgsl!("../uv_shader.wgsl"));
+        Self::new::<V>(
+            renderer,
+            shader,
+            0,
+            wgpu::PrimitiveTopology::TriangleStrip,
+            "Triangle Strip",
+        )
+    }
+
     pub fn new<V: Vertex + bytemuck::Pod>(
         renderer: &VRenderer,
         shader: wgpu::ShaderModule,

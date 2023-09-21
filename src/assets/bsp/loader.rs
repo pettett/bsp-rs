@@ -19,7 +19,7 @@ use bevy_ecs::system::Commands;
 use glam::{ivec3, vec2, vec3, IVec3, Vec3, Vec4};
 use rayon::prelude::*;
 use std::{collections::HashMap, num::NonZeroU32, path::Path, sync::Arc};
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt, Device};
 
 #[derive(Default)]
 struct MeshBuilder<V: Vertex + Default> {
@@ -481,21 +481,32 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
     }
 
     // Create a lighting buffer for use in all shaders
+    insert_lighting_buffer(commands, &lighting_cols[..], renderer);
+}
 
-    let lighting_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Lighting Buffer"),
-        contents: bytemuck::cast_slice(&lighting_cols[..]),
-        usage: wgpu::BufferUsages::STORAGE,
-    });
+pub fn insert_lighting_buffer(
+    commands: &mut Commands,
+    lighting_cols: &[Vec4],
+    renderer: &VRenderer,
+) {
+    let lighting_buffer = renderer
+        .device()
+        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Lighting Buffer"),
+            contents: bytemuck::cast_slice(lighting_cols),
+            usage: wgpu::BufferUsages::STORAGE,
+        });
 
-    let lighting_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &renderer.lighting_bind_group_layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: lighting_buffer.as_entire_binding(),
-        }],
-        label: Some("lighting_bind_group"),
-    });
+    let lighting_bind_group = renderer
+        .device()
+        .create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &renderer.lighting_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: lighting_buffer.as_entire_binding(),
+            }],
+            label: Some("lighting_bind_group"),
+        });
 
     //commands.insert_resource(VPK::<0>(pak));
     commands.insert_resource(LightingData {

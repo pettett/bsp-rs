@@ -138,6 +138,26 @@ impl VPKFile {
             Err(x) => Err(io::Error::new(x.kind(), "")),
         }
     }
+
+    pub fn vtx(&self) -> &OnceLock<io::Result<Arc<VTX>>> {
+        &self.vtx
+    }
+
+    pub fn vvd(&self) -> &OnceLock<io::Result<Arc<VVD>>> {
+        &self.vvd
+    }
+
+    pub fn mdl(&self) -> &OnceLock<io::Result<Arc<MDL>>> {
+        &self.mdl
+    }
+
+    pub fn vmt(&self) -> &OnceLock<io::Result<Arc<VMT>>> {
+        &self.vmt
+    }
+
+    pub fn vtf(&self) -> &OnceLock<io::Result<Arc<VTF>>> {
+        &self.vtf
+    }
 }
 
 #[derive(Debug)]
@@ -304,7 +324,6 @@ impl VPKDirectory {
     pub fn load_vtf(&self, path: &dyn VPath) -> io::Result<&Arc<VTF>> {
         self.load_file_once(path, |f| &f.vtf)
     }
-
     /// Load material from global path (materials/x/y.vmt)
     pub fn load_vmt(&self, path: &dyn VPath) -> io::Result<&Arc<VMT>> {
         self.load_file_once(path, |f| &f.vmt)

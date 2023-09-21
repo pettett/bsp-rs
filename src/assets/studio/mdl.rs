@@ -28,36 +28,36 @@ impl BinaryData for MDL {
 
         let text = header.texture.read(buffer, 0, &mut pos)?;
 
-        for (i, t) in &text {
-            println!("{:?}", t);
-            println!("{}", t.name_offset.read_str(buffer, *i, &mut pos)?)
-        }
+        // for (i, t) in &text {
+        //     println!("{:?}", t);
+        //     println!("{}", t.name_offset.read_str(buffer, *i, &mut pos)?)
+        // }
 
         let body = header.bodypart.read(buffer, 0, &mut pos)?;
 
         for (i, t) in &body {
-            println!("{:?}", t);
+            //println!("{:?}", t);
             let models: Vec<(i64, mstudiomodel_t)> =
                 t.modelindex.read_array(buffer, *i, &mut pos, t.nummodels)?;
 
             for (ii, model) in &models {
-                println!("{:?}", model);
+                //println!("{:?}", model);
 
                 assert!(model.vertexindex % 0x30 == 0);
                 assert!(model.tangentsindex % 0x10 == 0);
                 let first_vertex = (model.vertexindex / 0x30) | 0;
                 let first_tangent = (model.tangentsindex / 0x10) | 0;
 
-                println!("{first_vertex} {first_tangent}");
+                //println!("{first_vertex} {first_tangent}");
 
                 let meshes: Vec<(i64, mstudiomesh_t)> = model.meshes.read(buffer, *ii, &mut pos)?;
 
-                println!("{:?}", meshes);
+                //println!("{:?}", meshes);
             }
 
             let name = t.name_index.read_str(buffer, *i, &mut pos)?;
 
-            println!("{}", name);
+            //println!("{}", name);
         }
 
         Ok(Self { header, body, text })

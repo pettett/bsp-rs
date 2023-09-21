@@ -93,36 +93,36 @@ impl BinaryData for VTX {
 
         let mut body = BodyPart::default();
 
-        println!("{:?}", b);
+        //    println!("{:?}", b);
         // I'm honestly not sure if I need any of this.
         for (i, p) in &b {
             let mds = p.models.read(buffer, *i, &mut pos)?;
-            println!("{:?}", mds);
+            //    println!("{:?}", mds);
 
             let mut model = Model::default();
 
             for (i, md) in &mds {
                 let l = md.lods.read(buffer, *i, &mut pos)?;
-                println!("{:?}", l);
+                //    println!("{:?}", l);
 
                 let mut model_lod = ModelLOD::default();
 
                 for (i, lod) in &l {
                     let me = lod.meshes.read(buffer, *i, &mut pos)?;
-                    println!("{:?}", me);
+                    //println!("{:?}", me);
 
                     let mut mesh = Mesh::default();
 
                     for (i, m) in &me {
                         let sgs = m.strip_groups.read(buffer, *i, &mut pos)?;
-                        println!("{:?}", sgs);
+                        //println!("{:?}", sgs);
 
                         let mut mesh_strip = MeshStrip::default();
 
                         for (i, sg) in &sgs {
                             let indices = sg.indices_count.read_f(buffer, *i, &mut pos)?;
                             //let indices = bytemuck::zeroed_slice_box(1);
-                            println!("{:?}", indices);
+                            //println!("{:?}", indices);
                             let mut strip_group_header = VTXStripGroupHeader {
                                 indices,
                                 head: sg.clone(),
@@ -137,7 +137,7 @@ impl BinaryData for VTX {
                                     .push(VTXStrip { header: sh.clone() });
                             }
 
-                            println!("{:?}", shs);
+                            //println!("{:?}", shs);
 
                             mesh_strip.0.push(strip_group_header);
                         }

@@ -183,9 +183,6 @@ mod mdl_tests {
             assert!(t.w == 0.0 || t.w == -1.0 || t.w == 1.0)
         }
         println!("Tangents all good!");
-        for t in vvd.verts.iter() {
-            println!("{:#?}", t);
-        }
     }
 
     #[test]
