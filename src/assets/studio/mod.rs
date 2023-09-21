@@ -53,6 +53,9 @@ impl BinOffset {
 
         *pos += buffer.read_until(0, &mut data)? as i64;
 
+        // Remove trailing 0
+        data.pop();
+
         Ok(String::from_utf8(data).unwrap())
     }
     //TODO: choose name
@@ -192,25 +195,31 @@ mod mdl_tests {
         ))
         .unwrap();
 
-        let Ok(vtx) = dir.load_vtx(&VGlobalPath::from("models/props_c17/bench01a.dx90.vtx")) else {
-            panic!()
-        };
-        let Ok(mdl) = dir.load_mdl(&VGlobalPath::from("models/props_c17/bench01a.mdl")) else {
-            panic!()
-        };
-        let Ok(vvd) = dir.load_vvd(&VGlobalPath::from("models/props_c17/bench01a.vdd")) else {
-            panic!()
-        };
+        let vtx = dir
+            .load_vtx(&VGlobalPath::from("models/props_c17/bench01a.dx90.vtx"))
+            .unwrap();
 
-        let lod0 = &vtx.body.0[0].0[0];
+        let mdl = dir
+            .load_mdl(&VGlobalPath::from("models/props_c17/bench01a.mdl"))
+            .unwrap();
 
-        for m in &lod0.0 {
+        let vvd = dir
+            .load_vvd(&VGlobalPath::from("models/props_c17/bench01a.vvd"))
+            .unwrap();
+
+        assert_eq!(mdl.body.len(), vtx.body.0.len());
+
+        let vtx_lod0 = &vtx.body.0[0].0[0];
+
+        for m in &vtx_lod0.0 {
             for ms in &m.0 {
                 for sg in &ms.0 {
-                    println!("{:?}", sg.indices);
+                    //println!("{:?}", sg.indices);
                 }
             }
         }
+
+        println!("{:#?}", mdl);
     }
 
     // #[test]

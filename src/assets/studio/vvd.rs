@@ -10,7 +10,7 @@ pub struct VertexFileHeader {
     version: i32,                  // MODEL_VERTEX_FILE_VERSION
     checksum: i32,                 // same as studiohdr_t, ensures sync
     num_lods: u32,                 // num of valid lods
-    num_lod_vertexes: [i32; 8],    // num verts for desired root lod
+    num_lod_vertexes: [u32; 8],    // num verts for desired root lod
     num_fixups: u32,               // num of vertexFileFixup_t
     fixup_table_start: BinOffset,  // offset from base to fixup table
     vertex_data_start: BinOffset,  // offset from base to vertex block
@@ -63,20 +63,33 @@ impl BinaryData for VVD {
 
         let total_verts = header.num_lod_vertexes[0] as usize;
 
-        let tangents: Box<[Vec4]> = header
-            .tangent_data_start
-            .read_array_f(buffer, 0, &mut pos, total_verts)
-            .unwrap();
+        let v = header.vertex_data_start.index;
+        let v1 = v + header.num_lod_vertexes[0] * 0x30;
+        let t = header.tangent_data_start.index;
+        assert_eq!(v1, t);
 
-        let verts: Box<[ModelVertex]> = header
-            .vertex_data_start
-            .read_array_f(buffer, 0, &mut pos, total_verts)
-            .unwrap();
+        println!("VVD vert : {}", v);
 
-        let fixups: Box<[VVDFixup]> = header
-            .fixup_table_start
-            .read_array_f(buffer, 0, &mut pos, header.num_fixups as usize)
-            .unwrap();
+        let verts: Box<[ModelVertex]> =
+            header
+                .vertex_data_start
+                .read_array_f(buffer, 0, &mut pos, total_verts)?;
+
+        let tangents: Box<[Vec4]> =
+            header
+                .tangent_data_start
+                .read_array_f(buffer, 0, &mut pos, total_verts)?;
+
+        let fixups: Box<[VVDFixup]> = header.fixup_table_start.read_array_f(
+            buffer,
+            0,
+            &mut pos,
+            header.num_fixups as usize,
+        )?;
+
+        if header.num_fixups > 0 {
+            println!("Fixups: {:?}", fixups);
+        }
 
         Ok(Self {
             header,

@@ -26,19 +26,19 @@ pub fn main() {
         let (mut commands, renderer, game_data) = system_state.get(state.world());
 
         let Some(vtx) = game_data.load(
-            &VGlobalPath::from("models/props_c17/bench01a.dx90.vtx"),
+            &VGlobalPath::from("models/props_trainstation/trashcan_indoor001a.dx90.vtx"),
             VPKFile::vtx,
         ) else {
             panic!()
         };
         let Some(mdl) = game_data.load(
-            &VGlobalPath::from("models/props_c17/bench01a.mdl"),
+            &VGlobalPath::from("models/props_trainstation/trashcan_indoor001a.mdl"),
             VPKFile::mdl,
         ) else {
             panic!()
         };
         let Some(vvd) = game_data.load(
-            &VGlobalPath::from("models/props_c17/bench01a.vvd"),
+            &VGlobalPath::from("models/props_trainstation/trashcan_indoor001a.vvd"),
             VPKFile::vvd,
         ) else {
             panic!()
@@ -61,12 +61,13 @@ pub fn main() {
             println!("Mesh");
             for ms in &m.0 {
                 for sg in &ms.0 {
-                    let verts_start = sg.head.verts_start;
-                    let verts_count = sg.head.verts_count;
+                    println!("{:?}", sg.head.flags);
 
                     for s in &sg.strips {
                         let ind_start = s.header.index_offset as usize;
                         let ind_count = s.header.num_indices as usize;
+
+                        println!("{ind_start} {ind_count}");
 
                         let m = VMesh::new(
                             renderer.device(),
@@ -76,10 +77,7 @@ pub fn main() {
                         );
 
                         commands.spawn(m);
-                        break 'outer;
                     }
-
-                    //println!("{:?}", sg.indices);
                 }
             }
         }

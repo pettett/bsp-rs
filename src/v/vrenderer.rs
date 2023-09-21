@@ -214,7 +214,7 @@ impl VRenderer {
                                      //let  puffin_ui = puffin_imgui::ProfilerUi::default();
 
         let camera_entity = world
-            .spawn((camera, CameraController::new(10.), camera_uniform))
+            .spawn((camera, CameraController::new(1.), camera_uniform))
             .id();
         let lighting_bind_group_layout: wgpu::BindGroupLayout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {

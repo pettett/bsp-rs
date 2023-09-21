@@ -120,7 +120,13 @@ impl BinaryData for VTX {
                         let mut mesh_strip = MeshStrip::default();
 
                         for (i, sg) in &sgs {
-                            let indices = sg.indices_count.read_f(buffer, *i, &mut pos)?;
+                            let mut indices = sg.indices.read_f(buffer, *i, &mut pos)?;
+                            let verts = sg.verts.read_f(buffer, *i, &mut pos)?;
+
+                            // for i in indices.iter_mut() {
+                            //     *i += verts[*i as usize].orig_mesh_vert_id;
+                            // }
+
                             //let indices = bytemuck::zeroed_slice_box(1);
                             //println!("{:?}", indices);
                             let mut strip_group_header = VTXStripGroupHeader {
@@ -287,14 +293,13 @@ impl BinaryData for MeshHeader {}
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
 pub struct StripGroupHeader {
     // These are the arrays of all verts and indices for this mesh.  strips index into this.
-    pub verts_count: u32,
-    pub verts_start: u32,
+    verts: BinArray<VTXVertex>,
 
-    indices_count: BinArray<u16>,
+    indices: BinArray<u16>,
 
     strip_groups: BinArray<StripHeader>,
 
-    pub flags: u8,
+    pub flags: OptimizeStripFlags,
 
     // The following fields are only present if MDL version is >=49
     // Points to an array of unsigned shorts (16 bits each)
@@ -303,6 +308,15 @@ pub struct StripGroupHeader {
 }
 
 impl BinaryData for StripGroupHeader {}
+
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+pub enum OptimizeStripFlags {
+    NONE = 0,
+    IS_TRILIST = 0x01,
+    IS_TRISTRIP = 0x02,
+}
+unsafe impl bytemuck::Zeroable for OptimizeStripFlags {}
 // MDL versions 49 and above (found in
 
 // Counter-Strike: Global Offensive) have an extra two i32 fields (totaling 8 bytes). This is not reflected in the VTX header version, which remains at 7.
@@ -362,20 +376,20 @@ impl BinaryData for StripHeader {}
 // Each group (Indices and Vertices respectively), specify what position to read from the vertex pool, as well as the indices pool. These pools come from the parent StripGroupHeader object
 // Vertex
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
-struct Vertex {
+#[derive(Copy, Clone, Debug, bytemuck::Zeroable, bytemuck::Pod)]
+struct VTXVertex {
     // these index into the mesh's vert[origMeshVertID]'s bones
-    bone_weight_index: [u8; 3],
-    num_bones: u8,
+    pub bone_weight_index: [u8; 3],
+    pub num_bones: u8,
 
-    orig_mesh_vert_id: u16,
+    pub orig_mesh_vert_id: u16,
 
     // for sw skinned verts, these are indices into the global list of bones
     // for hw skinned verts, these are hardware bone indices
-    bone_id: [i8; 3],
+    pub bone_id: [i8; 3],
 }
 
-impl BinaryData for Vertex {}
+impl BinaryData for VTXVertex {}
 
 // origMeshVertID defines the index of this vertex that is to be read from the linked .VVD file's vertex array
 // Note:

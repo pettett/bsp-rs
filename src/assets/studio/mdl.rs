@@ -10,8 +10,24 @@ use super::mdl_headers::{self, mstudiobodyparts_t, mstudiotexture_t};
 #[derive(Debug)]
 pub struct MDL {
     pub header: mdl_headers::MDLHeader,
-    pub body: Vec<(i64, mstudiobodyparts_t)>,
+    pub body: Vec<MDLBodyPart>,
     pub text: Vec<(i64, mstudiotexture_t)>,
+}
+
+#[derive(Debug)]
+pub struct MDLBodyPart {
+    pub name: String,
+    pub head: mstudiobodyparts_t,
+    pub models: Vec<MDLModel>,
+}
+#[derive(Debug)]
+pub struct MDLModel {
+    pub head: mstudiomodel_t,
+    pub meshes: Vec<MDLMesh>,
+}
+#[derive(Debug)]
+pub struct MDLMesh {
+    pub head: mstudiomesh_t,
 }
 
 impl BinaryData for MDL {
@@ -34,32 +50,57 @@ impl BinaryData for MDL {
         // }
 
         let body = header.bodypart.read(buffer, 0, &mut pos)?;
+        let mut parts = Vec::<MDLBodyPart>::new();
+        for (i, t) in body {
+            let mut models = Vec::<MDLModel>::new();
 
-        for (i, t) in &body {
             //println!("{:?}", t);
-            let models: Vec<(i64, mstudiomodel_t)> =
-                t.modelindex.read_array(buffer, *i, &mut pos, t.nummodels)?;
+            let model_heads: Vec<(i64, mstudiomodel_t)> =
+                t.modelindex.read_array(buffer, i, &mut pos, t.nummodels)?;
 
-            for (ii, model) in &models {
+            for (ii, model) in model_heads {
                 //println!("{:?}", model);
 
                 assert!(model.vertexindex % 0x30 == 0);
                 assert!(model.tangentsindex % 0x10 == 0);
+
+                let v = model.vertexindex;
+                println!("Vert index : {}", v);
+
                 let first_vertex = (model.vertexindex / 0x30) | 0;
                 let first_tangent = (model.tangentsindex / 0x10) | 0;
 
                 //println!("{first_vertex} {first_tangent}");
 
-                let meshes: Vec<(i64, mstudiomesh_t)> = model.meshes.read(buffer, *ii, &mut pos)?;
+                let mesh_heads: Vec<(i64, mstudiomesh_t)> =
+                    model.meshes.read(buffer, ii, &mut pos)?;
+                let mut meshes = Vec::<MDLMesh>::new();
+
+                for (iii, mesh) in mesh_heads {
+                    meshes.push(MDLMesh { head: mesh })
+                }
 
                 //println!("{:?}", meshes);
+                models.push(MDLModel {
+                    head: model,
+                    meshes,
+                });
             }
 
-            let name = t.name_index.read_str(buffer, *i, &mut pos)?;
+            let name = t.name_index.read_str(buffer, i, &mut pos)?;
 
             //println!("{}", name);
+            parts.push(MDLBodyPart {
+                name,
+                head: t,
+                models,
+            });
         }
 
-        Ok(Self { header, body, text })
+        Ok(Self {
+            header,
+            body: parts,
+            text,
+        })
     }
 }
