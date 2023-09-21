@@ -207,15 +207,13 @@ mod mdl_tests {
             .load_vvd(&VGlobalPath::from("models/props_c17/bench01a.vvd"))
             .unwrap();
 
-        assert_eq!(mdl.body.len(), vtx.body.0.len());
+        assert_eq!(mdl.body.len(), vtx.body[0].0.len());
 
-        let vtx_lod0 = &vtx.body.0[0].0[0];
+        let vtx_lod0 = &vtx.body[0].0[0].0;
 
-        for m in &vtx_lod0.0 {
-            for ms in &m.0 {
-                for sg in &ms.0 {
-                    //println!("{:?}", sg.indices);
-                }
+        for m in vtx_lod0 {
+            for sg in &m.0 {
+                //println!("{:?}", sg.indices);
             }
         }
 

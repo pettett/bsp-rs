@@ -26,25 +26,28 @@ pub fn main() {
         let (mut commands, renderer, game_data) = system_state.get(state.world());
 
         let Some(vtx) = game_data.load(
-            &VGlobalPath::from("models/props_trainstation/trashcan_indoor001a.dx90.vtx"),
+            &VGlobalPath::from("models/props_c17/bench01a.dx90.vtx"),
             VPKFile::vtx,
         ) else {
             panic!()
         };
         let Some(mdl) = game_data.load(
-            &VGlobalPath::from("models/props_trainstation/trashcan_indoor001a.mdl"),
+            &VGlobalPath::from("models/props_c17/bench01a.mdl"),
             VPKFile::mdl,
         ) else {
             panic!()
         };
         let Some(vvd) = game_data.load(
-            &VGlobalPath::from("models/props_trainstation/trashcan_indoor001a.vvd"),
+            &VGlobalPath::from("models/props_c17/bench01a.vvd"),
             VPKFile::vvd,
         ) else {
             panic!()
         };
+        let l = vtx.header.num_lods as usize;
 
-        let lod0 = &vtx.body.0[0].0[0];
+        assert_eq!(l, vtx.body[0].0[0].0.len());
+
+        let lod0 = &vtx.body[0].0[0].0[0];
 
         let verts: Vec<UVAlphaVertex> = vvd
             .verts
@@ -59,25 +62,24 @@ pub fn main() {
         let shader_tex = Arc::new(VShader::new_triangle_strip::<UVAlphaVertex>(&renderer));
         'outer: for m in &lod0.0 {
             println!("Mesh");
-            for ms in &m.0 {
-                for sg in &ms.0 {
-                    println!("{:?}", sg.head.flags);
+            for strip_group in &m.0 {
+                println!("{:?}", strip_group.head.flags);
 
-                    for s in &sg.strips {
-                        let ind_start = s.header.index_offset as usize;
-                        let ind_count = s.header.num_indices as usize;
+                for s in &strip_group.strips {
+                    let ind_start = s.header.index_offset as usize;
+                    let ind_count = s.header.num_indices as usize;
 
-                        println!("{ind_start} {ind_count}");
+                    println!("{ind_start} {ind_count}");
 
-                        let m = VMesh::new(
-                            renderer.device(),
-                            &verts[..],
-                            &sg.indices[ind_start..ind_start + ind_count],
-                            shader_tex.clone(),
-                        );
+                    let m = VMesh::new(
+                        renderer.device(),
+                        &verts[..],
+                        &strip_group.indices[ind_start..ind_start + ind_count],
+                        shader_tex.clone(),
+                    );
 
-                        commands.spawn(m);
-                    }
+                    commands.spawn(m);
+                    break 'outer;
                 }
             }
         }
