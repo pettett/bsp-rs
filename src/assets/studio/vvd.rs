@@ -28,9 +28,17 @@ pub struct ModelVertex {
     pub uv: Vec2,
 }
 
+#[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
+pub struct Fixup {
+    pub lod: i32,
+    pub dst: i32,
+    pub src: i32,
+    pub count: i32,
+}
+
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable, bytemuck::Pod)]
-pub struct VVDFixup {
+struct VVDFixup {
     pub lod: i32,
     pub src: i32,
     pub count: i32,
@@ -40,12 +48,11 @@ impl BinaryData for ModelVertex {}
 impl BinaryData for VertexFileHeader {}
 impl BinaryData for VVDFixup {}
 
-#[repr(C, packed)]
 pub struct VVD {
     pub header: VertexFileHeader,
     pub verts: Box<[ModelVertex]>,
     pub tangents: Box<[Vec4]>,
-    pub fixups: Box<[VVDFixup]>,
+    pub fixups: Box<[Fixup]>,
 }
 
 impl BinaryData for VVD {
@@ -68,8 +75,6 @@ impl BinaryData for VVD {
         let t = header.tangent_data_start.index;
         assert_eq!(v1, t);
 
-        println!("VVD vert : {}", v);
-
         let verts: Box<[ModelVertex]> =
             header
                 .vertex_data_start
@@ -80,12 +85,23 @@ impl BinaryData for VVD {
                 .tangent_data_start
                 .read_array_f(buffer, 0, &mut pos, total_verts)?;
 
-        let fixups: Box<[VVDFixup]> = header.fixup_table_start.read_array_f(
+        let vvd_fixups: Box<[VVDFixup]> = header.fixup_table_start.read_array_f(
             buffer,
             0,
             &mut pos,
             header.num_fixups as usize,
         )?;
+
+        let mut fixups: Box<[Fixup]> = bytemuck::zeroed_slice_box(vvd_fixups.len());
+        let mut dst = 0;
+
+        for i in 0..fixups.len() {
+            fixups[i].dst = dst;
+            fixups[i].count = vvd_fixups[i].count;
+            fixups[i].lod = vvd_fixups[i].lod;
+            fixups[i].src = vvd_fixups[i].src;
+            dst += fixups[i].count;
+        }
 
         if header.num_fixups > 0 {
             println!("Fixups: {:?}", fixups);

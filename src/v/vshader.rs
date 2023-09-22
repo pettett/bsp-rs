@@ -24,6 +24,7 @@ impl VShader {
             shader,
             1,
             wgpu::PrimitiveTopology::TriangleList,
+            Some(wgpu::Face::Back),
             "Textured",
         )
     }
@@ -36,6 +37,7 @@ impl VShader {
             shader,
             2,
             wgpu::PrimitiveTopology::TriangleList,
+            Some(wgpu::Face::Back),
             "Textured Envmap",
         )
     }
@@ -48,6 +50,7 @@ impl VShader {
             shader,
             2,
             wgpu::PrimitiveTopology::TriangleList,
+            Some(wgpu::Face::Back),
             "Displacement",
         )
     }
@@ -60,6 +63,7 @@ impl VShader {
             shader,
             0,
             wgpu::PrimitiveTopology::LineList,
+            Some(wgpu::Face::Back),
             "Line list",
         )
     }
@@ -72,7 +76,8 @@ impl VShader {
             renderer,
             shader,
             0,
-            wgpu::PrimitiveTopology::TriangleStrip,
+            wgpu::PrimitiveTopology::TriangleList,
+            Some(wgpu::Face::Front),
             "Triangle Strip",
         )
     }
@@ -82,6 +87,7 @@ impl VShader {
         shader: wgpu::ShaderModule,
         textures: usize,
         topology: wgpu::PrimitiveTopology,
+        cull_mode: Option<wgpu::Face>,
         name: &str,
     ) -> Self {
         let mut texture_bind_group_layouts = Vec::new();
@@ -156,7 +162,7 @@ impl VShader {
                         topology, // 1.
                         strip_index_format: None,
                         front_face: wgpu::FrontFace::Ccw, // 2.
-                        cull_mode: Some(wgpu::Face::Back),
+                        cull_mode,
                         // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
                         polygon_mode: wgpu::PolygonMode::Fill,
                         // Requires Features::DEPTH_CLIP_CONTROL

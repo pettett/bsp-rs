@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bevy_ecs::system::{Commands, Res, SystemState};
 
 use bsp_explorer::{
-    assets::vpk::VPKFile,
+    assets::{studio::vvd::Fixup, vpk::VPKFile},
     game_data::GameData,
     run,
     util::v_path::VGlobalPath,
@@ -11,6 +11,18 @@ use bsp_explorer::{
     vertex::UVAlphaVertex,
 };
 use glam::Vec4;
+fn fixup_remapping_search(fixupTable: &Box<[Fixup]>, dstIdx: u16) -> u16 {
+    for i in 0..fixupTable.len() {
+        let map = fixupTable[i];
+        let idx = dstIdx as i32 - map.dst;
+        if idx >= 0 && idx < map.count {
+            return (map.src + idx) as u16;
+        }
+    }
+
+    // remap did not copy over this vertex, return as is.
+    return dstIdx;
+}
 
 pub fn main() {
     println!("Starting...");
@@ -26,19 +38,19 @@ pub fn main() {
         let (mut commands, renderer, game_data) = system_state.get(state.world());
 
         let Some(vtx) = game_data.load(
-            &VGlobalPath::from("models/props_c17/bench01a.dx90.vtx"),
+            &VGlobalPath::from("models/props_trainstation/train001.dx90.vtx"),
             VPKFile::vtx,
         ) else {
             panic!()
         };
         let Some(mdl) = game_data.load(
-            &VGlobalPath::from("models/props_c17/bench01a.mdl"),
+            &VGlobalPath::from("models/props_trainstation/train001.mdl"),
             VPKFile::mdl,
         ) else {
             panic!()
         };
         let Some(vvd) = game_data.load(
-            &VGlobalPath::from("models/props_c17/bench01a.vvd"),
+            &VGlobalPath::from("models/props_trainstation/train001.vvd"),
             VPKFile::vvd,
         ) else {
             panic!()
@@ -65,21 +77,36 @@ pub fn main() {
             println!("Mesh {:?}", m.flags);
 
             for strip_group in &m.strip_groups {
-                println!("{:?}", strip_group.head.flags);
+                let mut indices = strip_group.indices.clone();
+                if vvd.fixups.len() > 0 {
+                    let mut map_dsts = vec![0; vvd.fixups.len()];
+
+                    for i in 1..vvd.fixups.len() {
+                        map_dsts[i] = map_dsts[i - 1] + vvd.fixups[i - 1].count;
+                    }
+                    println!("{:?}", map_dsts);
+                    println!("{:?}", vvd.fixups[0]);
+
+                    for index in indices.iter_mut() {
+                        *index = fixup_remapping_search(
+                            &vvd.fixups,
+                            strip_group.verts[*index as usize].orig_mesh_vert_id,
+                        );
+                    }
+                } else {
+                    for index in indices.iter_mut() {
+                        *index = strip_group.verts[*index as usize].orig_mesh_vert_id;
+                    }
+                }
 
                 for s in &strip_group.strips {
                     let ind_start = s.header.index_offset as usize;
                     let ind_count = s.header.num_indices as usize;
 
-                    println!(
-                        "S {ind_start} E {ind_count} S 0 E {}",
-                        strip_group.indices.len()
-                    );
-
                     let m = VMesh::new(
                         renderer.device(),
                         &verts[..],
-                        &strip_group.indices[ind_start..ind_start + ind_count],
+                        &indices[ind_start..ind_start + ind_count],
                         shader_tex.clone(),
                     );
 

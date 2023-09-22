@@ -272,8 +272,9 @@ pub struct mstudiomesh_t {
     pub materialparam: i32,
     pub meshid: i32,
     pub center: Vec3,
-    pub vertexdata: (i32, [i32; 8]),
-    unused: [i32; 8], // remove as appropriate
+    _unused0: i32,
+    pub lod_vertices: [u32; 8],
+    _unused1: [i32; 8], // remove as appropriate
 }
 
 impl BinaryData for mstudiomesh_t {}

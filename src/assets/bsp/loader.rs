@@ -9,7 +9,7 @@ use crate::{
         model::BSPModel,
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
-    assets::{vpk::VPKDirectory, VMT},
+    assets::{bsp::gamelump::load_gamelump, vpk::VPKDirectory, VMT},
     game_data::GameData,
     util::v_path::{VGlobalPath, VLocalPath},
     v::{vrenderer::VRenderer, vshader::VShader, VMesh},
@@ -379,11 +379,26 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         })
         .collect();
 
-    println!("Loading BSP meshes...");
+    println!("Loading BSP shaders...");
     let shader_lines = Arc::new(VShader::new_white_lines::<Vec3>(renderer));
     let shader_tex = Arc::new(VShader::new_textured(renderer));
     let shader_tex_envmap = Arc::new(VShader::new_textured_envmap(renderer));
     let shader_disp = Arc::new(VShader::new_displacement(renderer));
+
+    println!("Loading BSP static props...");
+
+    let gamelump = load_gamelump(header.get_lump_header(LumpType::GameLump), &mut buffer).unwrap();
+
+    for prop in &gamelump.props {
+        commands.spawn(VMesh::new_box(
+            device,
+            prop.m_Origin + Vec3::ONE,
+            prop.m_Origin - Vec3::ONE,
+            shader_lines.clone(),
+        ));
+    }
+
+    println!("Loading BSP meshes...");
 
     for (tex, builder) in &textured_tris {
         let Some(vmt) = materials.get(tex) else {

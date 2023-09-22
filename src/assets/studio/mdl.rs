@@ -63,7 +63,6 @@ impl BinaryData for MDL {
                 assert!(model.tangentsindex % 0x10 == 0);
 
                 let v = model.vertexindex;
-                println!("Vert index : {}", v);
 
                 let first_vertex = (model.vertexindex / 0x30) | 0;
                 let first_tangent = (model.tangentsindex / 0x10) | 0;

@@ -20,3 +20,5 @@ pub trait BinaryData {
         Ok(header)
     }
 }
+
+impl<T: bytemuck::Pod> BinaryData for T {}

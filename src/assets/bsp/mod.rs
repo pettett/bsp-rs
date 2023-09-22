@@ -2,6 +2,7 @@ pub mod consts;
 pub mod displacement;
 pub mod edges;
 pub mod face;
+pub mod gamelump;
 pub mod header;
 pub mod lightmap;
 pub mod loader;

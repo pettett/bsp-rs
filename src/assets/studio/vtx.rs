@@ -123,13 +123,8 @@ impl BinaryData for VTX {
                         };
 
                         for (i, strip_group_header) in strip_group_headers {
-                            let mut indices =
-                                strip_group_header.indices.read_f(buffer, i, &mut pos)?;
+                            let indices = strip_group_header.indices.read_f(buffer, i, &mut pos)?;
                             let verts = strip_group_header.verts.read_f(buffer, i, &mut pos)?;
-
-                            // for i in indices.iter_mut() {
-                            //     *i += 1000;
-                            // }
 
                             //let indices = bytemuck::zeroed_slice_box(1);
                             //println!("{:?}", indices);
