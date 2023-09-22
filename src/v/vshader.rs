@@ -25,6 +25,7 @@ impl VShader {
             1,
             wgpu::PrimitiveTopology::TriangleList,
             Some(wgpu::Face::Back),
+            false,
             "Textured",
         )
     }
@@ -38,6 +39,7 @@ impl VShader {
             2,
             wgpu::PrimitiveTopology::TriangleList,
             Some(wgpu::Face::Back),
+            false,
             "Textured Envmap",
         )
     }
@@ -51,6 +53,7 @@ impl VShader {
             2,
             wgpu::PrimitiveTopology::TriangleList,
             Some(wgpu::Face::Back),
+            false,
             "Displacement",
         )
     }
@@ -64,6 +67,7 @@ impl VShader {
             0,
             wgpu::PrimitiveTopology::LineList,
             Some(wgpu::Face::Back),
+            false,
             "Line list",
         )
     }
@@ -78,6 +82,7 @@ impl VShader {
             0,
             wgpu::PrimitiveTopology::TriangleList,
             Some(wgpu::Face::Front),
+            true,
             "Triangle Strip",
         )
     }
@@ -88,6 +93,7 @@ impl VShader {
         textures: usize,
         topology: wgpu::PrimitiveTopology,
         cull_mode: Option<wgpu::Face>,
+        prop: bool,
         name: &str,
     ) -> Self {
         let mut texture_bind_group_layouts = Vec::new();
@@ -122,7 +128,13 @@ impl VShader {
 
         let mut bind_group_layouts = Vec::new();
         bind_group_layouts.push(renderer.camera_bind_group_layout());
-        bind_group_layouts.push(&renderer.lighting_bind_group_layout);
+
+        if prop {
+            bind_group_layouts.push(&renderer.model_bind_group_layout);
+        } else {
+            bind_group_layouts.push(&renderer.lighting_bind_group_layout);
+        }
+
         for t in &texture_bind_group_layouts {
             bind_group_layouts.push(t)
         }

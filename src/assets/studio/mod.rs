@@ -3,9 +3,122 @@ pub mod mdl_headers;
 pub mod vtx;
 pub mod vvd;
 
+use std::{io, sync::Arc};
+
 pub use mdl::MDL;
 pub use vtx::VTX;
 pub use vvd::VVD;
+
+use crate::{
+    assets::vpk::VPKFile,
+    game_data::GameData,
+    v::{
+        vpath::{VGlobalPath, VLocalPath, VPath, VSplitPath},
+        vrenderer::VRenderer,
+        vshader::VShader,
+        VMesh,
+    },
+    vertex::UVAlphaVertex,
+};
+
+use self::vvd::Fixup;
+pub fn fixup_remapping_search(fixupTable: &Box<[Fixup]>, dstIdx: u16) -> u16 {
+    for i in 0..fixupTable.len() {
+        let map = fixupTable[i];
+        let idx = dstIdx as i32 - map.dst;
+        if idx >= 0 && idx < map.count {
+            return (map.src + idx) as u16;
+        }
+    }
+
+    // remap did not copy over this vertex, return as is.
+    return dstIdx;
+}
+pub fn load_vmesh(
+    mdl_path: &dyn VPath,
+    renderer: &VRenderer,
+    game_data: &GameData,
+) -> Result<VMesh, &'static str> {
+    let mdl = game_data
+        .load(mdl_path, VPKFile::mdl)
+        .ok_or("No mdl file")?;
+
+    let dir = mdl_path.dir();
+
+    let mut vtx_filename = mdl_path.filename().to_owned();
+    vtx_filename.push_str(".dx90");
+    //println!("{vtx_filename}");
+    let vtx_path = VSplitPath::new(&dir, &vtx_filename, "vtx");
+    let vvd_path = VSplitPath::new(&dir, mdl_path.filename(), "vvd");
+
+    let vtx = game_data
+        .load(&vtx_path, VPKFile::vtx)
+        .ok_or("No VTX File")?;
+    let vvd = game_data
+        .load(&vvd_path, VPKFile::vvd)
+        .ok_or("No VVD File")?;
+
+    let l = vtx.header.num_lods as usize;
+
+    assert_eq!(l, vtx.body[0].0[0].0.len());
+
+    let lod0 = &vtx.body[0].0[0].0[0];
+
+    let verts = vvd
+        .verts
+        .iter()
+        .map(|v| UVAlphaVertex {
+            position: v.pos,
+            uv: v.uv,
+            alpha: 1.0,
+        })
+        .collect::<Vec<_>>();
+
+    let shader_tex = Arc::new(VShader::new_triangle_strip::<UVAlphaVertex>(&renderer));
+
+    for m in &lod0.0 {
+        //println!("Mesh {:?}", m.flags);
+
+        for strip_group in &m.strip_groups {
+            let mut indices = strip_group.indices.clone();
+            if vvd.fixups.len() > 0 {
+                let mut map_dsts = vec![0; vvd.fixups.len()];
+
+                for i in 1..vvd.fixups.len() {
+                    map_dsts[i] = map_dsts[i - 1] + vvd.fixups[i - 1].count;
+                }
+                //println!("{:?}", map_dsts);
+                //println!("{:?}", vvd.fixups[0]);
+
+                for index in indices.iter_mut() {
+                    *index = fixup_remapping_search(
+                        &vvd.fixups,
+                        strip_group.verts[*index as usize].orig_mesh_vert_id,
+                    );
+                }
+            } else {
+                for index in indices.iter_mut() {
+                    *index = strip_group.verts[*index as usize].orig_mesh_vert_id;
+                }
+            }
+
+            for s in &strip_group.strips {
+                let ind_start = s.header.index_offset as usize;
+                let ind_count = s.header.num_indices as usize;
+
+                let m = VMesh::new(
+                    renderer.device(),
+                    &verts[..],
+                    &indices[ind_start..ind_start + ind_count],
+                    shader_tex.clone(),
+                );
+
+                return Ok(m);
+            }
+        }
+    }
+    Err("No mesh in LODs")
+}
 
 #[cfg(test)]
 mod mdl_tests {
@@ -84,7 +197,7 @@ mod mdl_tests {
 
         for m in vtx_lod0 {
             for sg in &m.0 {
-                //println!("{:?}", sg.indices);
+                //5!("{:?}", sg.indices);
             }
         }
     }

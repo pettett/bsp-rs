@@ -9,7 +9,7 @@ use glam::{vec3, Vec3};
 
 use wgpu::util::DeviceExt;
 
-use super::{vrenderer::VRenderer, vshader::VShader, VTexture};
+use super::{vbuffer::VBuffer, vrenderer::VRenderer, vshader::VShader, VTexture};
 #[derive(Component)]
 pub struct VMesh {
     vertex_buffer: wgpu::Buffer,
@@ -34,6 +34,29 @@ impl VMesh {
 
         render_pass.set_bind_group(0, state.camera_bind_group(), &[]);
         render_pass.set_bind_group(1, &lighting.lighting_bind_group, &[]);
+
+        for (i, tex) in &self.texture_bind_group {
+            render_pass.set_bind_group(*i + 2, tex, &[]);
+        }
+
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
+
+        render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+    }
+
+    pub fn draw_instance<'a>(
+        &'a self,
+        state: &'a VRenderer,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        model: &'a VBuffer,
+    ) {
+        // 1.
+
+        self.shader.draw(state, render_pass);
+
+        render_pass.set_bind_group(0, state.camera_bind_group(), &[]);
+        render_pass.set_bind_group(1, &model.bind_group, &[]);
 
         for (i, tex) in &self.texture_bind_group {
             render_pass.set_bind_group(*i + 2, tex, &[]);

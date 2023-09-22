@@ -7,7 +7,7 @@ use crate::camera_controller::{
 };
 use crate::game_data::GameData;
 use crate::gui::state_imgui::StateImgui;
-use crate::v::vrenderer::{draw, VRenderer};
+use crate::v::vrenderer::{draw_static, VRenderer};
 use crate::v::VTexture;
 use bevy_ecs::event::{EventReader, Events};
 use bevy_ecs::schedule::Schedule;
@@ -90,7 +90,7 @@ impl StateApp {
             on_key_in,
             update_camera,
             update_view_proj,
-            draw,
+            draw_static,
         ));
         Self {
             world,

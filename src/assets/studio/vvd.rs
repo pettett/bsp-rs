@@ -98,9 +98,9 @@ impl BinaryData for VVD {
             dst += fixups[i].count;
         }
 
-        if header.num_fixups > 0 {
-            println!("Fixups: {:?}", fixups);
-        }
+        // if header.num_fixups > 0 {
+        //     println!("Fixups: {:?}", fixups);
+        // }
 
         Ok(Self {
             header,

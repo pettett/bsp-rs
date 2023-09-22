@@ -9,9 +9,12 @@ use crate::{
         model::BSPModel,
         textures::{BSPTexData, BSPTexDataStringTable, BSPTexInfo},
     },
-    assets::{bsp::gamelump::load_gamelump, vpk::VPKDirectory, VMT},
+    assets::{bsp::gamelump::load_gamelump, studio::load_vmesh, vpk::VPKDirectory, VMT},
     game_data::GameData,
+    geo::{Prop, Static},
+    transform::Transform,
     v::{
+        vbuffer::VBuffer,
         vpath::{VGlobalPath, VLocalPath},
         vrenderer::VRenderer,
         vshader::VShader,
@@ -19,10 +22,10 @@ use crate::{
     },
     vertex::{UVAlphaVertex, UVVertex, Vertex},
 };
-use bevy_ecs::system::Commands;
-use glam::{ivec3, vec2, vec3, IVec3, Vec3, Vec4};
+use bevy_ecs::system::{Commands, Spawn};
+use glam::{ivec3, vec2, vec3, IVec3, Mat4, Quat, Vec3, Vec4};
 use rayon::prelude::*;
-use std::{collections::HashMap, num::NonZeroU32, path::Path, sync::Arc};
+use std::{collections::HashMap, f32::consts::PI, num::NonZeroU32, path::Path, sync::Arc};
 use wgpu::{util::DeviceExt, Device};
 
 #[derive(Default)]
@@ -394,12 +397,47 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
     let gamelump = load_gamelump(header.get_lump_header(LumpType::GameLump), &mut buffer).unwrap();
 
     for prop in &gamelump.props {
-        commands.spawn(VMesh::new_box(
-            device,
-            prop.m_Origin + Vec3::ONE,
-            prop.m_Origin - Vec3::ONE,
-            shader_lines.clone(),
-        ));
+        let path = gamelump.static_prop_names[prop.m_PropType as usize].as_str();
+
+        let m = load_vmesh(&VGlobalPath::new(&path), renderer, game_data);
+
+        match m {
+            Ok(m) => {
+                // euler angles in radians
+                let a = prop.m_Angles * PI / 180.0;
+                let rot = Quat::from_axis_angle(Vec3::Z, a.y)
+                    * Quat::from_axis_angle(Vec3::X, a.z)
+                    * Quat::from_axis_angle(Vec3::Y, a.x);
+
+                let t = Transform::new(prop.m_Origin.into(), rot);
+
+                let mat = t.get_local_to_world();
+
+                commands.spawn((
+                    m,
+                    Prop::new(
+                        t,
+                        VBuffer::new::<Mat4>(
+                            device,
+                            &renderer.model_bind_group_layout,
+                            mat,
+                            "model",
+                        ),
+                    ),
+                ));
+            }
+            Err(e) => println!("Error loading {path}: {e}"),
+        }
+
+        // commands.spawn((
+        //     VMesh::new_box(
+        //         device,
+        //         prop.m_Origin + Vec3::ONE,
+        //         prop.m_Origin - Vec3::ONE,
+        //         shader_lines.clone(),
+        //     ),
+        //     Static(),
+        // ));
     }
 
     println!("Loading BSP meshes...");
@@ -484,20 +522,18 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
             }
         }
         if all_success {
-            commands.spawn(mesh);
+            commands.spawn((mesh, Static()));
         }
     }
 
     let models = header.get_lump::<BSPModel>(&mut buffer);
 
-    for m in models.iter() {
-        commands.spawn(VMesh::new_box(
-            device,
-            m.mins(),
-            m.maxs(),
-            shader_lines.clone(),
-        ));
-    }
+    // for m in models.iter() {
+    //     commands.spawn((
+    //         VMesh::new_box(device, m.mins(), m.maxs(), shader_lines.clone()),
+    //         Static(),
+    //     ));
+    // }
 
     // Create a lighting buffer for use in all shaders
     insert_lighting_buffer(commands, &lighting_cols[..], renderer);

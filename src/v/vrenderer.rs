@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use bevy_ecs::{
     entity::Entity,
+    query::Has,
     system::{Commands, NonSendMut, Query, Res, Resource},
     world::World,
 };
@@ -11,8 +12,10 @@ use crate::{
     assets::bsp::lightmap::LightingData,
     camera::{Camera, CameraUniform},
     camera_controller::CameraController,
+    geo::{Prop, Static},
     gui::state_imgui::StateImgui,
     state::StateInstance,
+    transform::Transform,
 };
 
 use super::{VMesh, VTexture};
@@ -28,12 +31,14 @@ pub struct VRenderer {
     camera_buffer: wgpu::Buffer,
     camera_bind_group_layout: wgpu::BindGroupLayout,
     camera_bind_group: wgpu::BindGroup,
-
+    //TODO: Better way to handle these
     pub lighting_bind_group_layout: wgpu::BindGroupLayout,
+    pub model_bind_group_layout: wgpu::BindGroupLayout,
 }
 
-pub fn draw(
-    meshes: Query<(&VMesh,)>,
+pub fn draw_static(
+    static_meshes: Query<(&VMesh, &Static)>,
+    prop_meshes: Query<(&VMesh, &Prop)>,
     cameras: Query<(&CameraUniform,)>,
     mut imgui: NonSendMut<StateImgui>,
     renderer: Res<VRenderer>,
@@ -95,8 +100,18 @@ pub fn draw(
                 }),
             });
 
-        for (mesh,) in meshes.iter() {
+        for (mesh, _) in static_meshes.iter() {
             mesh.draw(&renderer, &mut render_pass, &lighting);
+        }
+
+        for (mesh, prop) in prop_meshes.iter() {
+            // renderer.queue().write_buffer(
+            //     &prop.model.buffer,
+            //     0,
+            //     bytemuck::cast_slice(&[prop.transform.get_local_to_world()]),
+            // );
+
+            mesh.draw_instance(&renderer, &mut render_pass, &prop.model);
         }
     }
 
@@ -230,6 +245,22 @@ impl VRenderer {
                 }],
                 label: Some("lighting_bind_group_layout"),
             });
+
+        let model_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+                label: Some("model bind group layout"),
+            });
+
         Self {
             window: Arc::new(window),
             instance: Arc::new(StateInstance::new(surface, device, queue)),
@@ -240,6 +271,7 @@ impl VRenderer {
             depth_texture,
             camera_buffer,
             lighting_bind_group_layout,
+            model_bind_group_layout,
             camera_bind_group,
         }
     }

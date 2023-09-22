@@ -1,6 +1,7 @@
+use bevy_ecs::component::Component;
 use glam::{Mat4, Quat, Vec3, Vec3A};
 
-#[derive(Debug, Copy, Clone, Default, bytemuck::Zeroable)]
+#[derive(Debug, Copy, Clone, Default, bytemuck::Zeroable, Component)]
 pub struct Transform {
     pos: Vec3A,
     rot: Quat,

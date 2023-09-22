@@ -10,10 +10,31 @@ pub trait VPath {
 pub struct VGlobalPath<'a> {
     path: &'a str,
 }
+
+impl<'a> VGlobalPath<'a> {
+    pub fn new(path: &'a str) -> Self {
+        Self { path }
+    }
+}
 pub struct VLocalPath<'a> {
     local_path: &'a str,
     root_directory: &'static str,
     ext: &'static str,
+}
+pub struct VSplitPath<'a> {
+    directory: &'a str,
+    filename: &'a str,
+    ext: &'a str,
+}
+
+impl<'a> VSplitPath<'a> {
+    pub fn new(directory: &'a str, filename: &'a str, ext: &'a str) -> Self {
+        Self {
+            directory,
+            filename,
+            ext,
+        }
+    }
 }
 impl<'a> VLocalPath<'a> {
     pub fn new(root_directory: &'static str, local_path: &'a str, ext: &'static str) -> Self {
@@ -82,5 +103,18 @@ impl<'a> VPath for VGlobalPath<'a> {
         } else {
             "".to_owned()
         }
+    }
+}
+impl<'a> VPath for VSplitPath<'a> {
+    fn ext(&self) -> &str {
+        self.ext
+    }
+
+    fn filename(&self) -> &str {
+        self.filename
+    }
+
+    fn dir(&self) -> String {
+        self.directory.to_owned()
     }
 }

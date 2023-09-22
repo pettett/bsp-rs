@@ -1,3 +1,4 @@
+pub mod vbuffer;
 pub mod vmesh;
 pub mod vpath;
 pub mod vrenderer;
