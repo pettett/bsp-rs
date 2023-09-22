@@ -12,7 +12,7 @@ pub use vtf::VTF;
 mod vtf_tests {
     use std::path::PathBuf;
 
-    use crate::{assets::vpk::VPKDirectory, util::v_path::VGlobalPath};
+    use crate::{assets::vpk::VPKDirectory, v::vpath::VGlobalPath};
 
     const PATH: &str =
         "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";

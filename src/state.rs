@@ -5,15 +5,15 @@ use crate::camera::update_view_proj;
 use crate::camera_controller::{
     on_key_in, on_mouse_in, on_mouse_mv, update_camera, KeyIn, MouseIn, MouseMv,
 };
-use crate::game_data::{Game, GameData};
+use crate::game_data::GameData;
 use crate::gui::state_imgui::StateImgui;
-use crate::v::VTexture;
-
 use crate::v::vrenderer::{draw, VRenderer};
+use crate::v::VTexture;
 use bevy_ecs::event::{EventReader, Events};
 use bevy_ecs::schedule::Schedule;
 use bevy_ecs::system::{Commands, Res};
 use bevy_ecs::world::{Mut, World};
+use ini::Ini;
 use winit::dpi::PhysicalSize;
 use winit::event::*;
 
@@ -67,8 +67,10 @@ pub struct MapChangeEvent(pub PathBuf);
 impl StateApp {
     /// Creating some of the wgpu types requires async code
     /// https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#state-new
-    pub async fn new(mut world: World, renderer: VRenderer) -> Self {
-        let game_data = GameData::load_game(Game::HalfLife2);
+    pub fn new(mut world: World, renderer: VRenderer) -> Self {
+        let ini = Ini::load_from_file("conf.ini").unwrap();
+
+        let game_data = GameData::from_ini(&ini);
 
         world.insert_non_send_resource(StateImgui::init(&game_data, &renderer));
         world.insert_resource(game_data);

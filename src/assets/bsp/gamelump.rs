@@ -7,7 +7,7 @@ use std::{
 use fixedstr::zstr;
 use glam::Vec3;
 
-use crate::{assets::bsp::header::BSPHeader, util::binary_data::BinaryData};
+use crate::binaries::BinaryData;
 
 use super::{lump::BSPLump, Lump};
 
@@ -38,8 +38,6 @@ struct dgamelump_t {
     filelen: i32, // length
 }
 
-impl BinaryData for dgamelump_t {}
-
 #[derive(Debug)]
 #[repr(C, packed)]
 pub struct PropDictEntry {
@@ -47,7 +45,6 @@ pub struct PropDictEntry {
 }
 
 impl BinaryData for PropDictEntry {}
-impl BinaryData for StaticPropLumpV5_t {}
 
 #[derive(Debug)]
 pub struct GameLump {
@@ -107,7 +104,7 @@ pub fn load_gamelump(lump: &BSPLump, buffer: &mut BufReader<File>) -> io::Result
 mod gamelump_tests {
     use std::{collections::HashMap, io::Seek, path::Path};
 
-    use crate::assets::bsp::LumpType;
+    use crate::assets::bsp::{header::BSPHeader, LumpType};
 
     use super::*;
 

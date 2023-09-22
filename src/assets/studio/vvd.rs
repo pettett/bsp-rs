@@ -1,5 +1,4 @@
-use super::BinOffset;
-use crate::binaries::BinaryData;
+use crate::binaries::{BinArray, BinOffset, BinaryData};
 use glam::{Vec2, Vec3, Vec4};
 use std::{io::Seek, mem};
 
@@ -43,10 +42,6 @@ struct VVDFixup {
     pub src: i32,
     pub count: i32,
 }
-
-impl BinaryData for ModelVertex {}
-impl BinaryData for VertexFileHeader {}
-impl BinaryData for VVDFixup {}
 
 pub struct VVD {
     pub header: VertexFileHeader,

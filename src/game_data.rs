@@ -1,34 +1,26 @@
+use bevy_ecs::system::Resource;
+use ini::Ini;
 use std::{
     io,
     path::{Path, PathBuf},
     sync::{Arc, OnceLock},
 };
 
-use bevy_ecs::system::Resource;
-
 use crate::{
     assets::vpk::VPKDirectory,
     assets::VMT,
     assets::{vpk::VPKFile, vtf::VTF},
     binaries::BinaryData,
-    util::v_path::VPath,
+    v::vpath::VPath,
 };
 #[derive(Resource)]
 pub struct GameData {
     path: PathBuf,
     maps: PathBuf,
-    starter_map: &'static Path,
+    starter_map: PathBuf,
     dirs: Vec<Arc<VPKDirectory>>,
 }
 
-pub enum Game {
-    HalfLife2,
-    HalfLife2Ep1,
-    HalfLife2Ep2,
-    Portal,
-    Portal2,
-    TeamFortress2,
-}
 impl GameData {
     pub fn load_vmt(&self, path: &dyn VPath) -> Option<&Arc<VMT>> {
         for d in &self.dirs {
@@ -60,75 +52,102 @@ impl GameData {
         }
         None
     }
+    pub fn from_ini(ini: &Ini) -> Self {
+        let mut path = PathBuf::new();
 
-    pub fn load_game(game: Game) -> Self {
-        let path =
-            Path::new("D:\\Program Files (x86)\\Steam\\steamapps\\common").join(match game {
-                Game::HalfLife2 | Game::HalfLife2Ep1 | Game::HalfLife2Ep2 => "Half-Life 2",
-                Game::Portal => "Portal",
-                Game::Portal2 => "Portal 2",
-                Game::TeamFortress2 => "Team Fortress 2",
-            });
+        let launch = ini.section(Some("launch")).unwrap();
 
-        match game {
-            Game::HalfLife2 => Self {
-                dirs: vec![
-                    Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
-                    Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
-                ],
-                starter_map: Path::new("d1_trainstation_02.bsp"),
-                maps: path.join("hl2\\maps"),
-                path,
-            },
-            Game::HalfLife2Ep1 => Self {
-                dirs: vec![
-                    Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
-                    Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
-                    Arc::new(VPKDirectory::load(path.join("episodic\\ep1_pak_dir.vpk")).unwrap()),
-                ],
-                starter_map: Path::new("ep1_c17_01.bsp"),
-                maps: path.join("episodic\\maps"),
-                path,
-            },
-            Game::HalfLife2Ep2 => Self {
-                dirs: vec![
-                    Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
-                    Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
-                    Arc::new(VPKDirectory::load(path.join("ep2\\ep2_pak_dir.vpk")).unwrap()),
-                ],
-                starter_map: Path::new("ep2_outland_07.bsp"),
-                maps: path.join("ep2\\maps"),
-                path,
-            },
-            Game::Portal => Self {
-                dirs: vec![
-                    Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
-                    Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
-                    Arc::new(VPKDirectory::load(path.join("portal\\portal_pak_dir.vpk")).unwrap()),
-                ],
-                starter_map: Path::new("testchmb_a_02.bsp"),
-                maps: path.join("portal\\maps"),
-                path,
-            },
-            Game::Portal2 => Self {
-                dirs: vec![Arc::new(
-                    VPKDirectory::load(path.join("portal2\\pak01_dir.vpk")).unwrap(),
-                )],
-                starter_map: Path::new("sp_a4_laser_platform.bsp"),
-                maps: path.join("portal2\\maps"),
-                path,
-            },
-            Game::TeamFortress2 => Self {
-                dirs: vec![
-                    Arc::new(VPKDirectory::load(path.join("tf\\tf2_misc_dir.vpk")).unwrap()),
-                    Arc::new(VPKDirectory::load(path.join("tf\\tf2_textures_dir.vpk")).unwrap()),
-                ],
-                starter_map: Path::new("ctf_2fort.bsp"),
-                maps: path.join("tf\\maps"),
-                path,
-            },
+        let game = ini.section(Some(launch.get("game")).unwrap()).unwrap();
+        let root = launch.get("root").unwrap();
+        path.push(root);
+        let name = game.get("name").unwrap();
+        let map = game.get("map").unwrap();
+        path.push(name);
+
+        let maps = path.join(game.get("maps").unwrap());
+
+        let mut dirs = Vec::new();
+        for vpk in game.get_all("vpk") {
+            println!("{vpk}");
+
+            dirs.push(Arc::new(VPKDirectory::load(path.join(vpk)).unwrap()));
+        }
+
+        GameData {
+            starter_map: maps.join(map),
+            maps,
+            dirs,
+            path,
         }
     }
+    // pub fn load_game(game: Game) -> Self {
+    //     let path =
+    //         Path::new("D:\\Program Files (x86)\\Steam\\steamapps\\common").join(match game {
+    //             Game::HalfLife2 | Game::HalfLife2Ep1 | Game::HalfLife2Ep2 => "Half-Life 2",
+    //             Game::Portal => "Portal",
+    //             Game::Portal2 => "Portal 2",
+    //             Game::TeamFortress2 => "Team Fortress 2",
+    //         });
+
+    //     match game {
+    //         Game::HalfLife2 => Self {
+    //             dirs: vec![
+    //                 Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
+    //                 Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
+    //             ],
+    //             starter_map: Path::new("d1_trainstation_02.bsp"),
+    //             maps: path.join("hl2\\maps"),
+    //             path,
+    //         },
+    //         Game::HalfLife2Ep1 => Self {
+    //             dirs: vec![
+    //                 Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
+    //                 Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
+    //                 Arc::new(VPKDirectory::load(path.join("episodic\\ep1_pak_dir.vpk")).unwrap()),
+    //             ],
+    //             starter_map: Path::new("ep1_c17_01.bsp"),
+    //             maps: path.join("episodic\\maps"),
+    //             path,
+    //         },
+    //         Game::HalfLife2Ep2 => Self {
+    //             dirs: vec![
+    //                 Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
+    //                 Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
+    //                 Arc::new(VPKDirectory::load(path.join("ep2\\ep2_pak_dir.vpk")).unwrap()),
+    //             ],
+    //             starter_map: Path::new("ep2_outland_07.bsp"),
+    //             maps: path.join("ep2\\maps"),
+    //             path,
+    //         },
+    //         Game::Portal => Self {
+    //             dirs: vec![
+    //                 Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
+    //                 Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
+    //                 Arc::new(VPKDirectory::load(path.join("portal\\portal_pak_dir.vpk")).unwrap()),
+    //             ],
+    //             starter_map: Path::new("testchmb_a_02.bsp"),
+    //             maps: path.join("portal\\maps"),
+    //             path,
+    //         },
+    //         Game::Portal2 => Self {
+    //             dirs: vec![Arc::new(
+    //                 VPKDirectory::load(path.join("portal2\\pak01_dir.vpk")).unwrap(),
+    //             )],
+    //             starter_map: Path::new("sp_a4_laser_platform.bsp"),
+    //             maps: path.join("portal2\\maps"),
+    //             path,
+    //         },
+    //         Game::TeamFortress2 => Self {
+    //             dirs: vec![
+    //                 Arc::new(VPKDirectory::load(path.join("tf\\tf2_misc_dir.vpk")).unwrap()),
+    //                 Arc::new(VPKDirectory::load(path.join("tf\\tf2_textures_dir.vpk")).unwrap()),
+    //             ],
+    //             starter_map: Path::new("ctf_2fort.bsp"),
+    //             maps: path.join("tf\\maps"),
+    //             path,
+    //         },
+    //     }
+    // }
 
     pub fn path(&self) -> &Path {
         &self.path
@@ -143,6 +162,6 @@ impl GameData {
     }
 
     pub fn starter_map(&self) -> &Path {
-        self.starter_map
+        &self.starter_map
     }
 }

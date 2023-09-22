@@ -21,18 +21,10 @@
 
 // To get the latest header for specific game, please use the studio.h file in the Valve's SDK instead.
 
-use std::{
-    io::{self, BufRead, BufReader, Read, Seek, SeekFrom},
-    marker::PhantomData,
-    mem,
-};
-
 use fixedstr::zstr;
 use glam::Vec3;
 
-use crate::binaries::BinaryData;
-
-use super::{BinArray, BinOffset};
+use crate::binaries::{BinArray, BinOffset, BinaryData};
 
 #[repr(C, packed)]
 pub struct MDLHeader {
@@ -200,7 +192,6 @@ pub struct MDLHeader {
                       //  */
 }
 
-impl BinaryData for MDLHeader {}
 unsafe impl bytemuck::Zeroable for MDLHeader {}
 
 // body part index
@@ -214,7 +205,6 @@ pub struct mstudiobodyparts_t {
     pub modelindex: BinOffset,
 }
 
-impl BinaryData for mstudiobodyparts_t {}
 unsafe impl bytemuck::Zeroable for mstudiobodyparts_t {}
 
 #[repr(C, packed)]
@@ -235,8 +225,6 @@ pub struct mstudiotexture_t {
                         // Struct is 64 bytes long
 }
 
-impl BinaryData for mstudiotexture_t {}
-
 #[repr(C, packed)]
 pub struct mstudiomodel_t {
     pub name: zstr<64>,
@@ -256,7 +244,6 @@ pub struct mstudiomodel_t {
     unused: [i32; 8], // remove as appropriate
 }
 
-impl BinaryData for mstudiomodel_t {}
 unsafe impl bytemuck::Zeroable for mstudiomodel_t {}
 
 #[repr(C, packed)]
@@ -277,14 +264,12 @@ pub struct mstudiomesh_t {
     _unused1: [i32; 8], // remove as appropriate
 }
 
-impl BinaryData for mstudiomesh_t {}
 unsafe impl bytemuck::Zeroable for mstudiomesh_t {}
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug)]
 pub struct mstudionill_t;
 
-impl BinaryData for mstudionill_t {}
 unsafe impl bytemuck::Zeroable for mstudionill_t {}
 
 // Known flags Name 	Position 	Details

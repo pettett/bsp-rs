@@ -37,9 +37,6 @@ pub struct VTFHeader73 {
     padding3: [u8; 8], // Necessary on certain compilers
 }
 
-impl BinaryData for VTFHeader {}
-impl BinaryData for VTFHeader73 {}
-
 ///Tags
 ///    { '\x01', '\0', '\0' } - Low-res (thumbnail) image data.
 ///    { '\x30', '\0', '\0' } - High-res image data.
@@ -55,5 +52,3 @@ pub struct ResourceEntryInfo {
     pub flags: u8, // Resource entry flags. The only known flag is 0x2, which indicates that no data chunk corresponds to this resource.
     pub offset: u32, // The offset of this resource's data in the file.
 }
-
-impl BinaryData for ResourceEntryInfo {}

@@ -6,7 +6,6 @@ pub mod game_data;
 pub mod gui;
 pub mod state;
 pub mod transform;
-pub mod util;
 pub mod v;
 pub mod vertex;
 
@@ -20,10 +19,7 @@ use winit::{
     window::WindowBuilder,
 };
 
-pub async fn run<F>(init: F)
-where
-    F: FnOnce(&mut StateApp) -> (),
-{
+pub async fn vinit() -> (StateApp, EventLoop<()>) {
     env_logger::init();
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
@@ -31,10 +27,10 @@ where
 
     let renderer = VRenderer::new(window, &mut world).await;
 
-    let mut state = StateApp::new(world, renderer).await;
+    (StateApp::new(world, renderer), event_loop)
+}
 
-    init(&mut state);
-
+pub fn vrun(mut state: StateApp, event_loop: EventLoop<()>) -> ! {
     //let instance = state.renderer().instance();
     //let debug_mesh = state.debug_mesh.clone();
     //thread::spawn(move || {
@@ -96,5 +92,5 @@ where
             }
             _ => {}
         };
-    });
+    })
 }

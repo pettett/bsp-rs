@@ -11,8 +11,12 @@ use crate::{
     },
     assets::{bsp::gamelump::load_gamelump, vpk::VPKDirectory, VMT},
     game_data::GameData,
-    util::v_path::{VGlobalPath, VLocalPath},
-    v::{vrenderer::VRenderer, vshader::VShader, VMesh},
+    v::{
+        vpath::{VGlobalPath, VLocalPath},
+        vrenderer::VRenderer,
+        vshader::VShader,
+        VMesh,
+    },
     vertex::{UVAlphaVertex, UVVertex, Vertex},
 };
 use bevy_ecs::system::Commands;

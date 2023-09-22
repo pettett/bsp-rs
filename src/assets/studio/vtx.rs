@@ -56,9 +56,7 @@
 
 use std::mem;
 
-use crate::binaries::BinaryData;
-
-use super::BinArray;
+use crate::binaries::{BinArray, BinOffset, BinaryData};
 
 pub struct VTX {
     pub header: VTXFileHeader,
@@ -194,7 +192,6 @@ pub struct VTXFileHeader {
     body_parts: BinArray<BodyPartHeader>,
 }
 
-impl BinaryData for VTXFileHeader {}
 // This is the header structure for the current VERSION7 .vtx file
 // Body array
 
@@ -212,7 +209,6 @@ struct BodyPartHeader {
     //Model array
     models: BinArray<ModelHeader>,
 }
-impl BinaryData for BodyPartHeader {}
 
 // Model array
 
@@ -230,7 +226,6 @@ struct ModelHeader {
     //LOD mesh array
     lods: BinArray<ModelLODHeader>,
 }
-impl BinaryData for ModelHeader {}
 
 // LOD Mesh Array
 
@@ -248,7 +243,6 @@ struct ModelLODHeader {
     switch_point: f32,
 }
 
-impl BinaryData for ModelLODHeader {}
 // Mesh array
 
 // The mesh array is a list of MeshHeader objects.
@@ -267,8 +261,6 @@ struct VTXMeshHeader {
     strip_groups: BinArray<StripGroupHeader>,
     pub flags: u8,
 }
-
-impl BinaryData for VTXMeshHeader {}
 // Strip Group Array
 
 // The strip group array is a list of StripGroupHeader objects.
@@ -303,8 +295,6 @@ pub struct StripGroupHeader {
     pub numopology_indices: i32,
     pub topology_offset: i32,
 }
-
-impl BinaryData for StripGroupHeader {}
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
@@ -362,7 +352,6 @@ pub struct StripHeader {
     pub topology_offset: i32,
 }
 
-impl BinaryData for StripHeader {}
 // Like in StripGroupHeader, the last eight bytes/two i32 fields are present if the MDL file's header shows version 49 or higher. Presumably, (
 // Todo:
 // Verify
@@ -385,8 +374,6 @@ pub struct VTXVertex {
     // for hw skinned verts, these are hardware bone indices
     pub bone_id: [i8; 3],
 }
-
-impl BinaryData for VTXVertex {}
 
 // origMeshVertID defines the index of this vertex that is to be read from the linked .VVD file's vertex array
 // Note:

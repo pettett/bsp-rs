@@ -35,7 +35,7 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use crate::{binaries::BinaryData, util::v_path::VPath};
+use crate::{binaries::BinaryData, v::vpath::VPath};
 
 use super::{
     studio::{vtx::VTX, vvd::VVD, MDL},
@@ -69,8 +69,6 @@ pub struct VPKHeaderV2 {
     signature_section_size: u32,
 }
 
-impl BinaryData for VPKHeaderV1 {}
-impl BinaryData for VPKHeaderV2 {}
 impl VPKHeaderV1 {
     pub fn pak_header() -> Self {
         Self {
@@ -102,8 +100,6 @@ struct VPKDirectoryEntry {
 
     Terminator: u16, //  = 0xffff
 }
-
-impl BinaryData for VPKDirectoryEntry {}
 
 pub struct VPKFile {
     entry: VPKDirectoryEntry,
