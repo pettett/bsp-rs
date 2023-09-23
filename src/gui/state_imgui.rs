@@ -1,16 +1,12 @@
 use std::{sync::Arc, time::Instant};
 
-use bevy_ecs::system::Commands;
+use bevy_ecs::{component::Component, system::Commands};
 use imgui::{Condition, FontSource};
 use imgui_wgpu::{Renderer, RendererConfig};
 
 use winit::{event::Event, window::Window};
 
-use crate::{
-    game_data::{GameData},
-    gui::Viewable,
-    v::vrenderer::VRenderer,
-};
+use crate::{game_data::GameData, gui::Viewable, v::vrenderer::VRenderer};
 
 use super::map_select::MapSelect;
 
@@ -23,7 +19,7 @@ pub struct StateImgui {
     //puffin_ui : puffin_imgui::ProfilerUi,
     windows: Vec<WindowState>,
 }
-
+#[derive(Component)]
 pub struct WindowState {
     opened: bool,
     view: Arc<dyn Viewable>,
@@ -124,7 +120,7 @@ impl StateImgui {
         }
     }
 
-    pub fn init(game_data: &GameData, renderer: &VRenderer) -> Self {
+    pub fn init(renderer: &VRenderer) -> Self {
         // Set up dear imgui
         let mut imgui = imgui::Context::create();
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
@@ -173,15 +169,15 @@ impl StateImgui {
         //let dx1_data = dir.load_vtf("materials/metal/metalfloor001a.vtf").unwrap();
 
         let last_cursor = None;
-        let mut windows = Vec::<WindowState>::new();
+        let windows = Vec::<WindowState>::new();
 
-        for d in game_data.dirs() {
-            windows.push(WindowState::new(d.clone()));
-        }
+        // for d in game_data.dirs() {
+        //     windows.push(WindowState::new(d.clone()));
+        // }
 
-        windows.push(WindowState::new(Arc::new(
-            MapSelect::new(game_data.maps()).unwrap(),
-        )));
+        // windows.push(WindowState::new(Arc::new(
+        //     MapSelect::new(game_data.maps()).unwrap(),
+        // )));
 
         Self {
             imgui,

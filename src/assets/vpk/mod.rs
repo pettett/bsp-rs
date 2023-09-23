@@ -27,6 +27,8 @@
 pub mod gui;
 pub mod pak;
 
+use crate::{binaries::BinaryData, v::vpath::VPath};
+use ahash::{AHasher, RandomState};
 use std::{
     collections::HashMap,
     fs::File,
@@ -34,8 +36,6 @@ use std::{
     path::PathBuf,
     sync::{Arc, OnceLock},
 };
-
-use crate::{binaries::BinaryData, v::vpath::VPath};
 
 use super::{
     studio::{vtx::VTX, vvd::VVD, MDL},
@@ -162,7 +162,11 @@ pub struct VPKDirectory {
     header2: Option<VPKHeaderV2>,
     max_pack_file: u16,
     /// Files map, mapped by extension, then directory, then filename
-    pub files: HashMap<String, HashMap<String, HashMap<String, VPKFile>>>,
+    pub files: HashMap<
+        String,
+        HashMap<String, HashMap<String, VPKFile, RandomState>, RandomState>,
+        RandomState,
+    >,
 }
 
 impl VPKDirectory {
@@ -203,18 +207,24 @@ impl VPKDirectory {
         }
 
         let mut max_pack_file = 0;
-        let mut files = HashMap::<String, HashMap<String, HashMap<String, VPKFile>>>::new();
+        let mut files = HashMap::<_, HashMap<_, HashMap<_, _, _>, _>, _>::default();
 
         loop {
             let ext = read_string(&mut buffer);
             if ext.len() == 0 {
                 break;
             }
+
+            let ext_files = files.entry(ext).or_default();
+
             loop {
                 let dir = read_string(&mut buffer);
                 if dir.len() == 0 {
                     break;
                 }
+
+                let dir_files = ext_files.entry(dir).or_default();
+
                 loop {
                     let filename = read_string(&mut buffer);
 
@@ -240,9 +250,6 @@ impl VPKDirectory {
                     } else {
                         None
                     };
-
-                    let ext_files = files.entry(ext.clone()).or_default();
-                    let dir_files = ext_files.entry(dir.clone()).or_default();
 
                     dir_files.insert(
                         filename,

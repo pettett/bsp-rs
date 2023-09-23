@@ -4,7 +4,7 @@ use imgui_wgpu::Renderer;
 
 use crate::v::vrenderer::VRenderer;
 
-pub trait Viewable {
+pub trait Viewable: Sync + Send {
     fn gui_view(
         &self,
         ui: &Ui,

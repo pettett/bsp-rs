@@ -39,7 +39,7 @@ pub fn draw_static(
     cameras: Query<(&CameraUniform,)>,
     mut imgui: NonSendMut<StateImgui>,
     renderer: Res<VRenderer>,
-    lighting: Res<LightingData>,
+    lighting_opt: Option<Res<LightingData>>,
     mut commands: Commands,
 ) {
     let output = renderer.instance.surface().get_current_texture().unwrap();
@@ -97,8 +97,10 @@ pub fn draw_static(
                 }),
             });
 
-        for (mesh, _) in static_meshes.iter() {
-            mesh.draw(&renderer, &mut render_pass, &lighting);
+        if let Some(lighting) = &lighting_opt {
+            for (mesh, _) in static_meshes.iter() {
+                mesh.draw(&renderer, &mut render_pass, lighting);
+            }
         }
 
         for (mesh, prop) in prop_meshes.iter() {

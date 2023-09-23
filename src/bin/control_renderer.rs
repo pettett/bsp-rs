@@ -1,10 +1,28 @@
+use std::{cell::RefCell, sync::Arc};
+
 use bevy_ecs::system::{Commands, Res, SystemState};
-use bsp_explorer::{game_data::GameData, v::vrenderer::VRenderer, vinit, vrun};
+use bsp_explorer::{
+    game_data::GameData, gui::state_imgui::StateImgui, state::StateApp, v::vrenderer::VRenderer,
+    vinit, vrun,
+};
+use ini::Ini;
 
 pub fn main() {
     println!("Starting...");
 
-    let (mut state, event_loop) = pollster::block_on(vinit());
+    let (state, event_loop) = pollster::block_on(vinit());
+
+    vrun(state, event_loop);
+}
+
+fn init_world(state_arc: Arc<RefCell<StateApp>>) {
+    let mut state = state_arc.borrow_mut();
+
+    let ini = Ini::load_from_file("conf.ini").unwrap();
+
+    let game_data = GameData::from_ini(&ini);
+
+    state.world_mut().insert_resource(game_data);
 
     // Construct a `SystemState` struct, passing in a tuple of `SystemParam`
     // as if you were writing an ordinary system.
@@ -24,6 +42,4 @@ pub fn main() {
     );
 
     system_state.apply(state.world_mut());
-
-    vrun(state, event_loop);
 }

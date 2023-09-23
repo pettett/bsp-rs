@@ -68,13 +68,9 @@ impl StateApp {
     /// Creating some of the wgpu types requires async code
     /// https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#state-new
     pub fn new(mut world: World, renderer: VRenderer) -> Self {
-        let ini = Ini::load_from_file("conf.ini").unwrap();
-
-        let game_data = GameData::from_ini(&ini);
-
-        world.insert_non_send_resource(StateImgui::init(&game_data, &renderer));
-        world.insert_resource(game_data);
+        world.insert_non_send_resource(StateImgui::init(&renderer));
         world.insert_resource(renderer);
+
         let mut schedule = Schedule::default();
 
         world.insert_resource(Events::<MouseIn>::default());
@@ -166,8 +162,6 @@ impl StateApp {
         //    .process_events(event, can_use_mouse)
     }
 
-    pub fn update(&mut self) {}
-
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         puffin::profile_function!();
 
@@ -198,9 +192,11 @@ pub fn load_map(
     mut events: EventReader<MapChangeEvent>,
     mut commands: Commands,
     renderer: Res<VRenderer>,
-    game_data: Res<GameData>,
+    game_data_opt: Option<Res<GameData>>,
 ) {
-    for e in events.iter() {
-        load_bsp(&e.0, &mut commands, &game_data, &renderer)
+    if let Some(game_data) = &game_data_opt {
+        for e in events.iter() {
+            load_bsp(&e.0, &mut commands, &game_data, &renderer)
+        }
     }
 }

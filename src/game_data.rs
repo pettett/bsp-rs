@@ -4,6 +4,7 @@ use std::{
     io,
     path::{Path, PathBuf},
     sync::{Arc, OnceLock},
+    time::Instant,
 };
 
 use crate::{
@@ -53,6 +54,9 @@ impl GameData {
         None
     }
     pub fn from_ini(ini: &Ini) -> Self {
+        println!("Loading game data... ");
+        let now = Instant::now();
+
         let mut path = PathBuf::new();
 
         let launch = ini.section(Some("launch")).unwrap();
@@ -73,6 +77,7 @@ impl GameData {
             dirs.push(Arc::new(VPKDirectory::load(path.join(vpk)).unwrap()));
         }
 
+        println!("Took {:?}", now.elapsed());
         GameData {
             starter_map: maps.join(map),
             maps,

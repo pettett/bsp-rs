@@ -10,6 +10,8 @@ pub mod transform;
 pub mod v;
 pub mod vertex;
 
+use std::{cell::RefCell, sync::Arc};
+
 use bevy_ecs::world::World;
 use state::StateApp;
 
@@ -20,7 +22,7 @@ use winit::{
     window::WindowBuilder,
 };
 
-pub async fn vinit() -> (StateApp, EventLoop<()>) {
+pub async fn vinit() -> (Arc<RefCell<StateApp>>, EventLoop<()>) {
     env_logger::init();
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
@@ -28,10 +30,13 @@ pub async fn vinit() -> (StateApp, EventLoop<()>) {
 
     let renderer = VRenderer::new(window, &mut world).await;
 
-    (StateApp::new(world, renderer), event_loop)
+    (
+        Arc::new(RefCell::new(StateApp::new(world, renderer))),
+        event_loop,
+    )
 }
 
-pub fn vrun(mut state: StateApp, event_loop: EventLoop<()>) -> ! {
+pub fn vrun(state_arc: Arc<RefCell<StateApp>>, event_loop: EventLoop<()>) -> ! {
     //let instance = state.renderer().instance();
     //let debug_mesh = state.debug_mesh.clone();
     //thread::spawn(move || {
@@ -45,6 +50,10 @@ pub fn vrun(mut state: StateApp, event_loop: EventLoop<()>) -> ! {
     //});
 
     event_loop.run(move |event, _, control_flow| {
+        let Ok(mut state) = state_arc.try_borrow_mut() else {
+            return;
+        };
+
         let mouse_capture = state.handle_event(&event);
 
         match event {
@@ -75,11 +84,13 @@ pub fn vrun(mut state: StateApp, event_loop: EventLoop<()>) -> ! {
                 }
             },
             Event::RedrawRequested(window_id) if window_id == state.renderer().window().id() => {
-                state.update();
                 match state.render() {
                     Ok(_) => {}
                     // Reconfigure the surface if lost
-                    Err(wgpu::SurfaceError::Lost) => state.resize(state.size()),
+                    Err(wgpu::SurfaceError::Lost) => {
+                        let size = state.size();
+                        state.resize(size);
+                    }
                     // The system is out of memory, we should probably quit
                     Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
                     // All other errors (Outdated, Timeout) should be resolved by the next frame

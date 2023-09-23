@@ -36,7 +36,7 @@ pub fn fixup_remapping_search(fixup_table: &Box<[Fixup]>, dst_idx: u16) -> u16 {
 }
 pub fn load_vmesh(
     mdl_path: &dyn VPath,
-    renderer: &VRenderer,
+    device: &wgpu::Device,
     shader_tex: Arc<VShader>,
     game_data: &GameData,
 ) -> Result<VMesh, &'static str> {
@@ -106,7 +106,7 @@ pub fn load_vmesh(
                 let ind_count = s.header.num_indices as usize;
 
                 let m = VMesh::new(
-                    renderer.device(),
+                    device,
                     &verts[..],
                     &indices[ind_start..ind_start + ind_count],
                     shader_tex,

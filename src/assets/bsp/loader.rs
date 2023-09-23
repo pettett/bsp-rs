@@ -25,7 +25,7 @@ use crate::{
 use bevy_ecs::system::Commands;
 use glam::{ivec3, vec2, IVec3, Mat4, Quat, Vec3, Vec4};
 use rayon::prelude::*;
-use std::{collections::HashMap, f32::consts::PI, path::Path, sync::Arc};
+use std::{collections::HashMap, f32::consts::PI, path::Path, sync::Arc, time::Instant};
 use wgpu::util::DeviceExt;
 
 #[derive(Default)]
@@ -266,6 +266,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
     let device = renderer.device();
     let map_path = game_data.maps().join(map);
     println!("Loading BSP File {:?}...", map_path);
+    let now = Instant::now();
 
     let (header, mut buffer) = BSPHeader::load(&map_path).unwrap();
 
@@ -284,7 +285,8 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
     //mesh.load_debug_edges(instance.clone(), &header, &mut buffer);
     //state.add_mesh(mesh);
 
-    println!("Loading BSP Headers...");
+    println!("Took {:?}. Loading BSP Headers...", now.elapsed());
+    let now = Instant::now();
 
     let faces = header.get_lump::<BSPFace>(&mut buffer);
     let surf_edges = header.get_lump::<BSPSurfEdge>(&mut buffer);
@@ -316,7 +318,8 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         lighting_cols = vec![Vec4::ONE; entries];
     }
 
-    println!("Loading BSP Faces...");
+    println!("Took {:?}. Loading BSP Faces...", now.elapsed());
+    let now = Instant::now();
     let textured_tris = build_meshes(
         faces,
         &verts,
@@ -328,12 +331,14 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         &surf_edges,
     );
 
-    println!("Loading BSP Pak...");
+    println!("Took {:?}. Loading BSP Pak...", now.elapsed());
+    let now = Instant::now();
     let pak_header = header.get_lump_header(LumpType::PakFile);
 
     let pak: VPKDirectory = pak_header.read_binary(&mut buffer).unwrap();
 
-    println!("Loading BSP Texture strings...");
+    println!("Took {:?}. Loading BSP Texture strings...", now.elapsed());
+    let now = Instant::now();
     let tex_data_string_table = header.get_lump::<BSPTexDataStringTable>(&mut buffer);
     let tex_data_string_data = header.get_lump_header(LumpType::TexDataStringData);
 
@@ -348,7 +353,8 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         })
         .collect();
 
-    println!("Loading BSP Materials...");
+    println!("Took {:?}. Loading BSP Materials...", now.elapsed());
+    let now = Instant::now();
     let materials: HashMap<i32, &Arc<VMT>> = textured_tris
         .par_iter()
         .filter_map(|(tex, _tris)| {
@@ -386,13 +392,15 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         })
         .collect();
 
-    println!("Loading BSP shaders...");
+    println!("Took {:?}. Loading BSP shaders...", now.elapsed());
+    let now = Instant::now();
     let shader_lines = Arc::new(VShader::new_white_lines::<Vec3>(renderer));
     let shader_tex = Arc::new(VShader::new_textured(renderer));
     let _shader_tex_envmap = Arc::new(VShader::new_textured_envmap(renderer));
     let shader_disp = Arc::new(VShader::new_displacement(renderer));
 
-    println!("Loading BSP static props...");
+    println!("Took {:?}. Loading BSP static props...", now.elapsed());
+    let now = Instant::now();
 
     let gamelump = load_gamelump(header.get_lump_header(LumpType::GameLump), &mut buffer).unwrap();
 
@@ -406,7 +414,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
 
         let m = load_vmesh(
             &VGlobalPath::new(&path),
-            renderer,
+            renderer.device(),
             prop_shader.clone(),
             game_data,
         );
@@ -452,7 +460,8 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         commands.spawn(bundle);
     }
 
-    println!("Loading BSP meshes...");
+    println!("Took {:?}. Loading BSP meshes...", now.elapsed());
+    let now = Instant::now();
 
     for (tex, builder) in &textured_tris {
         let Some(vmt) = materials.get(tex) else {
@@ -537,6 +546,8 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
             commands.spawn((mesh, Static()));
         }
     }
+
+    println!("Took {:?}", now.elapsed());
 
     let _models = header.get_lump::<BSPModel>(&mut buffer);
 
