@@ -15,7 +15,6 @@ where
 {
     fn max() -> usize;
     fn lump_type() -> LumpType;
-    fn validate(lump: &Box<[Self]>);
 }
 
 // https://developer.valvesoftware.com/wiki/BSP_(Source)

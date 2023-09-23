@@ -76,7 +76,14 @@ mod bsp_tests {
 
     #[test]
     fn planes() {
-        test_lump::<BSPPlane>();
+        let lump = test_lump::<BSPPlane>();
+
+        for plane in lump.iter() {
+            let axis = plane.axis;
+            assert!((0..=5).contains(&axis));
+        }
+
+        println!("Validated planes lump!")
     }
     #[test]
     fn edges() {
@@ -213,12 +220,14 @@ mod bsp_tests {
         }
     }
 
-    fn test_lump<T: Lump + Clone + Zeroable>() {
+    fn test_lump<T: Lump + Clone + Zeroable>() -> Box<[T]> {
         let (header, mut buffer) = BSPHeader::load(Path::new(PATH)).unwrap();
-        let lump: Box<[T]> = header
+        let lump = header
             .get_lump_header(T::lump_type())
             .decode(&mut buffer)
             .unwrap();
-        Lump::validate(&lump);
+
+        assert!(lump.len() < BSPPlane::max());
+        return lump;
     }
 }

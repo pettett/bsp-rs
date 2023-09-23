@@ -1,37 +1,37 @@
 use std::mem;
 
 use crate::{
-    assets::studio::mdl_headers::{mstudiomesh_t, mstudiomodel_t},
+    assets::studio::mdl_headers::{StudioMesh, StudioModel},
     binaries::BinaryData,
 };
 
-use super::mdl_headers::{self, mstudiobodyparts_t, mstudiotexture_t};
+use super::mdl_headers::{self, StudioBodyparts, StudioTexture};
 
 pub struct MDL {
     pub header: mdl_headers::MDLHeader,
     pub body: Vec<MDLBodyPart>,
-    pub text: Vec<(i64, mstudiotexture_t)>,
+    pub text: Vec<(i64, StudioTexture)>,
 }
 
 pub struct MDLBodyPart {
     pub name: String,
-    pub head: mstudiobodyparts_t,
+    pub head: StudioBodyparts,
     pub models: Vec<MDLModel>,
 }
 
 pub struct MDLModel {
-    pub head: mstudiomodel_t,
+    pub head: StudioModel,
     pub meshes: Vec<MDLMesh>,
 }
 
 pub struct MDLMesh {
-    pub head: mstudiomesh_t,
+    pub head: StudioMesh,
 }
 
 impl BinaryData for MDL {
     fn read<R: std::io::Read + std::io::Seek>(
         buffer: &mut std::io::BufReader<R>,
-        max_size: Option<usize>,
+        _max_size: Option<usize>,
     ) -> std::io::Result<Self>
     where
         Self: Sized,
@@ -53,7 +53,7 @@ impl BinaryData for MDL {
             let mut models = Vec::<MDLModel>::new();
 
             //println!("{:?}", t);
-            let model_heads: Vec<(i64, mstudiomodel_t)> =
+            let model_heads: Vec<(i64, StudioModel)> =
                 t.modelindex.read_array(buffer, i, &mut pos, t.nummodels)?;
 
             for (ii, model) in model_heads {
@@ -62,18 +62,17 @@ impl BinaryData for MDL {
                 assert!(model.vertexindex % 0x30 == 0);
                 assert!(model.tangentsindex % 0x10 == 0);
 
-                let v = model.vertexindex;
+                let _v = model.vertexindex;
 
-                let first_vertex = (model.vertexindex / 0x30) | 0;
-                let first_tangent = (model.tangentsindex / 0x10) | 0;
+                let _first_vertex = (model.vertexindex / 0x30) | 0;
+                let _first_tangent = (model.tangentsindex / 0x10) | 0;
 
                 //println!("{first_vertex} {first_tangent}");
 
-                let mesh_heads: Vec<(i64, mstudiomesh_t)> =
-                    model.meshes.read(buffer, ii, &mut pos)?;
+                let mesh_heads: Vec<(i64, StudioMesh)> = model.meshes.read(buffer, ii, &mut pos)?;
                 let mut meshes = Vec::<MDLMesh>::new();
 
-                for (iii, mesh) in mesh_heads {
+                for (_iii, mesh) in mesh_heads {
                     meshes.push(MDLMesh { head: mesh })
                 }
 

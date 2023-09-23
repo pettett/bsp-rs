@@ -35,7 +35,7 @@ impl Lump for BSPDispInfo {
         LumpType::DispInfo
     }
 
-    fn validate(_lump: &Box<[Self]>) {}
+    //fn validate(_lump: &Box<[Self]>) {}
 }
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -53,8 +53,6 @@ impl Lump for BSPDispVert {
     fn lump_type() -> super::consts::LumpType {
         LumpType::DispVerts
     }
-
-    fn validate(_lump: &Box<[Self]>) {}
 }
 
 #[repr(C)]

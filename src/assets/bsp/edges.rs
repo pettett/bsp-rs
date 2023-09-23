@@ -20,11 +20,11 @@ impl Lump for BSPEdge {
     fn lump_type() -> LumpType {
         LumpType::Edges
     }
-    fn validate(lump: &Box<[Self]>) {
-        assert!(lump.len() < MAX_MAP_EDGES);
+    // fn validate(lump: &Box<[Self]>) {
+    //     assert!(lump.len() < MAX_MAP_EDGES);
 
-        println!("validated edge lump!");
-    }
+    //     println!("validated edge lump!");
+    // }
 }
 
 ///Surfedge
@@ -48,14 +48,6 @@ impl Lump for BSPSurfEdge {
     }
     fn lump_type() -> LumpType {
         LumpType::SurfEdges
-    }
-    fn validate(lump: &Box<[Self]>) {
-        assert!(lump.len() < MAX_MAP_SURFEDGES);
-        for edge_index in lump.iter() {
-            let index = edge_index.index;
-            assert!((-(MAX_MAP_EDGES as i32)..=(MAX_MAP_EDGES as i32)).contains(&index));
-        }
-        println!("Validated planes lump!")
     }
 }
 

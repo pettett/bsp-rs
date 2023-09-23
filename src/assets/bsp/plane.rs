@@ -36,15 +36,6 @@ impl Lump for BSPPlane {
         MAX_MAP_PLANES
     }
 
-    fn validate(lump: &Box<[Self]>) {
-        assert!(lump.len() < MAX_MAP_PLANES);
-        for plane in lump.iter() {
-            let axis = plane.axis;
-            assert!((0..=5).contains(&axis));
-        }
-        println!("Validated planes lump!")
-    }
-
     fn lump_type() -> super::consts::LumpType {
         super::consts::LumpType::Places
     }

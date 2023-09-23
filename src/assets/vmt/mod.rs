@@ -11,7 +11,6 @@
 pub mod gui;
 
 use std::{
-    cell::OnceCell,
     collections::HashMap,
     io::{Read, Seek},
     sync::{Arc, OnceLock},
@@ -225,7 +224,7 @@ mod vmt_tests {
 
         let mut shaders = HashSet::new();
 
-        for (d, files) in &dir.files["vmt"] {
+        for (_d, files) in &dir.files["vmt"] {
             for (_file, data) in files {
                 let Ok(vmt) = data.load_vmt(&dir) else {
                     continue;
@@ -245,7 +244,7 @@ mod vmt_tests {
 
         let mut shaders = HashSet::new();
 
-        for (d, files) in &dir.files["vmt"] {
+        for (_d, files) in &dir.files["vmt"] {
             for (_file, data) in files {
                 let Ok(vmt) = data.load_vmt(&dir) else {
                     continue;

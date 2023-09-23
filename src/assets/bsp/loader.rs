@@ -22,11 +22,11 @@ use crate::{
     },
     vertex::{UVAlphaVertex, UVVertex, Vertex},
 };
-use bevy_ecs::system::{Commands, Spawn};
-use glam::{ivec3, vec2, vec3, IVec3, Mat4, Quat, Vec3, Vec4};
+use bevy_ecs::system::Commands;
+use glam::{ivec3, vec2, IVec3, Mat4, Quat, Vec3, Vec4};
 use rayon::prelude::*;
-use std::{collections::HashMap, f32::consts::PI, num::NonZeroU32, path::Path, sync::Arc};
-use wgpu::{util::DeviceExt, Device};
+use std::{collections::HashMap, f32::consts::PI, path::Path, sync::Arc};
+use wgpu::util::DeviceExt;
 
 #[derive(Default)]
 struct MeshBuilder<V: Vertex + Default> {
@@ -350,7 +350,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
 
     println!("Loading BSP Materials...");
     let materials: HashMap<i32, &Arc<VMT>> = textured_tris
-        .iter()
+        .par_iter()
         .filter_map(|(tex, _tris)| {
             let Some(mat_name) = material_name_map.get(tex) else {
                 return None;
@@ -389,7 +389,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
     println!("Loading BSP shaders...");
     let shader_lines = Arc::new(VShader::new_white_lines::<Vec3>(renderer));
     let shader_tex = Arc::new(VShader::new_textured(renderer));
-    let shader_tex_envmap = Arc::new(VShader::new_textured_envmap(renderer));
+    let _shader_tex_envmap = Arc::new(VShader::new_textured_envmap(renderer));
     let shader_disp = Arc::new(VShader::new_displacement(renderer));
 
     println!("Loading BSP static props...");
@@ -397,19 +397,19 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
     let gamelump = load_gamelump(header.get_lump_header(LumpType::GameLump), &mut buffer).unwrap();
 
     for prop in &gamelump.props {
-        let path = gamelump.static_prop_names[prop.m_PropType as usize].as_str();
+        let path = gamelump.static_prop_names[prop.prop_type as usize].as_str();
 
         let m = load_vmesh(&VGlobalPath::new(&path), renderer, game_data);
 
         match m {
             Ok(m) => {
                 // euler angles in radians
-                let a = prop.m_Angles * PI / 180.0;
+                let a = prop.angles * PI / 180.0;
                 let rot = Quat::from_axis_angle(Vec3::Z, a.y)
                     * Quat::from_axis_angle(Vec3::X, a.z)
                     * Quat::from_axis_angle(Vec3::Y, a.x);
 
-                let t = Transform::new(prop.m_Origin.into(), rot);
+                let t = Transform::new(prop.m_origin.into(), rot);
 
                 let mat = t.get_local_to_world();
 
@@ -526,7 +526,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         }
     }
 
-    let models = header.get_lump::<BSPModel>(&mut buffer);
+    let _models = header.get_lump::<BSPModel>(&mut buffer);
 
     // for m in models.iter() {
     //     commands.spawn((

@@ -20,8 +20,6 @@ impl Lump for VPKDirectory {
     fn lump_type() -> LumpType {
         LumpType::PakFile
     }
-
-    fn validate(_lump: &Box<[Self]>) {}
 }
 
 impl BinaryData for VPKDirectory {
@@ -58,12 +56,12 @@ impl BinaryData for VPKDirectory {
                 filename,
                 VPKFile {
                     entry: VPKDirectoryEntry {
-                        CRC: e.header().crc32,
-                        PreloadBytes: e.header().uncompressed_size as u16,
-                        ArchiveIndex: 0,
-                        EntryOffset: 0,
-                        EntryLength: 0,
-                        Terminator: 0xffff,
+                        crc: e.header().crc32,
+                        preload_bytes: e.header().uncompressed_size as u16,
+                        archive_index: 0,
+                        entry_offset: 0,
+                        entry_length: 0,
+                        terminator: 0xffff,
                     },
                     preload: Some(e.compressed_data().to_vec()),
                     vtf: OnceLock::new(),

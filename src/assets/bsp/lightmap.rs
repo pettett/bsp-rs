@@ -41,5 +41,4 @@ impl Lump for ColorRGBExp32 {
     fn lump_type() -> LumpType {
         LumpType::Lighting
     }
-    fn validate(lump: &Box<[Self]>) {}
 }

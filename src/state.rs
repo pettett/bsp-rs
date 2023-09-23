@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::assets::bsp::loader::load_bsp;
 use crate::camera::update_view_proj;

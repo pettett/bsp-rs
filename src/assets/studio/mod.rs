@@ -3,7 +3,7 @@ pub mod mdl_headers;
 pub mod vtx;
 pub mod vvd;
 
-use std::{io, sync::Arc};
+use std::sync::Arc;
 
 pub use mdl::MDL;
 pub use vtx::VTX;
@@ -13,7 +13,7 @@ use crate::{
     assets::vpk::VPKFile,
     game_data::GameData,
     v::{
-        vpath::{VGlobalPath, VLocalPath, VPath, VSplitPath},
+        vpath::{VPath, VSplitPath},
         vrenderer::VRenderer,
         vshader::VShader,
         VMesh,
@@ -22,26 +22,26 @@ use crate::{
 };
 
 use self::vvd::Fixup;
-pub fn fixup_remapping_search(fixupTable: &Box<[Fixup]>, dstIdx: u16) -> u16 {
-    for i in 0..fixupTable.len() {
-        let map = fixupTable[i];
-        let idx = dstIdx as i32 - map.dst;
+pub fn fixup_remapping_search(fixup_table: &Box<[Fixup]>, dst_idx: u16) -> u16 {
+    for i in 0..fixup_table.len() {
+        let map = fixup_table[i];
+        let idx = dst_idx as i32 - map.dst;
         if idx >= 0 && idx < map.count {
             return (map.src + idx) as u16;
         }
     }
 
     // remap did not copy over this vertex, return as is.
-    return dstIdx;
+    return dst_idx;
 }
 pub fn load_vmesh(
     mdl_path: &dyn VPath,
     renderer: &VRenderer,
     game_data: &GameData,
 ) -> Result<VMesh, &'static str> {
-    let mdl = game_data
-        .load(mdl_path, VPKFile::mdl)
-        .ok_or("No mdl file")?;
+    //let mdl = game_data
+    //    .load(mdl_path, VPKFile::mdl)
+    //    .ok_or("No mdl file")?;
 
     let dir = mdl_path.dir();
 
@@ -125,7 +125,7 @@ mod mdl_tests {
     use crate::{assets::vpk::VPKDirectory, v::vpath::VGlobalPath};
     use std::path::PathBuf;
 
-    const PATH: &str = "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Portal 2\\portal2\\maps\\sp_a2_laser_intro.bsp";
+    //const PATH: &str = "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Portal 2\\portal2\\maps\\sp_a2_laser_intro.bsp";
 
     #[test]
     fn test_misc_dir() {
@@ -133,7 +133,7 @@ mod mdl_tests {
             "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_misc_dir.vpk",
         ))
         .unwrap();
-        for (d, files) in &dir.files["mdl"] {
+        for (_d, files) in &dir.files["mdl"] {
             for (_file, data) in files {
                 let Ok(mdl) = data.load_mdl(&dir) else {
                     continue;
@@ -150,7 +150,7 @@ mod mdl_tests {
         ))
         .unwrap();
 
-        let vtx = dir
+        let _vtx = dir
             .load_vtx(&VGlobalPath::from("models/props_c17/bench01a.dx90.vtx"))
             .unwrap();
     }
@@ -187,7 +187,7 @@ mod mdl_tests {
             .load_mdl(&VGlobalPath::from("models/props_c17/bench01a.mdl"))
             .unwrap();
 
-        let vvd = dir
+        let _vvd = dir
             .load_vvd(&VGlobalPath::from("models/props_c17/bench01a.vvd"))
             .unwrap();
 
@@ -196,7 +196,7 @@ mod mdl_tests {
         let vtx_lod0 = &vtx.body[0].0[0].0;
 
         for m in vtx_lod0 {
-            for sg in &m.0 {
+            for _sg in &m.0 {
                 //5!("{:?}", sg.indices);
             }
         }

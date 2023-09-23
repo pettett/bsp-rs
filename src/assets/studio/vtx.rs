@@ -56,7 +56,7 @@
 
 use std::mem;
 
-use crate::binaries::{BinArray, BinOffset, BinaryData};
+use crate::binaries::{BinArray, BinaryData};
 
 pub struct VTX {
     pub header: VTXFileHeader,
@@ -77,7 +77,7 @@ pub struct VTXMesh {
 impl BinaryData for VTX {
     fn read<R: std::io::Read + std::io::Seek>(
         buffer: &mut std::io::BufReader<R>,
-        max_size: Option<usize>,
+        _max_size: Option<usize>,
     ) -> std::io::Result<Self>
     where
         Self: Sized,
@@ -134,7 +134,7 @@ impl BinaryData for VTX {
                                 strips: Default::default(),
                             };
 
-                            for (i, sh) in shs {
+                            for (_i, sh) in shs {
                                 strip_group.strips.push(VTXStrip { header: sh });
                             }
 
@@ -299,9 +299,9 @@ pub struct StripGroupHeader {
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 pub enum OptimizeStripFlags {
-    NONE = 0,
-    IS_TRILIST = 0x01,
-    IS_TRISTRIP = 0x02,
+    None = 0,
+    IsTriList = 0x01,
+    IsTriStrip = 0x02,
 }
 unsafe impl bytemuck::Zeroable for OptimizeStripFlags {}
 // MDL versions 49 and above (found in

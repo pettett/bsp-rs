@@ -1,9 +1,14 @@
 use bevy_ecs::component::Component;
-use glam::{Quat, Vec3};
 
 use crate::{transform::Transform, v::vbuffer::VBuffer};
 #[derive(Component)]
 pub struct Static();
+
+#[derive(Component)]
+pub struct InstancedProp {
+    pub props: Vec<Prop>,
+}
+
 #[derive(Component)]
 pub struct Prop {
     pub transform: Transform,

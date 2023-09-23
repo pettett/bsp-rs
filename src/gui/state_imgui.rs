@@ -7,7 +7,7 @@ use imgui_wgpu::{Renderer, RendererConfig};
 use winit::{event::Event, window::Window};
 
 use crate::{
-    game_data::{self, GameData},
+    game_data::{GameData},
     gui::Viewable,
     v::vrenderer::VRenderer,
 };

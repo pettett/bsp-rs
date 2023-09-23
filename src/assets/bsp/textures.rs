@@ -78,11 +78,11 @@ impl Lump for BSPTexInfo {
     fn lump_type() -> LumpType {
         LumpType::TexInfo
     }
-    fn validate(lump: &Box<[Self]>) {
-        assert!(lump.len() < MAX_MAP_TEXINFO);
+    // fn validate(lump: &Box<[Self]>) {
+    //     assert!(lump.len() < MAX_MAP_TEXINFO);
 
-        println!("Validated texinfo lump!")
-    }
+    //     println!("Validated texinfo lump!")
+    // }
 }
 
 ///Texdata
@@ -113,11 +113,11 @@ impl Lump for BSPTexData {
     fn lump_type() -> LumpType {
         LumpType::TexData
     }
-    fn validate(lump: &Box<[Self]>) {
-        assert!(lump.len() < MAX_MAP_TEXINFO);
+    // fn validate(lump: &Box<[Self]>) {
+    //     assert!(lump.len() < MAX_MAP_TEXINFO);
 
-        println!("Validated dtexdata_t lump!")
-    }
+    //     println!("Validated dtexdata_t lump!")
+    // }
 }
 /// The TexdataStringTable (Lump 44) is an array of integers which are offsets into the TexdataStringData (lump 43). The TexdataStringData lump consists of concatenated null-terminated strings giving the texture name.
 
@@ -159,9 +159,9 @@ impl Lump for BSPTexDataStringTable {
     fn lump_type() -> LumpType {
         LumpType::TexDataStringTable
     }
-    fn validate(_lump: &Box<[Self]>) {
-        println!("Validated dtexdatastringdata_t lump!")
-    }
+    // fn validate(_lump: &Box<[Self]>) {
+    //     println!("Validated dtexdatastringdata_t lump!")
+    // }
 }
 //There can be a maximum of 12288 texinfos in a map (MAX_MAP_TEXINFO).
 //There is a limit of 2048 texdatas in the array (MAX_MAP_TEXDATA) and up to 256000 bytes in the TexdataStringData data block (MAX_MAP_TEXDATA_STRING_DATA).

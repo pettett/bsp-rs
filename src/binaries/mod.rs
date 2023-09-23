@@ -5,7 +5,7 @@ use std::{
     mem, slice,
 };
 
-use glam::{Vec2, Vec3, Vec4};
+
 
 pub trait BinaryData {
     fn read<R: Read + Seek>(buffer: &mut BufReader<R>, _max_size: Option<usize>) -> io::Result<Self>

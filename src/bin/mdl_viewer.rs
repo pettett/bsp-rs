@@ -1,15 +1,9 @@
-use std::sync::Arc;
-
 use bevy_ecs::system::{Commands, Res, SystemState};
 
 use bsp_explorer::{
-    assets::{
-        studio::{fixup_remapping_search, load_vmesh, vvd::Fixup},
-        vpk::VPKFile,
-    },
+    assets::studio::load_vmesh,
     game_data::GameData,
-    v::{vpath::VGlobalPath, vrenderer::VRenderer, vshader::VShader, VMesh},
-    vertex::UVAlphaVertex,
+    v::{vpath::VGlobalPath, vrenderer::VRenderer},
     vinit, vrun,
 };
 use glam::Vec4;

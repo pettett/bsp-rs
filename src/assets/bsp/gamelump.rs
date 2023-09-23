@@ -9,28 +9,28 @@ use glam::Vec3;
 
 use crate::binaries::BinaryData;
 
-use super::{lump::BSPLump, Lump};
+use super::lump::BSPLump;
 
 #[derive(Debug, bytemuck::Zeroable)]
 #[repr(C, packed)]
-pub struct StaticPropLumpV5_t {
-    pub m_Origin: Vec3,
-    pub m_Angles: Vec3,
-    pub m_PropType: u16,
-    pub m_FirstLeaf: u16,
-    pub m_LeafCount: u16,
-    pub m_Solid: u8,
-    pub m_Flags: u8,
-    pub m_Skin: i32,
-    pub m_FadeMinDist: f32,
-    pub m_FadeMaxDist: f32,
-    pub m_LightingOrigin: Vec3,
-    pub m_flForcedFadeScale: f32, //	int				m_Lighting;			// index into the GAMELUMP_STATIC_PROP_LIGHTING lump
+pub struct StaticPropLumpV5 {
+    pub m_origin: Vec3,
+    pub angles: Vec3,
+    pub prop_type: u16,
+    pub first_leaf: u16,
+    pub leaf_count: u16,
+    pub solid: u8,
+    pub flags: u8,
+    pub skin: i32,
+    pub fade_min_dist: f32,
+    pub fade_max_dist: f32,
+    pub lighting_origin: Vec3,
+    pub fl_forced_fade_scale: f32, //	int				m_Lighting;			// index into the GAMELUMP_STATIC_PROP_LIGHTING lump
 }
 
 #[derive(Debug, bytemuck::Zeroable)]
 #[repr(C, packed)]
-struct dgamelump_t {
+struct BSPGameLump {
     id: [u8; 4],  // gamelump ID
     flags: u16,   // flags
     version: u16, // gamelump version
@@ -49,7 +49,7 @@ impl BinaryData for PropDictEntry {}
 #[derive(Debug)]
 pub struct GameLump {
     pub static_prop_names: Vec<String>,
-    pub props: Vec<StaticPropLumpV5_t>,
+    pub props: Vec<StaticPropLumpV5>,
 }
 
 pub fn load_gamelump(lump: &BSPLump, buffer: &mut BufReader<File>) -> io::Result<GameLump> {
@@ -58,8 +58,8 @@ pub fn load_gamelump(lump: &BSPLump, buffer: &mut BufReader<File>) -> io::Result
     let lump_count = i32::read(buffer, None)?;
 
     let mut lumps = HashMap::new();
-    for i in 0..lump_count {
-        let e = dgamelump_t::read(buffer, None)?;
+    for _i in 0..lump_count {
+        let e = BSPGameLump::read(buffer, None)?;
 
         lumps.insert(e.id.clone(), e);
     }
@@ -74,22 +74,22 @@ pub fn load_gamelump(lump: &BSPLump, buffer: &mut BufReader<File>) -> io::Result
 
     let mut static_prop_names = Vec::new();
 
-    for i in 0..dict_entries {
+    for _i in 0..dict_entries {
         let e = PropDictEntry::read(buffer, None)?;
 
         static_prop_names.push(e.name.to_ascii_lowercase());
     }
     let leafs = i32::read(buffer, None)?;
-    for i in 0..leafs {
+    for _i in 0..leafs {
         u16::read(buffer, None)?;
     }
 
     let prop_lumps = i32::read(buffer, None)?;
     let mut props = Vec::new();
-    for p in 0..prop_lumps {
-        let prop = StaticPropLumpV5_t::read(buffer, None)?;
+    for _p in 0..prop_lumps {
+        let prop = StaticPropLumpV5::read(buffer, None)?;
 
-        assert!(0 <= prop.m_PropType && (prop.m_PropType as usize) < static_prop_names.len());
+        assert!((prop.prop_type as usize) < static_prop_names.len());
 
         props.push(prop);
     }
@@ -102,7 +102,7 @@ pub fn load_gamelump(lump: &BSPLump, buffer: &mut BufReader<File>) -> io::Result
 
 #[cfg(test)]
 mod gamelump_tests {
-    use std::{collections::HashMap, io::Seek, path::Path};
+    use std::path::Path;
 
     use crate::assets::bsp::{header::BSPHeader, LumpType};
 
@@ -116,6 +116,6 @@ mod gamelump_tests {
 
         let h = header.get_lump_header(LumpType::GameLump);
 
-        let gamelump = load_gamelump(h, &mut buffer).unwrap();
+        let _gamelump = load_gamelump(h, &mut buffer).unwrap();
     }
 }

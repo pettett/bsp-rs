@@ -82,23 +82,23 @@ impl VPKHeaderV1 {
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct VPKDirectoryEntry {
-    CRC: u32,
+    crc: u32,
     // A 32bit CRC of the file's data.
-    PreloadBytes: u16, // The number of bytes contained in the index file.
+    preload_bytes: u16, // The number of bytes contained in the index file.
 
     // A zero based index of the archive this file's data is contained in.
     // If 0x7fff, the data follows the directory.
-    ArchiveIndex: u16,
+    archive_index: u16,
 
     // If ArchiveIndex is 0x7fff, the offset of the file data relative to the end of the directory (see the header for more details).
     // Otherwise, the offset of the data from the start of the specified archive.
-    EntryOffset: u32,
+    entry_offset: u32,
 
     // If zero, the entire file is stored in the preload data.
     // Otherwise, the number of bytes stored starting at EntryOffset.
-    EntryLength: u32,
+    entry_length: u32,
 
-    Terminator: u16, //  = 0xffff
+    terminator: u16, //  = 0xffff
 }
 
 pub struct VPKFile {
@@ -156,51 +156,13 @@ impl VPKFile {
     }
 }
 
-#[derive(Debug)]
-pub enum VPKDirectoryTree {
-    Leaf(String),
-    Node(HashMap<String, VPKDirectoryTree>),
-}
-
 pub struct VPKDirectory {
     dir_path: PathBuf,
     header1: VPKHeaderV1,
     header2: Option<VPKHeaderV2>,
     max_pack_file: u16,
-    root: VPKDirectoryTree,
     /// Files map, mapped by extension, then directory, then filename
     pub files: HashMap<String, HashMap<String, HashMap<String, VPKFile>>>,
-}
-
-impl VPKDirectoryTree {
-    pub fn add_entry(&mut self, _prefix: &str, dir: &str, _ext: &str) {
-        self.add_entry_inner(dir, dir);
-    }
-
-    fn add_entry_inner(&mut self, parsed_entry: &str, entry: &str) {
-        if parsed_entry.len() == 0 {
-            //most likely added a folder "etc/", don't add a "" leaf
-            return;
-        }
-        match self {
-            VPKDirectoryTree::Leaf(..) => {}
-            VPKDirectoryTree::Node(tree) => match parsed_entry.find('/') {
-                Some(pos) => match tree.get_mut(&parsed_entry[..pos]) {
-                    Some(subtree) => subtree.add_entry_inner(&parsed_entry[pos + 1..], entry),
-                    None => {
-                        let mut dir = VPKDirectoryTree::Node(HashMap::new());
-
-                        dir.add_entry_inner(&parsed_entry[pos + 1..], entry);
-
-                        tree.insert(parsed_entry[..pos].to_owned(), dir);
-                    }
-                },
-                None => {
-                    tree.insert(parsed_entry.to_owned(), Self::Leaf(entry.to_owned()));
-                }
-            },
-        };
-    }
 }
 
 impl VPKDirectory {
@@ -215,16 +177,12 @@ impl VPKDirectory {
         dir_files.insert(filename, file);
     }
 
-    pub fn get_root(&self) -> &VPKDirectoryTree {
-        &self.root
-    }
     pub fn new(header1: VPKHeaderV1, header2: Option<VPKHeaderV2>) -> Self {
         Self {
             dir_path: Default::default(),
             header1,
             header2,
             max_pack_file: 0,
-            root: VPKDirectoryTree::Node(HashMap::new()),
             files: Default::default(),
         }
     }
@@ -244,7 +202,6 @@ impl VPKDirectory {
             println!("Loading {:?} version {}", dir_path, v);
         }
 
-        let mut root = VPKDirectoryTree::Node(HashMap::new());
         let mut max_pack_file = 0;
         let mut files = HashMap::<String, HashMap<String, HashMap<String, VPKFile>>>::new();
 
@@ -266,25 +223,23 @@ impl VPKDirectory {
                     }
 
                     let entry = VPKDirectoryEntry::read(&mut buffer, None).unwrap();
-                    let terminator = entry.Terminator;
+                    let terminator = entry.terminator;
 
                     assert_eq!(terminator, 0xffff);
 
-                    if entry.ArchiveIndex != 0x7fff {
+                    if entry.archive_index != 0x7fff {
                         // 0x7fff means contained in this same file
-                        max_pack_file = u16::max(entry.ArchiveIndex, max_pack_file);
+                        max_pack_file = u16::max(entry.archive_index, max_pack_file);
                     }
 
                     // Read metadata.
-                    let preload = if entry.PreloadBytes != 0 {
-                        let mut buf = vec![0; entry.PreloadBytes as usize];
+                    let preload = if entry.preload_bytes != 0 {
+                        let mut buf = vec![0; entry.preload_bytes as usize];
                         buffer.read_exact(&mut buf[..]).unwrap();
                         Some(buf)
                     } else {
                         None
                     };
-
-                    root.add_entry(&dir, &filename, &ext);
 
                     let ext_files = files.entry(ext.clone()).or_default();
                     let dir_files = ext_files.entry(dir.clone()).or_default();
@@ -312,7 +267,6 @@ impl VPKDirectory {
             header1,
             header2,
             max_pack_file,
-            root,
             files,
         })
     }
@@ -375,7 +329,7 @@ impl VPKDirectory {
             F::read(&mut buffer, Some(preload.len()))
         } else {
             // Attempt to load
-            let index = file_data.entry.ArchiveIndex;
+            let index = file_data.entry.archive_index;
             // replace dir with number
             let mut header_pak_path = self.dir_path.to_path_buf();
             let dir_file = self.dir_path.file_name().unwrap().to_string_lossy();
@@ -385,9 +339,9 @@ impl VPKDirectory {
             let file = File::open(header_pak_path).unwrap();
             let mut buffer = BufReader::new(file);
             // seek and load
-            buffer.seek_relative(file_data.entry.EntryOffset as i64)?;
+            buffer.seek_relative(file_data.entry.entry_offset as i64)?;
 
-            F::read(&mut buffer, Some(file_data.entry.EntryLength as usize))
+            F::read(&mut buffer, Some(file_data.entry.entry_length as usize))
         }
     }
 }
@@ -448,170 +402,4 @@ mod vpk_tests {
             }
         }
     }
-
-    #[test]
-    fn test_tree() {
-        let root = VPKDirectoryTree::Node(HashMap::new());
-
-        //root.add_entry("test/file/please/ignore.txt");
-        //root.add_entry("test/file/please/receive.txt");
-        //root.add_entry("test/folder/");
-        //root.add_entry("test/folder/please/receive.txt");
-
-        println!("{:?}", root);
-    }
 }
-
-// export function parseVPKDirectory(buffer: ArrayBufferSlice): VPKDirectory {
-//     const view = buffer.createDataView();
-//     assert(view.getUint32(0x00, true) === 0x55AA1234);
-//     const version = view.getUint32(0x04, true);
-//     const directorySize = view.getUint32(0x08, true);
-
-//     let idx: number;
-//     if (version === 0x01) {
-//         idx = 0x0C;
-//     } else if (version === 0x02) {
-//         const embeddedChunkSize = view.getUint32(0x0C, true);
-//         assert(embeddedChunkSize === 0);
-//         const chunkHashesSize = view.getUint32(0x10, true);
-//         const selfHashesSize = view.getUint32(0x14, true);
-//         const signatureSize = view.getUint32(0x18, true);
-//         idx = 0x1C;
-//     } else {
-//         throw "whoops";
-//     }
-
-//     // Parse directory.
-
-//     let maxPackFile = 0;
-
-//     const entries = new Map<string, VPKFileEntry>();
-//     while (true) {
-//         const ext = readString(buffer, idx);
-//         idx += ext.length + 1;
-//         if (ext.length === 0)
-//             break;
-
-//         while (true) {
-//             const dir = readString(buffer, idx);
-//             idx += dir.length + 1;
-//             if (dir.length === 0)
-//                 break;
-
-//             while (true) {
-//                 const filename = readString(buffer, idx);
-//                 idx += filename.length + 1;
-//                 if (filename.length === 0)
-//                     break;
-
-//                 const dirPrefix = (dir === '' || dir === ' ') ? '' : `${dir}/`;
-
-//                 const path = `${dirPrefix}${filename}.${ext}`;
-//                 const crc = view.getUint32(idx, true);
-//                 idx += 0x04;
-//                 const metadataSize = view.getUint16(idx, true);
-//                 idx += 0x02;
-
-//                 // Parse file chunks.
-//                 const chunks: VPKFileEntryChunk[] = [];
-//                 while (true) {
-//                     const packFileIdx = view.getUint16(idx + 0x00, true);
-//                     idx += 0x02;
-//                     if (packFileIdx === 0xFFFF)
-//                         break;
-
-//                     if (packFileIdx !== 0x07FF)
-//                         maxPackFile = Math.max(maxPackFile, packFileIdx);
-
-//                     const chunkOffset = view.getUint32(idx + 0x00, true);
-//                     const chunkSize = view.getUint32(idx + 0x04, true);
-//                     idx += 0x08;
-
-//                     if (chunkSize === 0)
-//                         continue;
-
-//                     chunks.push({ packFileIdx, chunkOffset, chunkSize });
-//                 }
-
-//                 // Read metadata.
-//                 const metadataChunk = metadataSize !== 0 ? buffer.subarray(idx, metadataSize) : null;
-//                 idx += metadataSize;
-
-//                 entries.set(path, { crc, path, chunks, metadataChunk });
-//             }
-//         }
-//     }
-
-//     return { entries, maxPackFile };
-// }
-
-// export class VPKMount {
-//     private fileDataPromise = new Map<string, Promise<ArrayBufferSlice>>();
-
-//     constructor(private basePath: string, private dir: VPKDirectory) {
-//     }
-
-//     private fetchChunk(dataFetcher: DataFetcher, chunk: VPKFileEntryChunk, abortedCallback: AbortedCallback, debugName: string): Promise<ArrayBufferSlice> {
-//         const packFileIdx = chunk.packFileIdx, rangeStart = chunk.chunkOffset, rangeSize = chunk.chunkSize;
-//         return dataFetcher.fetchData(`${this.basePath}_${leftPad('' + packFileIdx, 3, '0')}.vpk`, { debugName, rangeStart, rangeSize, abortedCallback });
-//     }
-
-//     public findEntry(path: string): VPKFileEntry | null {
-//         return nullify(this.dir.entries.get(path));
-//     }
-
-//     private async fetchFileDataInternal(dataFetcher: DataFetcher, entry: VPKFileEntry, abortedCallback: AbortedCallback): Promise<ArrayBufferSlice> {
-//         const promises = [];
-//         let size = 0;
-
-//         const metadataSize = entry.metadataChunk !== null ? entry.metadataChunk.byteLength : 0;
-//         size += metadataSize;
-
-//         for (let i = 0; i < entry.chunks.length; i++) {
-//             const chunk = entry.chunks[i];
-//             promises.push(this.fetchChunk(dataFetcher, chunk, abortedCallback, entry.path));
-//             size += chunk.chunkSize;
-//         }
-
-//         if (promises.length === 0) {
-//             assert(entry.metadataChunk !== null);
-//             return entry.metadataChunk;
-//         }
-
-//         const chunks = await Promise.all(promises);
-//         if (chunks.length === 1 && entry.metadataChunk === null)
-//             return chunks[0];
-
-//         const buf = new Uint8Array(metadataSize + size);
-
-//         let offs = 0;
-
-//         // Metadata comes first.
-//         if (entry.metadataChunk !== null) {
-//             buf.set(entry.metadataChunk.createTypedArray(Uint8Array), offs);
-//             offs += entry.metadataChunk.byteLength;
-//         }
-
-//         for (let i = 0; i < chunks.length; i++) {
-//             buf.set(chunks[i].createTypedArray(Uint8Array), offs);
-//             offs += chunks[i].byteLength;
-//         }
-
-//         return new ArrayBufferSlice(buf.buffer);
-//     }
-
-//     public fetchFileData(dataFetcher: DataFetcher, entry: VPKFileEntry): Promise<ArrayBufferSlice> {
-//         if (!this.fileDataPromise.has(entry.path)) {
-//             this.fileDataPromise.set(entry.path, this.fetchFileDataInternal(dataFetcher, entry, () => {
-//                 this.fileDataPromise.delete(entry.path);
-//             }));
-//         }
-//         return this.fileDataPromise.get(entry.path)!;
-//     }
-// }
-
-// export async function createVPKMount(dataFetcher: DataFetcher, basePath: string) {
-//     const dir = parseVPKDirectory(await dataFetcher.fetchData(`${basePath}_dir.vpk`));
-//     return new VPKMount(basePath, dir);
-// }

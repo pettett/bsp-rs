@@ -24,7 +24,7 @@
 use fixedstr::zstr;
 use glam::Vec3;
 
-use crate::binaries::{BinArray, BinOffset, BinaryData};
+use crate::binaries::{BinArray, BinOffset};
 
 #[repr(C, packed)]
 pub struct MDLHeader {
@@ -56,31 +56,31 @@ pub struct MDLHeader {
      * Note that indexes/counts are not always paired and ordered consistently.
      */
     // mstudiobone_t
-    pub bone: BinArray<mstudionill_t>, // Number of data sections (of type mstudiobone_t)
+    pub bone: BinArray<StudioNill>, // Number of data sections (of type mstudiobone_t)
 
     // mstudiobonecontroller_t
-    pub bonecontroller: BinArray<mstudionill_t>,
+    pub bonecontroller: BinArray<StudioNill>,
 
     // mstudiohitboxset_t
-    pub hitbox: BinArray<mstudionill_t>,
+    pub hitbox: BinArray<StudioNill>,
 
     // mstudioanimdesc_t
-    pub localanim: BinArray<mstudionill_t>,
+    pub localanim: BinArray<StudioNill>,
 
     // mstudioseqdesc_t
-    pub localseq: BinArray<mstudionill_t>,
+    pub localseq: BinArray<StudioNill>,
 
     pub activitylistversion: i32, // ??
     pub eventsindexed: i32,       // ??
 
     // VMT texture filenames
     // mstudiotexture_t
-    pub texture: BinArray<mstudiotexture_t>,
+    pub texture: BinArray<StudioTexture>,
 
     // This offset points to a series of i32s.
     // Each i32 value, in turn, is an offset relative to the start of this header/the-file,
     // At which there is a null-terminated string.
-    pub texturedir: BinArray<mstudionill_t>,
+    pub texturedir: BinArray<StudioNill>,
 
     // Each skin-family assigns a texture-id to a skin location
     pub skinreference_count: i32,
@@ -88,36 +88,36 @@ pub struct MDLHeader {
     pub skinreference_index: i32,
 
     // mstudiobodyparts_t
-    pub bodypart: BinArray<mstudiobodyparts_t>,
+    pub bodypart: BinArray<StudioBodyparts>,
 
     // Local attachment points
     // mstudioattachment_t
-    pub attachment: BinArray<mstudionill_t>,
+    pub attachment: BinArray<StudioNill>,
 
     // Node values appear to be single bytes, while their names are null-terminated strings.
-    pub localnode: BinArray<mstudionill_t>,
+    pub localnode: BinArray<StudioNill>,
     pub localnode_name_index: BinOffset,
 
     // mstudioflexdesc_t
-    pub flexdesc: BinArray<mstudionill_t>,
+    pub flexdesc: BinArray<StudioNill>,
 
     // mstudioflexcontroller_t
-    pub flexcontroller: BinArray<mstudionill_t>,
+    pub flexcontroller: BinArray<StudioNill>,
 
     // mstudioflexrule_t
-    pub flexrules: BinArray<mstudionill_t>,
+    pub flexrules: BinArray<StudioNill>,
 
     // IK probably referse to inverse kinematics
     // mstudioikchain_t
-    pub ikchain: BinArray<mstudionill_t>,
+    pub ikchain: BinArray<StudioNill>,
 
     // Information about any "mouth" on the model for speech animation
     // More than one sounds pretty creepy.
     // mstudiomouth_t
-    pub mouths: BinArray<mstudionill_t>,
+    pub mouths: BinArray<StudioNill>,
 
     // mstudioposeparamdesc_t
-    pub localposeparam: BinArray<mstudionill_t>,
+    pub localposeparam: BinArray<StudioNill>,
 
     /*
      * For anyone trying to follow along, as of this writing,
@@ -130,11 +130,11 @@ pub struct MDLHeader {
     // Unusual: In this one index comes first, then count.
     // Key-value data is a series of strings. If you can't find
     // what you're i32erested in, check the associated PHY file as well.
-    pub keyvalue_index: BinArray<mstudionill_t>,
+    pub keyvalue_index: BinArray<StudioNill>,
 
     // More inverse-kinematics
     // mstudioiklock_t
-    pub iklock: BinArray<mstudionill_t>,
+    pub iklock: BinArray<StudioNill>,
 
     pub mass: f32,     // Mass of object (4-bytes)
     pub contents: i32, // ??
@@ -142,14 +142,14 @@ pub struct MDLHeader {
     // Other models can be referenced for re-used sequences and animations
     // (See also: The $includemodel QC option.)
     // mstudiomodelgroup_t
-    pub includemodel: BinArray<mstudionill_t>,
+    pub includemodel: BinArray<StudioNill>,
 
     pub virtual_model: i32, // Placeholder for mutable-void*
     // Note that the SDK only compiles as 32-bit, so an i32 and a pointer are the same size (4 bytes)
 
     // mstudioanimblock_t
     pub animblocks_name_index: BinOffset,
-    pub animblocks: BinArray<mstudionill_t>,
+    pub animblocks: BinArray<StudioNill>,
 
     pub animblock_model: i32, // Placeholder for mutable-void*
 
@@ -172,9 +172,9 @@ pub struct MDLHeader {
     unused1: i32, // ??
 
     // mstudioflexcontrollerui_t
-    pub flexcontrollerui: BinArray<mstudionill_t>,
+    pub flexcontrollerui: BinArray<StudioNill>,
 
-    pub vertAnimFixedpointScale: f32, // ??
+    pub vert_anim_fixedpoint_scale: f32, // ??
     unused2: i32,
 
     /**
@@ -198,18 +198,18 @@ unsafe impl bytemuck::Zeroable for MDLHeader {}
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug)]
-pub struct mstudiobodyparts_t {
+pub struct StudioBodyparts {
     pub name_index: BinOffset, // index into models array
     pub nummodels: u32,
     pub base: u32,
     pub modelindex: BinOffset,
 }
 
-unsafe impl bytemuck::Zeroable for mstudiobodyparts_t {}
+unsafe impl bytemuck::Zeroable for StudioBodyparts {}
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
-pub struct mstudiotexture_t {
+pub struct StudioTexture {
     // Number of bytes past the beginning of this structure
     // where the first character of the texture name can be found.
     pub name_offset: BinOffset, // Offset for null-terminated string
@@ -226,11 +226,11 @@ pub struct mstudiotexture_t {
 }
 
 #[repr(C, packed)]
-pub struct mstudiomodel_t {
+pub struct StudioModel {
     pub name: zstr<64>,
     pub t: i32,
     pub boundingradius: f32,
-    pub meshes: BinArray<mstudiomesh_t>,
+    pub meshes: BinArray<StudioMesh>,
     pub numvertices: u32,   // number of unique vertices/normals/texcoords
     pub vertexindex: i32,   // vertex Vector
     pub tangentsindex: i32, // tangents Vector
@@ -238,17 +238,17 @@ pub struct mstudiomodel_t {
     pub attachmentindex: i32,
     pub numeyeballs: i32,
     pub eyeballindex: i32,
-    pub pVertexData: i32,
+    pub p_vertex_data: i32,
     // base of external vertex data stores
-    pub pTangentData: i32,
+    pub p_tangent_data: i32,
     unused: [i32; 8], // remove as appropriate
 }
 
-unsafe impl bytemuck::Zeroable for mstudiomodel_t {}
+unsafe impl bytemuck::Zeroable for StudioModel {}
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug)]
-pub struct mstudiomesh_t {
+pub struct StudioMesh {
     pub material: i32,
     pub modelindex: i32,
     pub numvertices: i32,  // number of unique vertices/normals/texcoords
@@ -264,13 +264,13 @@ pub struct mstudiomesh_t {
     _unused1: [i32; 8], // remove as appropriate
 }
 
-unsafe impl bytemuck::Zeroable for mstudiomesh_t {}
+unsafe impl bytemuck::Zeroable for StudioMesh {}
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug)]
-pub struct mstudionill_t;
+pub struct StudioNill;
 
-unsafe impl bytemuck::Zeroable for mstudionill_t {}
+unsafe impl bytemuck::Zeroable for StudioNill {}
 
 // Known flags Name 	Position 	Details
 // STUDIOHDR_FLAGS_AUTOGENERATED_HITBOX 	0 	This flag is set if no hitbox information was specified
@@ -292,44 +292,6 @@ unsafe impl bytemuck::Zeroable for mstudionill_t {}
 // STUDIOHDR_FLAGS_AMBIENT_BOOST 	16 	Ambient boost (runtime flag).
 // STUDIOHDR_FLAGS_DO_NOT_CAST_SHADOWS 	17 	Don't cast shadows from this model (useful on first-person models).
 // STUDIOHDR_FLAGS_CAST_TEXTURE_SHADOWS 	18 	Alpha textures should cast shadows in vrad on this model (ONLY prop_static!). Requires setup in the lights.rad file.
-// Secondary header
-
-// This header section is optional, and is found via the studiohdr2index value.
-
-// struct studiohdr2_t
-// {
-//         // ??
-//         i32    srcbonetransform_count:
-//         i32    srcbonetransform_index:
-
-//         i32    illumpositionattachmentindex:
-
-//         f32  flMaxEyeDeflection:    //  If set to 0, then equivalent to cos(30)
-
-//         // mstudiolinearbone_t
-//         i32    linearbone_index:
-
-//         i32    unknown[64]:
-// }:
-
-// Texture data
-
-// struct mstudiotexture_t
-// {
-//         // Number of bytes past the beginning of this structure
-//         // where the first byteacter of the texture name can be found.
-//         i32    name_offset: // Offset for null-terminated string
-//         i32    flags:
-
-//         i32    used:        // Padding?
-//         i32    unused:      // Padding.
-
-//         i32    material:        // Placeholder for IMaterial
-//         i32    client_material: // Placeholder for void*
-
-//         i32    unused2[10]: // Final padding
-//         // Struct is 64 bytes long
-// }:
 
 // Skin replacement tables
 

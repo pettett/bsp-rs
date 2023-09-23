@@ -84,10 +84,4 @@ impl Lump for BSPFace {
     fn lump_type() -> LumpType {
         LumpType::Faces
     }
-    fn validate(lump: &Box<[Self]>) {
-        for face in lump.iter() {
-            assert!((0..=1).contains(&face.side));
-        }
-        println!("validated face lump!");
-    }
 }

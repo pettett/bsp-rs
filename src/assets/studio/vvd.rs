@@ -1,4 +1,4 @@
-use crate::binaries::{BinArray, BinOffset, BinaryData};
+use crate::binaries::{BinOffset, BinaryData};
 use glam::{Vec2, Vec3, Vec4};
 use std::{io::Seek, mem};
 
@@ -53,12 +53,12 @@ pub struct VVD {
 impl BinaryData for VVD {
     fn read<R: std::io::Read + std::io::Seek>(
         buffer: &mut std::io::BufReader<R>,
-        max_size: Option<usize>,
+        _max_size: Option<usize>,
     ) -> std::io::Result<Self>
     where
         Self: Sized,
     {
-        let s = buffer.stream_position()?;
+        let _s = buffer.stream_position()?;
         let header = VertexFileHeader::read(buffer, None)?;
 
         let mut pos = mem::size_of::<VertexFileHeader>() as i64;

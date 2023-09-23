@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use bevy_ecs::{
     entity::Entity,
-    query::Has,
     system::{Commands, NonSendMut, Query, Res, Resource},
     world::World,
 };
@@ -15,7 +14,6 @@ use crate::{
     geo::{Prop, Static},
     gui::state_imgui::StateImgui,
     state::StateInstance,
-    transform::Transform,
 };
 
 use super::{VMesh, VTexture};
