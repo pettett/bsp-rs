@@ -1,3 +1,5 @@
+# BSP-RS
+
 # TODO
 
 - [x] Unify PakEntry and VPKEntry
@@ -6,6 +8,9 @@
 - [x] improve material file parsing
 - [ ] Attach materials as a component
 - [x] load models (this was a pain)
+    - [x] Instanced prop drawing
+    - [ ] Textured prop drawing
+    - [ ] Lit prop drawing
 - [x] stop rendering trigger volumes
 - [x] respect shader request from material
 - [ ] skybox
