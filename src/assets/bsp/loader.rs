@@ -11,7 +11,7 @@ use crate::{
     },
     assets::{bsp::gamelump::load_gamelump, studio::load_vmesh, vpk::VPKDirectory, VMT},
     game_data::GameData,
-    geo::{Prop, Static},
+    geo::{InstancedProp, Static},
     transform::Transform,
     v::{
         vbuffer::VBuffer,
@@ -396,10 +396,20 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
 
     let gamelump = load_gamelump(header.get_lump_header(LumpType::GameLump), &mut buffer).unwrap();
 
+    let mut instances = HashMap::new();
+    let prop_shader = Arc::new(VShader::new_instanced_prop::<UVAlphaVertex, Mat4>(
+        &renderer,
+    ));
+
     for prop in &gamelump.props {
         let path = gamelump.static_prop_names[prop.prop_type as usize].as_str();
 
-        let m = load_vmesh(&VGlobalPath::new(&path), renderer, game_data);
+        let m = load_vmesh(
+            &VGlobalPath::new(&path),
+            renderer,
+            prop_shader.clone(),
+            game_data,
+        );
 
         match m {
             Ok(m) => {
@@ -413,18 +423,16 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
 
                 let mat = t.get_local_to_world();
 
-                commands.spawn((
-                    m,
-                    Prop::new(
-                        t,
-                        VBuffer::new::<Mat4>(
-                            device,
-                            &renderer.model_bind_group_layout,
-                            mat,
-                            "model",
-                        ),
-                    ),
-                ));
+                let e = instances
+                    .entry(prop.prop_type)
+                    .or_insert_with(|| (m, InstancedProp::default()));
+
+                e.1.transforms.push(mat);
+
+                // commands.spawn((
+                //     m,
+                //    ,
+                // ));
             }
             Err(e) => println!("Error loading {path}: {e}"),
         }
@@ -438,6 +446,10 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         //     ),
         //     Static(),
         // ));
+    }
+
+    for (i, bundle) in instances {
+        commands.spawn(bundle);
     }
 
     println!("Loading BSP meshes...");

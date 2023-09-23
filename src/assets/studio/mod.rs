@@ -37,6 +37,7 @@ pub fn fixup_remapping_search(fixup_table: &Box<[Fixup]>, dst_idx: u16) -> u16 {
 pub fn load_vmesh(
     mdl_path: &dyn VPath,
     renderer: &VRenderer,
+    shader_tex: Arc<VShader>,
     game_data: &GameData,
 ) -> Result<VMesh, &'static str> {
     //let mdl = game_data
@@ -74,8 +75,6 @@ pub fn load_vmesh(
         })
         .collect::<Vec<_>>();
 
-    let shader_tex = Arc::new(VShader::new_triangle_strip::<UVAlphaVertex>(&renderer));
-
     for m in &lod0.0 {
         //println!("Mesh {:?}", m.flags);
 
@@ -110,7 +109,7 @@ pub fn load_vmesh(
                     renderer.device(),
                     &verts[..],
                     &indices[ind_start..ind_start + ind_count],
-                    shader_tex.clone(),
+                    shader_tex,
                 );
 
                 return Ok(m);

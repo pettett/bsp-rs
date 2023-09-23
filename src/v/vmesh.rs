@@ -45,27 +45,28 @@ impl VMesh {
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
     }
 
-    pub fn draw_instance<'a>(
+    pub fn draw_instanced<'a>(
         &'a self,
         state: &'a VRenderer,
         render_pass: &mut wgpu::RenderPass<'a>,
-        model: &'a VBuffer,
+        instance_count: u32,
+        instance_buffer: &'a wgpu::Buffer,
     ) {
         // 1.
 
         self.shader.draw(state, render_pass);
 
         render_pass.set_bind_group(0, state.camera_bind_group(), &[]);
-        render_pass.set_bind_group(1, &model.bind_group, &[]);
 
         for (i, tex) in &self.texture_bind_group {
             render_pass.set_bind_group(*i + 2, tex, &[]);
         }
 
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
 
-        render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+        render_pass.draw_indexed(0..self.num_indices, 0, 0..instance_count);
     }
 
     pub fn new_box(device: &wgpu::Device, min: Vec3, max: Vec3, shader: Arc<VShader>) -> Self {

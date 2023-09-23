@@ -1,6 +1,6 @@
 use glam::{IVec3, Vec2, Vec3};
 
-pub trait Vertex {
+pub trait Vertex: bytemuck::Pod {
     fn desc() -> wgpu::VertexBufferLayout<'static>;
 }
 
