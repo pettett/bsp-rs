@@ -12,7 +12,7 @@ use crate::{
     camera::{Camera, CameraUniform},
     camera_controller::CameraController,
     geo::{InstancedProp, Static},
-    gui::state_imgui::StateImgui,
+    gui::gui::{Gui, GuiWindow},
     state::StateInstance,
 };
 
@@ -35,7 +35,8 @@ pub fn draw_static(
     static_meshes: Query<(&VMesh, &Static)>,
     prop_meshes: Query<(&VMesh, &InstancedProp)>,
     cameras: Query<(&CameraUniform,)>,
-    mut imgui: NonSendMut<StateImgui>,
+    gui_windows: Query<&mut GuiWindow>,
+    mut imgui: NonSendMut<Gui>,
     renderer: Res<VRenderer>,
     lighting_opt: Option<Res<LightingData>>,
     mut commands: Commands,
@@ -117,7 +118,7 @@ pub fn draw_static(
         }
     }
 
-    imgui.render_pass(&renderer, &mut encoder, &output, &view, &mut commands);
+    imgui.render_pass(&renderer, gui_windows, &mut encoder, &view, &mut commands);
 
     // submit will accept anything that implements IntoIter
     renderer.queue().submit(std::iter::once(encoder.finish()));

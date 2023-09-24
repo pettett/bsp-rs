@@ -28,8 +28,8 @@ impl Camera {
             transform: Transform::new(Vec3A::new(-8000.0, -2000.0, 1000.0), Quat::IDENTITY),
             aspect,
             fovy: 45.0,
-            znear: 0.1,
-            zfar: 10000.0,
+            znear: 1.0,
+            zfar: 5000.0,
         }
     }
     pub fn transform(&self) -> &Transform {

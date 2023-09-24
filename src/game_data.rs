@@ -51,8 +51,9 @@ impl GameData {
         get_cell: F,
     ) -> Option<&'a Arc<T>> {
         for d in &self.dirs {
-            if let Ok(vtf) = d.load_file_once(path, &get_cell) {
-                return Some(vtf);
+            match d.load_file_once(path, &get_cell) {
+                Ok(vtf) => return Some(vtf),
+                Err(_) => continue,
             }
         }
         None

@@ -31,7 +31,7 @@ pub fn main() {
     ));
     let m = load_vmesh(
         &VGlobalPath::from("models/props_trainstation/train001.mdl"),
-        &renderer.instance.device,
+        &renderer.instance,
         prop_shader,
         &game_data.inner,
     )

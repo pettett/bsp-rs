@@ -4,6 +4,7 @@ use wgpu::{Device, Queue};
 
 use crate::{
     assets::vtf::header::{VTFHeader, VTFHeader73},
+    state::StateInstance,
     v::VTexture,
 };
 
@@ -77,47 +78,44 @@ impl VTF {
         self.header.low_res_image_height as u32
     }
 
-    pub fn get_high_res(&self, device: &Device, queue: &Queue) -> &VRes<VTexture> {
-        self.high_res
-            .get_or_init(|| self.upload_high_res(device, queue))
+    pub fn get_high_res(&self, instance: &StateInstance) -> &VRes<VTexture> {
+        self.high_res.get_or_init(|| self.upload_high_res(instance))
     }
 
-    pub fn get_low_res(&self, device: &Device, queue: &Queue) -> &VRes<VTexture> {
-        self.low_res
-            .get_or_init(|| self.upload_low_res(device, queue))
+    pub fn get_low_res(&self, instance: &StateInstance) -> &VRes<VTexture> {
+        self.low_res.get_or_init(|| self.upload_low_res(instance))
     }
     pub fn get_high_res_imgui(
         &self,
-        device: &Device,
-        queue: &Queue,
+        instance: &StateInstance,
         renderer: &mut imgui_wgpu::Renderer,
     ) -> &VRes<imgui::TextureId> {
         self.high_res_imgui
-            .get_or_init(|| match self.get_high_res(device, queue) {
+            .get_or_init(|| match self.get_high_res(instance) {
                 Ok(high_res) => Ok(renderer
                     .textures
-                    .insert(high_res.to_imgui(device, renderer))),
+                    .insert(high_res.to_imgui(&instance.device, renderer))),
                 Err(e) => Err(*e),
             })
     }
     pub fn get_low_res_imgui(
         &self,
-        device: &Device,
-        queue: &Queue,
+        instance: &StateInstance,
         renderer: &mut imgui_wgpu::Renderer,
     ) -> &VRes<imgui::TextureId> {
         self.low_res_imgui
-            .get_or_init(|| match self.get_low_res(device, queue) {
-                Ok(low_res) => Ok(renderer.textures.insert(low_res.to_imgui(device, renderer))),
+            .get_or_init(|| match self.get_low_res(instance) {
+                Ok(low_res) => Ok(renderer
+                    .textures
+                    .insert(low_res.to_imgui(&instance.device, renderer))),
                 Err(e) => Err(*e),
             })
     }
 
-    fn upload_high_res(&self, device: &Device, queue: &Queue) -> VRes<VTexture> {
+    fn upload_high_res(&self, instance: &StateInstance) -> VRes<VTexture> {
         if self.high_res_data.len() > 0 {
             Ok(self.upload(
-                device,
-                queue,
+                instance,
                 self.width(),
                 self.height(),
                 self.header.high_res_image_format,
@@ -128,10 +126,9 @@ impl VTF {
         }
     }
 
-    fn upload_low_res(&self, device: &Device, queue: &Queue) -> VRes<VTexture> {
+    fn upload_low_res(&self, instance: &StateInstance) -> VRes<VTexture> {
         Ok(self.upload(
-            device,
-            queue,
+            instance,
             self.low_res_width(),
             self.low_res_height(),
             self.header.low_res_image_format,
@@ -141,8 +138,7 @@ impl VTF {
 
     fn upload(
         &self,
-        device: &Device,
-        queue: &Queue,
+        instance: &StateInstance,
         width: u32,
         height: u32,
         format: ImageFormat,
@@ -155,7 +151,7 @@ impl VTF {
             height,
             depth_or_array_layers: 1,
         };
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
+        let texture = instance.device.create_texture(&wgpu::TextureDescriptor {
             // All textures are stored as 3D, we represent our 2D texture
             // by setting depth to 1.
             size,
@@ -184,7 +180,7 @@ impl VTF {
                 depth_or_array_layers: 1,
             };
 
-            queue.write_texture(
+            instance.queue.write_texture(
                 // Tells wgpu where to copy the pixel data
                 wgpu::ImageCopyTexture {
                     texture: &texture,
@@ -200,7 +196,7 @@ impl VTF {
             );
         }
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        let sampler = instance.device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::Repeat,
             address_mode_v: wgpu::AddressMode::Repeat,
             address_mode_w: wgpu::AddressMode::Repeat,

@@ -1,6 +1,9 @@
 use std::{sync::Arc, time::Instant};
 
-use bevy_ecs::{component::Component, system::Commands};
+use bevy_ecs::{
+    component::Component,
+    system::{Commands, Query},
+};
 use imgui::{Condition, FontSource};
 use imgui_wgpu::{Renderer, RendererConfig};
 
@@ -10,26 +13,28 @@ use crate::{game_data::GameData, gui::Viewable, v::vrenderer::VRenderer};
 
 use super::map_select::MapSelect;
 
-pub struct StateImgui {
+pub struct Gui {
     imgui: imgui::Context,
     last_cursor: Option<imgui::MouseCursor>,
     last_frame: Instant,
     platform: imgui_winit_support::WinitPlatform,
     renderer: Renderer,
     //puffin_ui : puffin_imgui::ProfilerUi,
-    windows: Vec<WindowState>,
 }
 #[derive(Component)]
-pub struct WindowState {
+pub struct GuiWindow {
     opened: bool,
     view: Arc<dyn Viewable>,
 }
-impl WindowState {
+impl GuiWindow {
     pub fn new(view: Arc<dyn Viewable>) -> Self {
         Self {
             opened: false,
             view,
         }
+    }
+    pub fn new_open(view: Arc<dyn Viewable>) -> Self {
+        Self { opened: true, view }
     }
     pub fn draw_menu(
         &mut self,
@@ -60,12 +65,12 @@ impl WindowState {
     }
 }
 
-impl StateImgui {
+impl Gui {
     pub fn render_pass(
         &mut self,
         renderer: &VRenderer,
+        mut windows: Query<&mut GuiWindow>,
         encoder: &mut wgpu::CommandEncoder,
-        _output: &wgpu::SurfaceTexture,
         view: &wgpu::TextureView,
         commands: &mut Commands,
     ) {
@@ -81,12 +86,12 @@ impl StateImgui {
         let ui = self.imgui.frame();
 
         if let Some(_menu_bar) = ui.begin_main_menu_bar() {
-            for window in &mut self.windows {
+            for mut window in windows.iter_mut() {
                 window.draw_menu(ui, renderer, &mut self.renderer);
             }
         }
 
-        for window in &mut self.windows {
+        for mut window in windows.iter_mut() {
             window.draw_window(ui, renderer, &mut self.renderer, commands);
         }
 
@@ -169,15 +174,6 @@ impl StateImgui {
         //let dx1_data = dir.load_vtf("materials/metal/metalfloor001a.vtf").unwrap();
 
         let last_cursor = None;
-        let windows = Vec::<WindowState>::new();
-
-        // for d in game_data.dirs() {
-        //     windows.push(WindowState::new(d.clone()));
-        // }
-
-        // windows.push(WindowState::new(Arc::new(
-        //     MapSelect::new(game_data.maps()).unwrap(),
-        // )));
 
         Self {
             imgui,
@@ -185,12 +181,11 @@ impl StateImgui {
             last_frame: Instant::now(),
             platform,
             renderer: imgui_renderer,
-            windows,
         }
     }
 }
 
-impl StateImgui {
+impl Gui {
     pub fn handle_event<T>(&mut self, window: &Window, event: &Event<T>) -> bool {
         self.platform
             .handle_event(self.imgui.io_mut(), window, event);

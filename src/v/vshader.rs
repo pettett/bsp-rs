@@ -8,6 +8,7 @@ use super::vrenderer::VRenderer;
 pub struct VShader {
     render_pipeline: wgpu::RenderPipeline,
     texture_bind_group_layouts: Vec<wgpu::BindGroupLayout>,
+    tex_bind_start: u32,
 }
 
 impl VShader {
@@ -78,7 +79,7 @@ impl VShader {
         Self::new_instanced::<V, I>(
             renderer,
             shader,
-            0,
+            1,
             wgpu::PrimitiveTopology::TriangleList,
             Some(wgpu::Face::Front),
             "Triangle Strip",
@@ -192,6 +193,7 @@ impl VShader {
         Self {
             render_pipeline,
             texture_bind_group_layouts,
+            tex_bind_start: 2,
         }
     }
 
@@ -300,6 +302,11 @@ impl VShader {
         Self {
             render_pipeline,
             texture_bind_group_layouts,
+            tex_bind_start: 1,
         }
+    }
+
+    pub fn tex_bind_start(&self) -> u32 {
+        self.tex_bind_start
     }
 }

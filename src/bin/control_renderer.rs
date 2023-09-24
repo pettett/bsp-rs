@@ -10,7 +10,10 @@ use bevy_ecs::{
 };
 use bsp_explorer::{
     game_data::{GameData, GameDataArc},
-    gui::state_imgui::StateImgui,
+    gui::{
+        gui::{Gui, GuiWindow},
+        map_select::MapSelect,
+    },
     state::{box_cmds, command_task, spawn_command_task, MapChangeEvent, StateApp},
     v::vrenderer::VRenderer,
     vinit, vrun,
@@ -28,18 +31,27 @@ pub fn main() {
 }
 
 fn init_world(state: &mut StateApp) {
-    state.world_mut().spawn(command_task(|| {
-        let ini = Ini::load_from_file("conf.ini").unwrap();
+    state
+        .world_mut()
+        .spawn(command_task("Loading game data", || {
+            let ini = Ini::load_from_file("conf.ini").unwrap();
 
-        let game_data = GameData::from_ini(&ini);
+            let game_data = GameData::from_ini(&ini);
 
-        box_cmds(|commands| {
-            let start_map = game_data.inner.starter_map().to_owned();
-            commands.add(|w: &mut World| w.send_event(MapChangeEvent(start_map)));
+            box_cmds(|commands| {
+                let start_map = game_data.inner.starter_map().to_owned();
+                commands.add(|w: &mut World| w.send_event(MapChangeEvent(start_map)));
 
-            commands.insert_resource(game_data);
-        })
-    }));
+                for d in game_data.inner.dirs() {
+                    commands.spawn(GuiWindow::new(d.clone()));
+                }
+                commands.spawn(GuiWindow::new(Arc::new(
+                    MapSelect::new(game_data.inner.maps()).unwrap(),
+                )));
+
+                commands.insert_resource(game_data);
+            })
+        }));
 
     println!("Loaded game data");
 }

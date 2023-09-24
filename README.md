@@ -1,5 +1,6 @@
 # BSP-RS
 
+![Road](readme/road.png)
 ![Station](readme/station.png)
 
 # TODO
@@ -11,7 +12,7 @@
 - [ ] Attach materials as a component
 - [x] load models (this was a pain)
     - [x] Instanced prop drawing
-    - [ ] Textured prop drawing
+    - [x] Textured prop drawing
     - [ ] Lit prop drawing
 - [x] stop rendering trigger volumes
 - [x] respect shader request from material
@@ -31,3 +32,4 @@
     - [ ] VMT files changed slightly
     - [ ] No lightmap data?
 - [ ] TF2
+- [ ] Unify getting texture reference from material

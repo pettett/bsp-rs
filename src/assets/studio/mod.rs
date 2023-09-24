@@ -12,8 +12,9 @@ pub use vvd::VVD;
 use crate::{
     assets::vpk::VPKFile,
     game_data::GameData,
+    state::StateInstance,
     v::{
-        vpath::{VPath, VSplitPath},
+        vpath::{VLocalPath, VPath, VSplitPath},
         vshader::VShader,
         VMesh,
     },
@@ -35,7 +36,7 @@ pub fn fixup_remapping_search(fixup_table: &Box<[Fixup]>, dst_idx: u16) -> u16 {
 }
 pub fn load_vmesh(
     mdl_path: &dyn VPath,
-    device: &wgpu::Device,
+    instance: &StateInstance,
     shader_tex: Arc<VShader>,
     game_data: &GameData,
 ) -> Result<VMesh, &'static str> {
@@ -44,6 +45,9 @@ pub fn load_vmesh(
         .ok_or("No mdl file")?;
 
     let dir = mdl_path.dir();
+
+    let mut mat_dir = "materials/".to_owned();
+    mat_dir.push_str(&dir);
 
     let mut vtx_filename = mdl_path.filename().to_owned();
     vtx_filename.push_str(".dx90");
@@ -104,12 +108,39 @@ pub fn load_vmesh(
                 let ind_start = s.header.index_offset as usize;
                 let ind_count = s.header.num_indices as usize;
 
-                let m = VMesh::new(
-                    device,
+                let mut m = VMesh::new(
+                    &instance.device,
                     &verts[..],
                     &indices[ind_start..ind_start + ind_count],
                     shader_tex,
                 );
+
+                let mat_path = VSplitPath::new(&mat_dir, &mdl.textures[0].name, "vmt");
+
+                let vmt = game_data
+                    .load(&mat_path, VPKFile::vmt)
+                    .ok_or("No VMT material file")?;
+
+                let tex_path = {
+                    let Some(tex_path) = vmt.get_basetex() else {
+                        return Err("Could not find texture param in vmt");
+                    };
+
+                    tex_path.replace('\\', "/")
+                };
+
+                let vtf_path = VLocalPath::new("materials", &tex_path, "vtf");
+
+                let vtf = game_data
+                    .load(&vtf_path, VPKFile::vtf)
+                    .ok_or("No VTF texture file")?;
+
+                let vtex = vtf
+                    .get_high_res(instance)
+                    .as_ref()
+                    .map_err(|()| "Failed to load high res")?;
+
+                m.load_tex(&instance.device, 0, vtex);
 
                 return Ok(m);
             }

@@ -9,7 +9,7 @@ use glam::{vec3, Vec3};
 
 use wgpu::util::DeviceExt;
 
-use super::{vbuffer::VBuffer, vrenderer::VRenderer, vshader::VShader, VTexture};
+use super::{vrenderer::VRenderer, vshader::VShader, VTexture};
 #[derive(Component)]
 pub struct VMesh {
     vertex_buffer: wgpu::Buffer,
@@ -35,14 +35,7 @@ impl VMesh {
         render_pass.set_bind_group(0, state.camera_bind_group(), &[]);
         render_pass.set_bind_group(1, &lighting.lighting_bind_group, &[]);
 
-        for (i, tex) in &self.texture_bind_group {
-            render_pass.set_bind_group(*i + 2, tex, &[]);
-        }
-
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
-
-        render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+        self.draw_inner(render_pass, 1, None);
     }
 
     pub fn draw_instanced<'a>(
@@ -58,12 +51,26 @@ impl VMesh {
 
         render_pass.set_bind_group(0, state.camera_bind_group(), &[]);
 
+        self.draw_inner(render_pass, instance_count, Some(instance_buffer));
+    }
+
+    fn draw_inner<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        instance_count: u32,
+        instance_buffer: Option<&'a wgpu::Buffer>,
+    ) {
+        // 1.
+
         for (i, tex) in &self.texture_bind_group {
-            render_pass.set_bind_group(*i + 2, tex, &[]);
+            render_pass.set_bind_group(*i + self.shader.tex_bind_start(), tex, &[]);
         }
 
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
+
+        if let Some(instance_buffer) = instance_buffer {
+            render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
+        }
         render_pass.set_index_buffer(self.index_buffer.slice(..), self.index_format);
 
         render_pass.draw_indexed(0..self.num_indices, 0, 0..instance_count);

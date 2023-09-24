@@ -6,8 +6,7 @@ use std::{
 
 use bevy_ecs::system::{Commands, Res, SystemState};
 use bsp_explorer::{
-    game_data::GameData, gui::state_imgui::StateImgui, state::StateApp, v::vrenderer::VRenderer,
-    vinit, vrun,
+    game_data::GameData, gui::gui::Gui, state::StateApp, v::vrenderer::VRenderer, vinit, vrun,
 };
 use ini::Ini;
 

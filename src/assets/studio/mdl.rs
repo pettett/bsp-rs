@@ -11,12 +11,17 @@ pub struct MDL {
     //pub header: mdl_headers::MDLHeader,
     pub version: u32,
     pub body: Vec<MDLBodyPart>,
+    pub textures: Vec<MDLTexture>,
 }
 
 pub struct MDLBodyPart {
     pub name: String,
     pub head: StudioBodyparts,
     pub models: Vec<MDLModel>,
+}
+#[derive(Debug)]
+pub struct MDLTexture {
+    pub name: String,
 }
 
 pub struct MDLModel {
@@ -40,7 +45,17 @@ impl BinaryData for MDL {
 
         let mut pos = mem::size_of::<mdl_headers::MDLHeader>() as i64;
 
-        let text = header.texture.read_f(buffer, 0, &mut pos)?;
+        let text = header.texture.read(buffer, 0, &mut pos)?;
+        let mut textures = Vec::<MDLTexture>::new();
+
+        for (i, t) in text {
+            textures.push(MDLTexture {
+                name: t
+                    .name_offset
+                    .read_str(buffer, i, &mut pos)?
+                    .to_ascii_lowercase(),
+            });
+        }
 
         // for (i, t) in &text {
         //     println!("{:?}", t);
@@ -96,6 +111,7 @@ impl BinaryData for MDL {
         Ok(Self {
             body: parts,
             version: header.version,
+            textures,
         })
     }
 }

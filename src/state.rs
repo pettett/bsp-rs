@@ -9,7 +9,8 @@ use crate::camera_controller::{
     on_key_in, on_mouse_in, on_mouse_mv, update_camera, KeyIn, MouseIn, MouseMv,
 };
 use crate::game_data::{GameData, GameDataArc};
-use crate::gui::state_imgui::StateImgui;
+use crate::gui::gui::{Gui, GuiWindow};
+use crate::gui::task_viewer::TaskViewer;
 use crate::v::vrenderer::{draw_static, VRenderer};
 use crate::v::VTexture;
 use bevy_ecs::prelude::*;
@@ -56,6 +57,7 @@ pub type CommandTaskResult = Box<dyn Send + FnOnce(&mut Commands) -> ()>;
 
 #[derive(Component)]
 pub struct CommandTask {
+    pub name: &'static str,
     handle: Option<JoinHandle<CommandTaskResult>>,
 }
 
@@ -66,13 +68,18 @@ pub fn box_cmds(f: impl Send + FnOnce(&mut Commands) -> () + 'static) -> Command
 
 pub fn spawn_command_task(
     commands: &mut Commands,
+    name: &'static str,
     f: impl 'static + Send + FnOnce() -> CommandTaskResult,
 ) {
-    commands.spawn(command_task(f));
+    commands.spawn(command_task(name, f));
 }
 
-pub fn command_task(f: impl 'static + Send + FnOnce() -> CommandTaskResult) -> CommandTask {
+pub fn command_task(
+    name: &'static str,
+    f: impl 'static + Send + FnOnce() -> CommandTaskResult,
+) -> CommandTask {
     CommandTask {
+        name,
         handle: Some(thread::spawn(f)),
     }
 }
@@ -109,7 +116,7 @@ impl StateApp {
     /// Creating some of the wgpu types requires async code
     /// https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#state-new
     pub fn new(mut world: World, renderer: VRenderer) -> Self {
-        world.insert_non_send_resource(StateImgui::init(&renderer));
+        world.insert_non_send_resource(Gui::init(&renderer));
         world.insert_resource(renderer);
 
         let mut schedule = Schedule::default();
@@ -121,6 +128,8 @@ impl StateApp {
         world.insert_resource(Events::<Test>::default());
 
         world.send_event(Test());
+
+        world.spawn(GuiWindow::new_open(Arc::new(TaskViewer::new())));
 
         // Add our system to the schedule
         schedule.add_systems((
@@ -184,7 +193,7 @@ impl StateApp {
             .window()
             .clone();
         self.world
-            .get_non_send_resource_mut::<StateImgui>()
+            .get_non_send_resource_mut::<Gui>()
             .unwrap()
             .handle_event(&window, event)
     }

@@ -21,6 +21,7 @@ pub struct VLocalPath<'a> {
     root_directory: &'static str,
     ext: &'static str,
 }
+#[derive(Debug)]
 pub struct VSplitPath<'a> {
     directory: &'a str,
     filename: &'a str,
