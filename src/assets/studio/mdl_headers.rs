@@ -27,9 +27,9 @@ use glam::Vec3;
 use crate::binaries::{BinArray, BinOffset};
 
 #[repr(C, packed)]
-pub struct MDLHeader {
+pub(super) struct MDLHeader {
     pub id: [u8; 4],    // Model format ID, such as "IDST" (0x49 0x44 0x53 0x54)
-    pub version: i32,   // Format version number, such as 48 (0x30,0x00,0x00,0x00)
+    pub version: u32,   // Format version number, such as 48 (0x30,0x00,0x00,0x00)
     pub checksum: i32,  // This has to be the same in the phy and vtx files to load!
     pub name: zstr<64>, // The internal name of the model, padding with null bytes.
     // Typically "my_model.mdl" will have an internal name of "my_model"
@@ -75,7 +75,7 @@ pub struct MDLHeader {
 
     // VMT texture filenames
     // mstudiotexture_t
-    pub texture: BinArray<StudioTexture>,
+    pub texture: BinArray<Texture>,
 
     // This offset points to a series of i32s.
     // Each i32 value, in turn, is an offset relative to the start of this header/the-file,
@@ -209,7 +209,7 @@ unsafe impl bytemuck::Zeroable for StudioBodyparts {}
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, bytemuck::Zeroable)]
-pub struct StudioTexture {
+pub(super) struct Texture {
     // Number of bytes past the beginning of this structure
     // where the first character of the texture name can be found.
     pub name_offset: BinOffset, // Offset for null-terminated string

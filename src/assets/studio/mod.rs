@@ -14,7 +14,6 @@ use crate::{
     game_data::GameData,
     v::{
         vpath::{VPath, VSplitPath},
-        vrenderer::VRenderer,
         vshader::VShader,
         VMesh,
     },
@@ -40,9 +39,9 @@ pub fn load_vmesh(
     shader_tex: Arc<VShader>,
     game_data: &GameData,
 ) -> Result<VMesh, &'static str> {
-    //let mdl = game_data
-    //    .load(mdl_path, VPKFile::mdl)
-    //    .ok_or("No mdl file")?;
+    let mdl = game_data
+        .load(mdl_path, VPKFile::mdl)
+        .ok_or("No mdl file")?;
 
     let dir = mdl_path.dir();
 
@@ -137,7 +136,7 @@ mod mdl_tests {
                 let Ok(mdl) = data.load_mdl(&dir) else {
                     continue;
                 };
-                assert!(mdl.header.version < 100);
+                assert!(mdl.version < 100);
             }
         }
     }
@@ -189,6 +188,8 @@ mod mdl_tests {
         let _vvd = dir
             .load_vvd(&VGlobalPath::from("models/props_c17/bench01a.vvd"))
             .unwrap();
+
+        //print!("{:?}", mdl.text);
 
         assert_eq!(mdl.body.len(), vtx.body[0].0.len());
 

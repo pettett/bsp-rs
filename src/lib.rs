@@ -10,7 +10,10 @@ pub mod transform;
 pub mod v;
 pub mod vertex;
 
-use std::{cell::RefCell, sync::Arc};
+use std::{
+    cell::RefCell,
+    sync::{Arc, Mutex},
+};
 
 use bevy_ecs::world::World;
 use state::StateApp;
@@ -22,7 +25,7 @@ use winit::{
     window::WindowBuilder,
 };
 
-pub async fn vinit() -> (Arc<RefCell<StateApp>>, EventLoop<()>) {
+pub async fn vinit() -> (StateApp, EventLoop<()>) {
     env_logger::init();
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
@@ -30,13 +33,10 @@ pub async fn vinit() -> (Arc<RefCell<StateApp>>, EventLoop<()>) {
 
     let renderer = VRenderer::new(window, &mut world).await;
 
-    (
-        Arc::new(RefCell::new(StateApp::new(world, renderer))),
-        event_loop,
-    )
+    (StateApp::new(world, renderer), event_loop)
 }
 
-pub fn vrun(state_arc: Arc<RefCell<StateApp>>, event_loop: EventLoop<()>) -> ! {
+pub fn vrun(mut state: StateApp, event_loop: EventLoop<()>) -> ! {
     //let instance = state.renderer().instance();
     //let debug_mesh = state.debug_mesh.clone();
     //thread::spawn(move || {
@@ -50,10 +50,6 @@ pub fn vrun(state_arc: Arc<RefCell<StateApp>>, event_loop: EventLoop<()>) -> ! {
     //});
 
     event_loop.run(move |event, _, control_flow| {
-        let Ok(mut state) = state_arc.try_borrow_mut() else {
-            return;
-        };
-
         let mouse_capture = state.handle_event(&event);
 
         match event {

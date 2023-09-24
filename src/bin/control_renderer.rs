@@ -1,4 +1,8 @@
-use std::{cell::RefCell, sync::Arc};
+use std::{
+    cell::RefCell,
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use bevy_ecs::system::{Commands, Res, SystemState};
 use bsp_explorer::{
@@ -10,14 +14,14 @@ use ini::Ini;
 pub fn main() {
     println!("Starting...");
 
-    let (state, event_loop) = pollster::block_on(vinit());
+    let (mut state, event_loop) = pollster::block_on(vinit());
+
+    init_world(&mut state);
 
     vrun(state, event_loop);
 }
 
-fn init_world(state_arc: Arc<RefCell<StateApp>>) {
-    let mut state = state_arc.borrow_mut();
-
+fn init_world(state: &mut StateApp) {
     let ini = Ini::load_from_file("conf.ini").unwrap();
 
     let game_data = GameData::from_ini(&ini);

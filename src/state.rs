@@ -1,4 +1,6 @@
 use std::path::PathBuf;
+use std::thread::JoinHandle;
+use std::{mem, thread, time};
 
 use crate::assets::bsp::loader::load_bsp;
 use crate::camera::update_view_proj;
@@ -9,11 +11,9 @@ use crate::game_data::GameData;
 use crate::gui::state_imgui::StateImgui;
 use crate::v::vrenderer::{draw_static, VRenderer};
 use crate::v::VTexture;
-use bevy_ecs::event::{EventReader, Events};
-use bevy_ecs::schedule::Schedule;
-use bevy_ecs::system::{Commands, Res};
-use bevy_ecs::world::{Mut, World};
+use bevy_ecs::prelude::*;
 use ini::Ini;
+use rayon::ThreadPool;
 use winit::dpi::PhysicalSize;
 use winit::event::*;
 
@@ -64,6 +64,44 @@ impl StateInstance {
 #[derive(bevy_ecs::event::Event)]
 pub struct MapChangeEvent(pub PathBuf);
 
+#[derive(bevy_ecs::event::Event)]
+pub struct Test();
+#[derive(Component)]
+pub struct SpawnBatchTask {
+    handle: Option<JoinHandle<Box<dyn Send + Fn(&mut Commands) -> ()>>>,
+}
+
+fn test(mut q: EventReader<Test>, mut c: Commands) {
+    for t in q.iter() {
+        println!("Got event!");
+
+        c.spawn(SpawnBatchTask {
+            handle: Some(thread::spawn(|| {
+                let ten_millis = time::Duration::from_millis(1000);
+
+                thread::sleep(ten_millis);
+
+                Box::new(|c: &mut Commands| c.add(|w: &mut World| w.send_event(Test())))
+                    as Box<dyn Send + Fn(&mut Commands) -> ()>
+            })),
+        });
+    }
+}
+
+fn complete(mut q: Query<(Entity, &mut SpawnBatchTask)>, mut c: Commands) {
+    for (e, mut p) in q.iter_mut() {
+        if p.handle.as_ref().unwrap().is_finished() {
+            let t = mem::replace(&mut p.handle, None).unwrap().join().unwrap();
+
+            println!("Finished event: ");
+
+            c.entity(e).despawn();
+
+            t(&mut c);
+        }
+    }
+}
+
 impl StateApp {
     /// Creating some of the wgpu types requires async code
     /// https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#state-new
@@ -77,10 +115,15 @@ impl StateApp {
         world.insert_resource(Events::<MouseMv>::default());
         world.insert_resource(Events::<KeyIn>::default());
         world.insert_resource(Events::<MapChangeEvent>::default());
+        world.insert_resource(Events::<Test>::default());
+
+        world.send_event(Test());
 
         // Add our system to the schedule
         schedule.add_systems((
             load_map,
+            test,
+            complete,
             on_mouse_in,
             on_mouse_mv,
             on_key_in,
@@ -130,7 +173,7 @@ impl StateApp {
         self.renderer().size
     }
 
-    pub fn handle_event<T>(&mut self, event: &Event<T>) -> bool {
+    pub fn handle_event<T>(&mut self, event: &winit::event::Event<T>) -> bool {
         let window = self
             .world
             .get_resource::<VRenderer>()

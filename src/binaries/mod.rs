@@ -5,8 +5,6 @@ use std::{
     mem, slice,
 };
 
-
-
 pub trait BinaryData {
     fn read<R: Read + Seek>(buffer: &mut BufReader<R>, _max_size: Option<usize>) -> io::Result<Self>
     where
@@ -29,7 +27,7 @@ pub trait BinaryData {
         _max_size: Option<usize>,
     ) -> io::Result<Box<[Self]>>
     where
-        Self: Sized + bytemuck::Zeroable + bytemuck::Pod,
+        Self: Sized + bytemuck::Zeroable,
     {
         let mut header = bytemuck::zeroed_slice_box(count);
 
@@ -86,10 +84,7 @@ impl BinOffset {
         Ok(String::from_utf8(data).unwrap())
     }
     //TODO: choose name
-    pub fn read_array_f<
-        T: Sized + bytemuck::Zeroable + bytemuck::Pod + BinaryData,
-        R: Read + Seek,
-    >(
+    pub fn read_array_f<T: Sized + bytemuck::Zeroable, R: Read + Seek>(
         &self,
         buffer: &mut BufReader<R>,
         start: i64,
@@ -151,7 +146,7 @@ impl<T: Sized + BinaryData> BinArray<T> {
         self.offset.read_array(buffer, start, pos, self.count)
     }
 }
-impl<T: Sized + BinaryData + bytemuck::Pod> BinArray<T> {
+impl<T: Sized + bytemuck::Zeroable> BinArray<T> {
     pub fn read_f<R: Read + Seek>(
         &self,
         buffer: &mut BufReader<R>,

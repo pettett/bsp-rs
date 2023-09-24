@@ -5,12 +5,12 @@ use crate::{
     binaries::BinaryData,
 };
 
-use super::mdl_headers::{self, StudioBodyparts, StudioTexture};
+use super::mdl_headers::{self, StudioBodyparts, Texture};
 
 pub struct MDL {
-    pub header: mdl_headers::MDLHeader,
+    //pub header: mdl_headers::MDLHeader,
+    pub version: u32,
     pub body: Vec<MDLBodyPart>,
-    pub text: Vec<(i64, StudioTexture)>,
 }
 
 pub struct MDLBodyPart {
@@ -40,7 +40,7 @@ impl BinaryData for MDL {
 
         let mut pos = mem::size_of::<mdl_headers::MDLHeader>() as i64;
 
-        let text = header.texture.read(buffer, 0, &mut pos)?;
+        let text = header.texture.read_f(buffer, 0, &mut pos)?;
 
         // for (i, t) in &text {
         //     println!("{:?}", t);
@@ -94,9 +94,8 @@ impl BinaryData for MDL {
         }
 
         Ok(Self {
-            header,
             body: parts,
-            text,
+            version: header.version,
         })
     }
 }
