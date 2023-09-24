@@ -4,7 +4,7 @@ use std::thread::JoinHandle;
 use std::{mem, thread, time};
 
 use crate::assets::bsp::loader::load_bsp;
-use crate::camera::update_view_proj;
+use crate::camera::{update_view_proj, Camera};
 use crate::camera_controller::{
     on_key_in, on_mouse_in, on_mouse_mv, update_camera, KeyIn, MouseIn, MouseMv,
 };
@@ -14,6 +14,7 @@ use crate::gui::task_viewer::TaskViewer;
 use crate::v::vrenderer::{draw_static, VRenderer};
 use crate::v::VTexture;
 use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemState;
 use ini::Ini;
 use rayon::ThreadPool;
 use winit::dpi::PhysicalSize;
@@ -163,11 +164,16 @@ impl StateApp {
     // impl State
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
-            let mut renderer = self.world.get_resource_mut::<VRenderer>().unwrap();
+            let mut state =
+                SystemState::<(Query<&mut Camera>, ResMut<VRenderer>)>::new(&mut self.world);
+
+            let (mut cameras, mut renderer) = state.get_mut(&mut self.world);
 
             renderer.size = new_size;
-            //TODO:
-            //renderer.camera.aspect = new_size.width as f32 / new_size.height as f32;
+
+            for mut camera in cameras.iter_mut() {
+                camera.aspect = new_size.width as f32 / new_size.height as f32;
+            }
             renderer.config.width = new_size.width;
             renderer.config.height = new_size.height;
             renderer.depth_texture = VTexture::create_depth_texture(
