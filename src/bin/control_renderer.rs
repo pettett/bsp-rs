@@ -4,9 +4,15 @@ use std::{
     thread,
 };
 
-use bevy_ecs::system::{Commands, Res, SystemState};
+use bevy_ecs::{
+    system::{Commands, Res, SystemState},
+    world::World,
+};
 use bsp_explorer::{
-    game_data::GameData, gui::state_imgui::StateImgui, state::StateApp, v::vrenderer::VRenderer,
+    game_data::{GameData, GameDataArc},
+    gui::state_imgui::StateImgui,
+    state::{box_cmds, command_task, spawn_command_task, MapChangeEvent, StateApp},
+    v::vrenderer::VRenderer,
     vinit, vrun,
 };
 use ini::Ini;
@@ -22,28 +28,18 @@ pub fn main() {
 }
 
 fn init_world(state: &mut StateApp) {
-    let ini = Ini::load_from_file("conf.ini").unwrap();
+    state.world_mut().spawn(command_task(|| {
+        let ini = Ini::load_from_file("conf.ini").unwrap();
 
-    let game_data = GameData::from_ini(&ini);
+        let game_data = GameData::from_ini(&ini);
 
-    state.world_mut().insert_resource(game_data);
+        box_cmds(|commands| {
+            let start_map = game_data.inner.starter_map().to_owned();
+            commands.add(|w: &mut World| w.send_event(MapChangeEvent(start_map)));
 
-    // Construct a `SystemState` struct, passing in a tuple of `SystemParam`
-    // as if you were writing an ordinary system.
+            commands.insert_resource(game_data);
+        })
+    }));
 
-    let mut system_state: SystemState<(Commands, Res<VRenderer>, Res<GameData>)> =
-        SystemState::new(state.world_mut());
-
-    // Use system_state.get_mut(&mut world) and unpack your system parameters into variables!
-    // system_state.get(&world) provides read-only versions of your system parameters instead.
-    let (mut commands, renderer, game_data) = system_state.get(state.world());
-
-    bsp_explorer::assets::bsp::loader::load_bsp(
-        game_data.starter_map(),
-        &mut commands,
-        &game_data,
-        &renderer,
-    );
-
-    system_state.apply(state.world_mut());
+    println!("Loaded game data");
 }

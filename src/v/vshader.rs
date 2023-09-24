@@ -1,4 +1,7 @@
-use crate::vertex::{UVVertex, Vertex};
+use crate::{
+    state::StateInstance,
+    vertex::{UVVertex, Vertex},
+};
 
 use super::vrenderer::VRenderer;
 
@@ -15,9 +18,9 @@ impl VShader {
     pub fn draw<'a>(&'a self, _state: &'a VRenderer, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_pipeline(&self.render_pipeline);
     }
-    pub fn new_textured(renderer: &VRenderer) -> Self {
+    pub fn new_textured(renderer: &StateInstance) -> Self {
         let shader = renderer
-            .device()
+            .device
             .create_shader_module(wgpu::include_wgsl!("../textured_shader.wgsl"));
         Self::new::<UVVertex>(
             renderer,
@@ -28,9 +31,9 @@ impl VShader {
             "Textured",
         )
     }
-    pub fn new_textured_envmap(renderer: &VRenderer) -> Self {
+    pub fn new_textured_envmap(renderer: &StateInstance) -> Self {
         let shader = renderer
-            .device()
+            .device
             .create_shader_module(wgpu::include_wgsl!("../textured_shader_envmap.wgsl"));
         Self::new::<UVVertex>(
             renderer,
@@ -41,9 +44,9 @@ impl VShader {
             "Textured Envmap",
         )
     }
-    pub fn new_displacement(renderer: &VRenderer) -> Self {
+    pub fn new_displacement(renderer: &StateInstance) -> Self {
         let shader = renderer
-            .device()
+            .device
             .create_shader_module(wgpu::include_wgsl!("../displacement.wgsl"));
         Self::new::<UVVertex>(
             renderer,
@@ -54,9 +57,9 @@ impl VShader {
             "Displacement",
         )
     }
-    pub fn new_white_lines<V: Vertex>(renderer: &VRenderer) -> Self {
+    pub fn new_white_lines<V: Vertex>(renderer: &StateInstance) -> Self {
         let shader = renderer
-            .device()
+            .device
             .create_shader_module(wgpu::include_wgsl!("../solid_white.wgsl"));
         Self::new::<V>(
             renderer,
@@ -68,9 +71,9 @@ impl VShader {
         )
     }
 
-    pub fn new_instanced_prop<V: Vertex, I: Vertex>(renderer: &VRenderer) -> Self {
+    pub fn new_instanced_prop<V: Vertex, I: Vertex>(renderer: &StateInstance) -> Self {
         let shader = renderer
-            .device()
+            .device
             .create_shader_module(wgpu::include_wgsl!("../uv_shader.wgsl"));
         Self::new_instanced::<V, I>(
             renderer,
@@ -83,7 +86,7 @@ impl VShader {
     }
 
     pub fn new<V: Vertex>(
-        renderer: &VRenderer,
+        renderer: &StateInstance,
         shader: wgpu::ShaderModule,
         textures: usize,
         topology: wgpu::PrimitiveTopology,
@@ -93,7 +96,7 @@ impl VShader {
         let mut texture_bind_group_layouts = Vec::new();
 
         for i in 0..textures {
-            texture_bind_group_layouts.push(renderer.device().create_bind_group_layout(
+            texture_bind_group_layouts.push(renderer.device.create_bind_group_layout(
                 &wgpu::BindGroupLayoutDescriptor {
                     entries: &[
                         wgpu::BindGroupLayoutEntry {
@@ -121,7 +124,7 @@ impl VShader {
         }
 
         let mut bind_group_layouts = Vec::new();
-        bind_group_layouts.push(renderer.camera_bind_group_layout());
+        bind_group_layouts.push(&renderer.camera_bind_group_layout);
 
         bind_group_layouts.push(&renderer.lighting_bind_group_layout);
 
@@ -131,7 +134,7 @@ impl VShader {
 
         let render_pipeline_layout =
             renderer
-                .device()
+                .device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some(name),
                     bind_group_layouts: &bind_group_layouts[..],
@@ -140,7 +143,7 @@ impl VShader {
 
         let render_pipeline =
             renderer
-                .device()
+                .device
                 .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some(name),
                     layout: Some(&render_pipeline_layout),
@@ -155,7 +158,7 @@ impl VShader {
                         entry_point: "fs_main",
                         targets: &[Some(wgpu::ColorTargetState {
                             // 4.
-                            format: renderer.config().format,
+                            format: renderer.format,
                             blend: Some(wgpu::BlendState::REPLACE),
                             write_mask: wgpu::ColorWrites::ALL,
                         })],
@@ -193,7 +196,7 @@ impl VShader {
     }
 
     pub fn new_instanced<V: Vertex, I: Vertex>(
-        renderer: &VRenderer,
+        renderer: &StateInstance,
         shader: wgpu::ShaderModule,
         textures: usize,
         topology: wgpu::PrimitiveTopology,
@@ -203,7 +206,7 @@ impl VShader {
         let mut texture_bind_group_layouts = Vec::new();
 
         for i in 0..textures {
-            texture_bind_group_layouts.push(renderer.device().create_bind_group_layout(
+            texture_bind_group_layouts.push(renderer.device.create_bind_group_layout(
                 &wgpu::BindGroupLayoutDescriptor {
                     entries: &[
                         wgpu::BindGroupLayoutEntry {
@@ -231,7 +234,7 @@ impl VShader {
         }
 
         let mut bind_group_layouts = Vec::new();
-        bind_group_layouts.push(renderer.camera_bind_group_layout());
+        bind_group_layouts.push(&renderer.camera_bind_group_layout);
 
         for t in &texture_bind_group_layouts {
             bind_group_layouts.push(t)
@@ -239,7 +242,7 @@ impl VShader {
 
         let render_pipeline_layout =
             renderer
-                .device()
+                .device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some(name),
                     bind_group_layouts: &bind_group_layouts[..],
@@ -248,7 +251,7 @@ impl VShader {
 
         let render_pipeline =
             renderer
-                .device()
+                .device
                 .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some(name),
                     layout: Some(&render_pipeline_layout),
@@ -263,7 +266,7 @@ impl VShader {
                         entry_point: "fs_main",
                         targets: &[Some(wgpu::ColorTargetState {
                             // 4.
-                            format: renderer.config().format,
+                            format: renderer.format,
                             blend: Some(wgpu::BlendState::REPLACE),
                             write_mask: wgpu::ColorWrites::ALL,
                         })],

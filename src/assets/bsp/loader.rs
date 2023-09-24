@@ -12,6 +12,7 @@ use crate::{
     assets::{bsp::gamelump::load_gamelump, studio::load_vmesh, vpk::VPKDirectory, VMT},
     game_data::GameData,
     geo::{InstancedProp, Static},
+    state::{box_cmds, spawn_command_task, CommandTaskResult, StateInstance},
     transform::Transform,
     v::{
         vbuffer::VBuffer,
@@ -25,8 +26,16 @@ use crate::{
 use bevy_ecs::system::Commands;
 use glam::{ivec3, vec2, IVec3, Mat4, Quat, Vec3, Vec4};
 use rayon::prelude::*;
-use std::{collections::HashMap, f32::consts::PI, path::Path, sync::Arc, time::Instant};
+use std::{
+    collections::HashMap,
+    f32::consts::PI,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Instant,
+};
 use wgpu::util::DeviceExt;
+
+use super::gamelump::GameLump;
 
 #[derive(Default)]
 struct MeshBuilder<V: Vertex + Default> {
@@ -262,12 +271,32 @@ impl<V: Vertex + Default> MeshBuilder<V> {
     }
 }
 
-pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, renderer: &VRenderer) {
-    let device = renderer.device();
+pub fn load_bsp(
+    map: &Path,
+    commands: &mut Commands,
+    game_data: Arc<GameData>,
+    renderer: &VRenderer,
+) {
     let map_path = game_data.maps().join(map);
-    println!("Loading BSP File {:?}...", map_path);
-    let now = Instant::now();
+    let instance = renderer.instance();
+    spawn_command_task(commands, move || {
+        load_bsp_task(map_path, game_data, instance)
+    });
+}
 
+struct Shaders {
+    shader_lines: Arc<VShader>,
+    shader_tex: Arc<VShader>,
+    _shader_tex_envmap: Arc<VShader>,
+    shader_disp: Arc<VShader>,
+    prop_shader: Arc<VShader>,
+}
+
+fn load_bsp_task(
+    map_path: PathBuf,
+    game_data: Arc<GameData>,
+    renderer: Arc<StateInstance>,
+) -> CommandTaskResult {
     let (header, mut buffer) = BSPHeader::load(&map_path).unwrap();
 
     header.validate();
@@ -277,6 +306,22 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         println!("Loaded BSP File version {v}");
     }
 
+    let shader_lines = Arc::new(VShader::new_white_lines::<Vec3>(&renderer));
+    let shader_tex = Arc::new(VShader::new_textured(&renderer));
+    let _shader_tex_envmap = Arc::new(VShader::new_textured_envmap(&renderer));
+    let shader_disp = Arc::new(VShader::new_displacement(&renderer));
+    let prop_shader = Arc::new(VShader::new_instanced_prop::<UVAlphaVertex, Mat4>(
+        &renderer,
+    ));
+
+    let shaders = Arc::new(Shaders {
+        shader_lines,
+        shader_tex,
+        _shader_tex_envmap,
+        shader_disp,
+        prop_shader,
+    });
+
     //let mut mesh = StateMesh::new(renderer, wgpu::PrimitiveTopology::TriangleList);
     //mesh.load_glb_mesh(instance.clone());
     //state.add_mesh(mesh);
@@ -284,9 +329,6 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
     //let mut mesh = StateMesh::new(renderer, wgpu::PrimitiveTopology::LineList);
     //mesh.load_debug_edges(instance.clone(), &header, &mut buffer);
     //state.add_mesh(mesh);
-
-    println!("Took {:?}. Loading BSP Headers...", now.elapsed());
-    let now = Instant::now();
 
     let faces = header.get_lump::<BSPFace>(&mut buffer);
     let surf_edges = header.get_lump::<BSPSurfEdge>(&mut buffer);
@@ -318,8 +360,6 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         lighting_cols = vec![Vec4::ONE; entries];
     }
 
-    println!("Took {:?}. Loading BSP Faces...", now.elapsed());
-    let now = Instant::now();
     let textured_tris = build_meshes(
         faces,
         &verts,
@@ -331,14 +371,10 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         &surf_edges,
     );
 
-    println!("Took {:?}. Loading BSP Pak...", now.elapsed());
-    let now = Instant::now();
     let pak_header = header.get_lump_header(LumpType::PakFile);
 
-    let pak: VPKDirectory = pak_header.read_binary(&mut buffer).unwrap();
+    let pak: Arc<VPKDirectory> = Arc::new(pak_header.read_binary(&mut buffer).unwrap());
 
-    println!("Took {:?}. Loading BSP Texture strings...", now.elapsed());
-    let now = Instant::now();
     let tex_data_string_table = header.get_lump::<BSPTexDataStringTable>(&mut buffer);
     let tex_data_string_data = header.get_lump_header(LumpType::TexDataStringData);
 
@@ -353,9 +389,7 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         })
         .collect();
 
-    println!("Took {:?}. Loading BSP Materials...", now.elapsed());
-    let now = Instant::now();
-    let materials: HashMap<i32, &Arc<VMT>> = textured_tris
+    let materials: HashMap<i32, Arc<VMT>> = textured_tris
         .par_iter()
         .filter_map(|(tex, _tris)| {
             let Some(mat_name) = material_name_map.get(tex) else {
@@ -385,38 +419,96 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
             };
 
             if let Some(vmt) = vmt {
-                Some((*tex, vmt))
+                Some((*tex, vmt.clone()))
             } else {
                 None
             }
         })
         .collect();
 
-    println!("Took {:?}. Loading BSP shaders...", now.elapsed());
-    let now = Instant::now();
-    let shader_lines = Arc::new(VShader::new_white_lines::<Vec3>(renderer));
-    let shader_tex = Arc::new(VShader::new_textured(renderer));
-    let _shader_tex_envmap = Arc::new(VShader::new_textured_envmap(renderer));
-    let shader_disp = Arc::new(VShader::new_displacement(renderer));
+    let _models = header.get_lump::<BSPModel>(&mut buffer);
 
-    println!("Took {:?}. Loading BSP static props...", now.elapsed());
-    let now = Instant::now();
-
+    // for m in models.iter() {
+    //     commands.spawn((
+    //         VMesh::new_box(device, m.mins(), m.maxs(), shader_lines.clone()),
+    //         Static(),
+    //     ));
+    // }
     let gamelump = load_gamelump(header.get_lump_header(LumpType::GameLump), &mut buffer).unwrap();
 
+    box_cmds(move |commands| {
+        // Create a lighting buffer for use in all shaders
+        insert_lighting_buffer(commands, &lighting_cols[..], &renderer);
+
+        for (tex, builder) in textured_tris {
+            let Some(vmt) = materials.get(&tex) else {
+                println!("Could not find material for {:?}", tex);
+                continue;
+            };
+
+            let vmt = vmt.clone();
+            let renderer = renderer.clone();
+            let game_data = game_data.clone();
+            let shaders = shaders.clone();
+            let pak = pak.clone();
+            spawn_command_task(commands, move || {
+                load_static(game_data, renderer, vmt, builder, pak, shaders)
+            });
+        }
+
+        spawn_command_task(commands, move || {
+            load_props(game_data, renderer, gamelump, shaders)
+        });
+    })
+}
+
+pub fn insert_lighting_buffer(
+    commands: &mut Commands,
+    lighting_cols: &[Vec4],
+    renderer: &StateInstance,
+) {
+    let lighting_buffer = renderer
+        .device
+        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Lighting Buffer"),
+            contents: bytemuck::cast_slice(lighting_cols),
+            usage: wgpu::BufferUsages::STORAGE,
+        });
+
+    let lighting_bind_group = renderer
+        .device
+        .create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &renderer.lighting_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: lighting_buffer.as_entire_binding(),
+            }],
+            label: Some("lighting_bind_group"),
+        });
+
+    //commands.insert_resource(VPK::<0>(pak));
+    commands.insert_resource(LightingData {
+        lighting_buffer,
+        lighting_bind_group,
+    });
+}
+
+fn load_props(
+    game_data: Arc<GameData>,
+    renderer: Arc<StateInstance>,
+    gamelump: GameLump,
+    shaders: Arc<Shaders>,
+) -> CommandTaskResult {
     let mut instances = HashMap::new();
-    let prop_shader = Arc::new(VShader::new_instanced_prop::<UVAlphaVertex, Mat4>(
-        &renderer,
-    ));
 
     for prop in &gamelump.props {
         let path = gamelump.static_prop_names[prop.prop_type as usize].as_str();
 
         let m = load_vmesh(
             &VGlobalPath::new(&path),
-            renderer.device(),
-            prop_shader.clone(),
-            game_data,
+            &renderer.device,
+            shaders.prop_shader.clone(),
+            &game_data,
         );
 
         match m {
@@ -456,139 +548,102 @@ pub fn load_bsp(map: &Path, commands: &mut Commands, game_data: &GameData, rende
         // ));
     }
 
-    for (i, bundle) in instances {
-        commands.spawn(bundle);
+    box_cmds(|commands| {
+        for (i, bundle) in instances {
+            commands.spawn(bundle);
+        }
+    })
+}
+
+fn load_static(
+    game_data: Arc<GameData>,
+    renderer: Arc<StateInstance>,
+    vmt: Arc<VMT>,
+    builder: MeshBuilder<UVVertex>,
+    pak: Arc<VPKDirectory>,
+    shaders: Arc<Shaders>,
+) -> CommandTaskResult {
+    let (shader, shader_textures) = match vmt.shader() {
+        "patch" => match vmt.patch.get() {
+            Some(Some(vmt_patch)) => match vmt_patch.shader() {
+                "lightmappedgeneric" => (shaders.shader_tex.clone(), vec!["$basetexture"]),
+                "unlittwotexture" => (shaders.shader_tex.clone(), vec!["$basetexture"]),
+                "worldvertextransition" => (
+                    shaders.shader_disp.clone(),
+                    vec!["$basetexture2", "$basetexture"],
+                ), // displacement - TODO: Include envmap
+
+                x => {
+                    println!(
+                        "Unknown patched shader {x} - Patch:\n {:#?}\n Original:\n {:#?}",
+                        vmt.data,
+                        vmt.patch.get().as_ref().unwrap().as_ref().unwrap().data
+                    );
+                    (shaders.shader_lines.clone(), vec![])
+                }
+            },
+            _ => {
+                println!("ERROR: No patch vmt");
+                (shaders.shader_lines.clone(), vec![])
+            }
+        }, //normal brushes with lightmap
+        "lightmappedgeneric" => (shaders.shader_tex.clone(), vec!["$basetexture"]), // normal brushes
+        "unlittwotexture" => (shaders.shader_tex.clone(), vec!["$basetexture"]),    // screens
+        "unlitgeneric" => (shaders.shader_tex.clone(), vec!["$basetexture"]),       // glass?
+        "worldvertextransition" => (
+            shaders.shader_disp.clone(),
+            vec!["$basetexture2", "$basetexture"],
+        ), // displacement
+        x => {
+            println!("Unknown shader {x}");
+            (shaders.shader_lines.clone(), vec![])
+        }
+    };
+
+    let mut mesh = VMesh::new_empty(&renderer.device, shader);
+
+    mesh.from_verts_and_tris(
+        &renderer.device,
+        bytemuck::cast_slice(&builder.verts),
+        bytemuck::cast_slice(&builder.tris),
+        builder.tris.len() as u32,
+    );
+    let mut all_success = true;
+    for (i, tex) in shader_textures.iter().enumerate() {
+        let tex_path = {
+            let Some(tex_path) = vmt.get(tex) else {
+                println!("ERROR: Could not find {} texture for {:?}", tex, vmt);
+                continue;
+            };
+
+            tex_path.replace('\\', "/")
+        };
+
+        let vtf_path = VLocalPath::new("materials", &tex_path, "vtf");
+
+        let vtf = if let Some(vtf) = game_data.load_vtf(&vtf_path) {
+            vtf
+        } else {
+            match pak.load_vtf(&vtf_path) {
+                Ok(vtf) => vtf,
+                Err(x) => {
+                    println!("ERROR: {x} Could not find vtf for {tex}: <{tex_path}>");
+                    continue;
+                }
+            }
+        };
+
+        if let Ok(high_res) = vtf.get_high_res(&renderer.device, &renderer.queue) {
+            mesh.load_tex(&renderer.device, i as u32, high_res);
+        } else {
+            all_success = false;
+            break;
+        }
     }
 
-    println!("Took {:?}. Loading BSP meshes...", now.elapsed());
-    let now = Instant::now();
-
-    for (tex, builder) in &textured_tris {
-        let Some(vmt) = materials.get(tex) else {
-            println!("Could not find material for {:?}", tex);
-            continue;
-        };
-
-        let (shader, shader_textures) = match vmt.shader() {
-            "patch" => match vmt.patch.get() {
-                Some(Some(vmt_patch)) => match vmt_patch.shader() {
-                    "lightmappedgeneric" => (shader_tex.clone(), vec!["$basetexture"]),
-                    "unlittwotexture" => (shader_tex.clone(), vec!["$basetexture"]),
-                    "worldvertextransition" => {
-                        (shader_disp.clone(), vec!["$basetexture2", "$basetexture"])
-                    } // displacement - TODO: Include envmap
-
-                    x => {
-                        println!(
-                            "Unknown patched shader {x} - Patch:\n {:#?}\n Original:\n {:#?}",
-                            vmt.data,
-                            vmt.patch.get().as_ref().unwrap().as_ref().unwrap().data
-                        );
-                        (shader_lines.clone(), vec![])
-                    }
-                },
-                _ => {
-                    println!("ERROR: No patch vmt");
-                    (shader_lines.clone(), vec![])
-                }
-            }, //normal brushes with lightmap
-            "lightmappedgeneric" => (shader_tex.clone(), vec!["$basetexture"]), // normal brushes
-            "unlittwotexture" => (shader_tex.clone(), vec!["$basetexture"]),    // screens
-            "unlitgeneric" => (shader_tex.clone(), vec!["$basetexture"]),       // glass?
-            "worldvertextransition" => (shader_disp.clone(), vec!["$basetexture2", "$basetexture"]), // displacement
-            x => {
-                println!("Unknown shader {x}");
-                (shader_lines.clone(), vec![])
-            }
-        };
-
-        let mut mesh = VMesh::new_empty(device, shader);
-
-        mesh.from_verts_and_tris(
-            device,
-            bytemuck::cast_slice(&builder.verts),
-            bytemuck::cast_slice(&builder.tris),
-            builder.tris.len() as u32,
-        );
-        let mut all_success = true;
-        for (i, tex) in shader_textures.iter().enumerate() {
-            let tex_path = {
-                let Some(tex_path) = vmt.get(tex) else {
-                    println!("ERROR: Could not find {} texture for {:?}", tex, vmt);
-                    continue;
-                };
-
-                tex_path.replace('\\', "/")
-            };
-
-            let vtf_path = VLocalPath::new("materials", &tex_path, "vtf");
-
-            let vtf = if let Some(vtf) = game_data.load_vtf(&vtf_path) {
-                vtf
-            } else {
-                match pak.load_vtf(&vtf_path) {
-                    Ok(vtf) => vtf,
-                    Err(x) => {
-                        println!("ERROR: {x} Could not find vtf for {tex}: <{tex_path}>");
-                        continue;
-                    }
-                }
-            };
-
-            if let Ok(high_res) = vtf.get_high_res(device, renderer.queue()) {
-                mesh.load_tex(device, i as u32, high_res);
-            } else {
-                all_success = false;
-                break;
-            }
-        }
+    box_cmds(move |commands| {
         if all_success {
             commands.spawn((mesh, Static()));
         }
-    }
-
-    println!("Took {:?}", now.elapsed());
-
-    let _models = header.get_lump::<BSPModel>(&mut buffer);
-
-    // for m in models.iter() {
-    //     commands.spawn((
-    //         VMesh::new_box(device, m.mins(), m.maxs(), shader_lines.clone()),
-    //         Static(),
-    //     ));
-    // }
-
-    // Create a lighting buffer for use in all shaders
-    insert_lighting_buffer(commands, &lighting_cols[..], renderer);
-}
-
-pub fn insert_lighting_buffer(
-    commands: &mut Commands,
-    lighting_cols: &[Vec4],
-    renderer: &VRenderer,
-) {
-    let lighting_buffer = renderer
-        .device()
-        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Lighting Buffer"),
-            contents: bytemuck::cast_slice(lighting_cols),
-            usage: wgpu::BufferUsages::STORAGE,
-        });
-
-    let lighting_bind_group = renderer
-        .device()
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &renderer.lighting_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: lighting_buffer.as_entire_binding(),
-            }],
-            label: Some("lighting_bind_group"),
-        });
-
-    //commands.insert_resource(VPK::<0>(pak));
-    commands.insert_resource(LightingData {
-        lighting_buffer,
-        lighting_bind_group,
-    });
+    })
 }

@@ -4,7 +4,7 @@ use bevy_ecs::system::{Commands, Res, SystemState};
 
 use bsp_explorer::{
     assets::studio::load_vmesh,
-    game_data::GameData,
+    game_data::{GameData, GameDataArc},
     geo::InstancedProp,
     v::{vpath::VGlobalPath, vrenderer::VRenderer, vshader::VShader},
     vertex::UVAlphaVertex,
@@ -20,20 +20,20 @@ pub fn main() {
     // Construct a `SystemState` struct, passing in a tuple of `SystemParam`
     // as if you were writing an ordinary system.
 
-    let mut system_state: SystemState<(Commands, Res<VRenderer>, Res<GameData>)> =
+    let mut system_state: SystemState<(Commands, Res<VRenderer>, Res<GameDataArc>)> =
         SystemState::new(state.world_mut());
 
     // Use system_state.get_mut(&mut world) and unpack your system parameters into variables!
     // system_state.get(&world) provides read-only versions of your system parameters instead.
     let (mut commands, renderer, game_data) = system_state.get(state.world());
     let prop_shader = Arc::new(VShader::new_instanced_prop::<UVAlphaVertex, Mat4>(
-        &renderer,
+        &renderer.instance(),
     ));
     let m = load_vmesh(
         &VGlobalPath::from("models/props_trainstation/train001.mdl"),
-        renderer.device(),
+        &renderer.instance.device,
         prop_shader,
-        &game_data,
+        &game_data.inner,
     )
     .unwrap();
 
@@ -48,7 +48,7 @@ pub fn main() {
     bsp_explorer::assets::bsp::loader::insert_lighting_buffer(
         &mut commands,
         &[Vec4::ONE],
-        &renderer,
+        &renderer.instance,
     );
 
     system_state.apply(state.world_mut());

@@ -20,17 +20,15 @@ use super::{VMesh, VTexture};
 
 #[derive(Resource)]
 pub struct VRenderer {
-    instance: Arc<StateInstance>,
+    pub instance: Arc<StateInstance>,
     pub config: wgpu::SurfaceConfiguration,
     pub size: winit::dpi::PhysicalSize<u32>,
     window: Arc<winit::window::Window>,
     pub depth_texture: VTexture,
     camera_entity: Entity,
     camera_buffer: wgpu::Buffer,
-    camera_bind_group_layout: wgpu::BindGroupLayout,
     camera_bind_group: wgpu::BindGroup,
     //TODO: Better way to handle these
-    pub lighting_bind_group_layout: wgpu::BindGroupLayout,
 }
 
 pub fn draw_static(
@@ -42,7 +40,7 @@ pub fn draw_static(
     lighting_opt: Option<Res<LightingData>>,
     mut commands: Commands,
 ) {
-    let output = renderer.instance.surface().get_current_texture().unwrap();
+    let output = renderer.instance.surface.get_current_texture().unwrap();
 
     let view = output
         .texture
@@ -252,14 +250,19 @@ impl VRenderer {
 
         Self {
             window: Arc::new(window),
-            instance: Arc::new(StateInstance::new(surface, device, queue)),
-            camera_bind_group_layout,
+            instance: Arc::new(StateInstance {
+                surface,
+                device,
+                queue,
+                camera_bind_group_layout,
+                lighting_bind_group_layout,
+                format: config.format,
+            }),
             config,
             size,
             camera_entity,
             depth_texture,
             camera_buffer,
-            lighting_bind_group_layout,
             camera_bind_group,
         }
     }
@@ -268,23 +271,19 @@ impl VRenderer {
         &self.window
     }
     pub fn surface(&self) -> &wgpu::Surface {
-        &self.instance.surface()
+        &self.instance.surface
     }
     pub fn device(&self) -> &wgpu::Device {
-        &self.instance.device()
+        &self.instance.device
     }
     pub fn queue(&self) -> &wgpu::Queue {
-        &self.instance.queue()
+        &self.instance.queue
     }
     pub fn config(&self) -> &wgpu::SurfaceConfiguration {
         &self.config
     }
     pub fn camera_bind_group(&self) -> &wgpu::BindGroup {
         &self.camera_bind_group
-    }
-
-    pub fn camera_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        &self.camera_bind_group_layout
     }
 
     pub fn instance(&self) -> Arc<StateInstance> {

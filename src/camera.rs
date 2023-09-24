@@ -25,7 +25,7 @@ pub const OPENGL_TO_WGPU_MATRIX: Mat4 = Mat4::from_cols_array(
 impl Camera {
     pub fn new(aspect: f32) -> Self {
         Self {
-            transform: Transform::new(Vec3A::new(-200.0, 0.0, 0.0), Quat::IDENTITY),
+            transform: Transform::new(Vec3A::new(-8000.0, -2000.0, 1000.0), Quat::IDENTITY),
             aspect,
             fovy: 45.0,
             znear: 0.1,

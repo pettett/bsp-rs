@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::{mem, thread, time};
 
@@ -7,7 +8,7 @@ use crate::camera::update_view_proj;
 use crate::camera_controller::{
     on_key_in, on_mouse_in, on_mouse_mv, update_camera, KeyIn, MouseIn, MouseMv,
 };
-use crate::game_data::GameData;
+use crate::game_data::{GameData, GameDataArc};
 use crate::gui::state_imgui::StateImgui;
 use crate::v::vrenderer::{draw_static, VRenderer};
 use crate::v::VTexture;
@@ -34,31 +35,15 @@ pub struct StateApp {
     schedule: Schedule,
 }
 
-/// Data that will be read only for the course of the program
+/// Data that will be read only for the course of the program, containing everything needed to create shaders and pipelines
 pub struct StateInstance {
-    surface: wgpu::Surface,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-}
+    pub surface: wgpu::Surface,
+    pub device: wgpu::Device,
+    pub queue: wgpu::Queue,
+    pub format: wgpu::TextureFormat,
 
-impl StateInstance {
-    pub fn new(surface: wgpu::Surface, device: wgpu::Device, queue: wgpu::Queue) -> Self {
-        Self {
-            surface,
-            device,
-            queue,
-        }
-    }
-
-    pub fn surface(&self) -> &wgpu::Surface {
-        &self.surface
-    }
-    pub fn device(&self) -> &wgpu::Device {
-        &self.device
-    }
-    pub fn queue(&self) -> &wgpu::Queue {
-        &self.queue
-    }
+    pub camera_bind_group_layout: wgpu::BindGroupLayout,
+    pub lighting_bind_group_layout: wgpu::BindGroupLayout,
 }
 
 #[derive(bevy_ecs::event::Event)]
@@ -66,38 +51,56 @@ pub struct MapChangeEvent(pub PathBuf);
 
 #[derive(bevy_ecs::event::Event)]
 pub struct Test();
+
+pub type CommandTaskResult = Box<dyn Send + FnOnce(&mut Commands) -> ()>;
+
 #[derive(Component)]
-pub struct SpawnBatchTask {
-    handle: Option<JoinHandle<Box<dyn Send + Fn(&mut Commands) -> ()>>>,
+pub struct CommandTask {
+    handle: Option<JoinHandle<CommandTaskResult>>,
 }
 
-fn test(mut q: EventReader<Test>, mut c: Commands) {
-    for t in q.iter() {
-        println!("Got event!");
+/// A quite annoying function to cast to the correct dyn type
+pub fn box_cmds(f: impl Send + FnOnce(&mut Commands) -> () + 'static) -> CommandTaskResult {
+    Box::new(f) as CommandTaskResult
+}
 
-        c.spawn(SpawnBatchTask {
-            handle: Some(thread::spawn(|| {
-                let ten_millis = time::Duration::from_millis(1000);
+pub fn spawn_command_task(
+    commands: &mut Commands,
+    f: impl 'static + Send + FnOnce() -> CommandTaskResult,
+) {
+    commands.spawn(command_task(f));
+}
 
-                thread::sleep(ten_millis);
-
-                Box::new(|c: &mut Commands| c.add(|w: &mut World| w.send_event(Test())))
-                    as Box<dyn Send + Fn(&mut Commands) -> ()>
-            })),
-        });
+pub fn command_task(f: impl 'static + Send + FnOnce() -> CommandTaskResult) -> CommandTask {
+    CommandTask {
+        handle: Some(thread::spawn(f)),
     }
 }
 
-fn complete(mut q: Query<(Entity, &mut SpawnBatchTask)>, mut c: Commands) {
+// fn test(mut q: EventReader<Test>, mut c: Commands) {
+//     for t in q.iter() {
+//         println!("Got event!");
+
+//         spawn_command_task(&mut c, || {
+//             let ten_millis = time::Duration::from_millis(1000);
+
+//             thread::sleep(ten_millis);
+
+//             box_cmds(|c: &mut Commands| c.add(|w: &mut World| w.send_event(Test())))
+//         });
+//     }
+// }
+
+fn complete_command_tasks(mut q: Query<(Entity, &mut CommandTask)>, mut c: Commands) {
     for (e, mut p) in q.iter_mut() {
         if p.handle.as_ref().unwrap().is_finished() {
-            let t = mem::replace(&mut p.handle, None).unwrap().join().unwrap();
-
-            println!("Finished event: ");
+            let t = mem::replace(&mut p.handle, None).unwrap().join();
 
             c.entity(e).despawn();
 
-            t(&mut c);
+            if let Ok(cmd) = t {
+                cmd(&mut c);
+            }
         }
     }
 }
@@ -122,8 +125,8 @@ impl StateApp {
         // Add our system to the schedule
         schedule.add_systems((
             load_map,
-            test,
-            complete,
+            //    test,
+            complete_command_tasks,
             on_mouse_in,
             on_mouse_mv,
             on_key_in,
@@ -235,11 +238,15 @@ pub fn load_map(
     mut events: EventReader<MapChangeEvent>,
     mut commands: Commands,
     renderer: Res<VRenderer>,
-    game_data_opt: Option<Res<GameData>>,
+    game_data_opt: Option<Res<GameDataArc>>,
 ) {
-    if let Some(game_data) = &game_data_opt {
-        for e in events.iter() {
-            load_bsp(&e.0, &mut commands, &game_data, &renderer)
+    for e in events.iter() {
+        if let Some(game_data) = &game_data_opt {
+            println!("Loading map {:?}", e.0);
+
+            load_bsp(&e.0, &mut commands, game_data.inner.clone(), &renderer)
+        } else {
+            panic!("No game data to load map");
         }
     }
 }

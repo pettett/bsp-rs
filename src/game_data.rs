@@ -15,6 +15,10 @@ use crate::{
     v::vpath::VPath,
 };
 #[derive(Resource)]
+pub struct GameDataArc {
+    pub inner: Arc<GameData>,
+}
+
 pub struct GameData {
     path: PathBuf,
     maps: PathBuf,
@@ -53,7 +57,7 @@ impl GameData {
         }
         None
     }
-    pub fn from_ini(ini: &Ini) -> Self {
+    pub fn from_ini(ini: &Ini) -> GameDataArc {
         println!("Loading game data... ");
         let now = Instant::now();
 
@@ -78,11 +82,13 @@ impl GameData {
         }
 
         println!("Took {:?}", now.elapsed());
-        GameData {
-            starter_map: maps.join(map),
-            maps,
-            dirs,
-            path,
+        GameDataArc {
+            inner: Arc::new(GameData {
+                starter_map: maps.join(map),
+                maps,
+                dirs,
+                path,
+            }),
         }
     }
     // pub fn load_game(game: Game) -> Self {
