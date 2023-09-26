@@ -2,6 +2,7 @@
 
 pub mod binary_data;
 pub mod consts;
+#[cfg(feature = "desktop")]
 pub mod gui;
 mod header;
 pub mod vtf;

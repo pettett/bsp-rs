@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bevy_ecs::system::{Commands, Res, SystemState};
+use bevy_ecs::system::{Commands, NonSend, Res, SystemState};
 
 use bsp_explorer::{
     assets::studio::load_vmesh,
@@ -20,7 +20,7 @@ pub fn main() {
     // Construct a `SystemState` struct, passing in a tuple of `SystemParam`
     // as if you were writing an ordinary system.
 
-    let mut system_state: SystemState<(Commands, Res<VRenderer>, Res<GameDataArc>)> =
+    let mut system_state: SystemState<(Commands, NonSend<VRenderer>, Res<GameDataArc>)> =
         SystemState::new(state.world_mut());
 
     // Use system_state.get_mut(&mut world) and unpack your system parameters into variables!

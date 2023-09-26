@@ -24,6 +24,7 @@
 //     maxPackFile: number;
 // }
 
+#[cfg(feature = "desktop")]
 pub mod gui;
 pub mod pak;
 

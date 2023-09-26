@@ -10,14 +10,17 @@ use bevy_ecs::{
 };
 use bsp_explorer::{
     game_data::{GameData, GameDataArc},
-    gui::{
-        gui::{Gui, GuiWindow},
-        map_select::MapSelect,
-    },
     state::{box_cmds, command_task, spawn_command_task, MapChangeEvent, StateApp},
     v::vrenderer::VRenderer,
     vinit, vrun,
 };
+
+#[cfg(feature = "desktop")]
+use bsp_explorer::gui::{
+    gui::{Gui, GuiWindow},
+    map_select::MapSelect,
+};
+
 use ini::Ini;
 
 pub fn main() {
@@ -42,9 +45,11 @@ fn init_world(state: &mut StateApp) {
                 let start_map = game_data.inner.starter_map().to_owned();
                 commands.add(|w: &mut World| w.send_event(MapChangeEvent(start_map)));
 
+                #[cfg(feature = "desktop")]
                 for d in game_data.inner.dirs() {
                     commands.spawn(GuiWindow::new(d.clone()));
                 }
+                #[cfg(feature = "desktop")]
                 commands.spawn(GuiWindow::new(Arc::new(
                     MapSelect::new(game_data.inner.maps()).unwrap(),
                 )));

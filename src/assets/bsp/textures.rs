@@ -63,13 +63,13 @@ use super::{
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct BSPTexInfo {
     /// [s/t][xyz offset]
-    pub tex_s: Vec4,
+    pub tex_s: [f32; 4],
     /// [s/t][xyz offset]
-    pub tex_t: Vec4,
-    pub lightmap_s: Vec4, // [s/t][xyz offset] - length is in units of texels/area
-    pub lightmap_t: Vec4, // [s/t][xyz offset] - length is in units of texels/area
-    pub flags: i32,       // miptex flags overrides
-    pub tex_data: i32,    // Pointer to texture name, size, etc.
+    pub tex_t: [f32; 4],
+    pub lightmap_s: [f32; 4], // [s/t][xyz offset] - length is in units of texels/area
+    pub lightmap_t: [f32; 4], // [s/t][xyz offset] - length is in units of texels/area
+    pub flags: i32,           // miptex flags overrides
+    pub tex_data: i32,        // Pointer to texture name, size, etc.
 }
 impl Lump for BSPTexInfo {
     fn max() -> usize {

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bevy_ecs::{
     entity::Entity,
-    system::{Commands, NonSendMut, Query, Res, Resource},
+    system::{Commands, NonSend, NonSendMut, Query, Res, Resource},
     world::World,
 };
 use wgpu::util::DeviceExt;
@@ -12,13 +12,14 @@ use crate::{
     camera::{Camera, CameraUniform},
     camera_controller::CameraController,
     geo::{InstancedProp, Static},
-    gui::gui::{Gui, GuiWindow},
     state::StateInstance,
 };
 
+#[cfg(feature = "desktop")]
+use crate::gui::gui::{Gui, GuiWindow};
+
 use super::{VMesh, VTexture};
 
-#[derive(Resource)]
 pub struct VRenderer {
     pub instance: Arc<StateInstance>,
     pub config: wgpu::SurfaceConfiguration,
@@ -35,9 +36,9 @@ pub fn draw_static(
     static_meshes: Query<(&VMesh, &Static)>,
     prop_meshes: Query<(&VMesh, &InstancedProp)>,
     cameras: Query<(&CameraUniform,)>,
-    gui_windows: Query<&mut GuiWindow>,
-    mut imgui: NonSendMut<Gui>,
-    renderer: Res<VRenderer>,
+    #[cfg(feature = "desktop")] gui_windows: Query<&mut GuiWindow>,
+    #[cfg(feature = "desktop")] mut imgui: NonSendMut<Gui>,
+    renderer: NonSend<VRenderer>,
     lighting_opt: Option<Res<LightingData>>,
     mut commands: Commands,
 ) {
@@ -118,6 +119,7 @@ pub fn draw_static(
         }
     }
 
+    #[cfg(feature = "desktop")]
     imgui.render_pass(&renderer, gui_windows, &mut encoder, &view, &mut commands);
 
     // submit will accept anything that implements IntoIter

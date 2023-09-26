@@ -1,14 +1,4 @@
-use std::{
-    cell::RefCell,
-    sync::{Arc, Mutex},
-    thread,
-};
-
-use bevy_ecs::system::{Commands, Res, SystemState};
-use bsp_explorer::{
-    game_data::GameData, gui::gui::Gui, state::StateApp, v::vrenderer::VRenderer, vinit, vrun,
-};
-use ini::Ini;
+use bsp_explorer::{vinit, vrun};
 
 pub fn main() {
     println!("Starting...");

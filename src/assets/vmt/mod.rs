@@ -8,6 +8,7 @@
 // export type VKFPairUnit = string | number | VKFPair[];
 // export type VKFPair<T extends VKFPairUnit = VKFPairUnit> = [string, T];
 
+#[cfg(feature = "desktop")]
 pub mod gui;
 
 use std::{

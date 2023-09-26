@@ -8,15 +8,13 @@ use crate::camera::{update_view_proj, Camera};
 use crate::camera_controller::{
     on_key_in, on_mouse_in, on_mouse_mv, update_camera, KeyIn, MouseIn, MouseMv,
 };
-use crate::game_data::{GameData, GameDataArc};
-use crate::gui::gui::{Gui, GuiWindow};
-use crate::gui::task_viewer::TaskViewer;
+use crate::game_data::GameDataArc;
+#[cfg(feature = "desktop")]
+use crate::gui::{Gui, GuiWindow, TaskViewer};
 use crate::v::vrenderer::{draw_static, VRenderer};
 use crate::v::VTexture;
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemState;
-use ini::Ini;
-use rayon::ThreadPool;
 use winit::dpi::PhysicalSize;
 use winit::event::*;
 
@@ -117,8 +115,9 @@ impl StateApp {
     /// Creating some of the wgpu types requires async code
     /// https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#state-new
     pub fn new(mut world: World, renderer: VRenderer) -> Self {
+        #[cfg(feature = "desktop")]
         world.insert_non_send_resource(Gui::init(&renderer));
-        world.insert_resource(renderer);
+        world.insert_non_send_resource(renderer);
 
         let mut schedule = Schedule::default();
 
@@ -129,7 +128,7 @@ impl StateApp {
         world.insert_resource(Events::<Test>::default());
 
         world.send_event(Test());
-
+        #[cfg(feature = "desktop")]
         world.spawn(GuiWindow::new_open(Arc::new(TaskViewer::new())));
 
         // Add our system to the schedule
@@ -156,16 +155,16 @@ impl StateApp {
         &mut self.world
     }
     pub fn renderer(&self) -> &VRenderer {
-        &self.world.get_resource().unwrap()
+        &self.world.get_non_send_resource().unwrap()
     }
     pub fn renderer_mut(&mut self) -> Mut<'_, VRenderer> {
-        self.world.get_resource_mut().unwrap()
+        self.world.get_non_send_resource_mut().unwrap()
     }
     // impl State
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             let mut state =
-                SystemState::<(Query<&mut Camera>, ResMut<VRenderer>)>::new(&mut self.world);
+                SystemState::<(Query<&mut Camera>, NonSendMut<VRenderer>)>::new(&mut self.world);
 
             let (mut cameras, mut renderer) = state.get_mut(&mut self.world);
 
@@ -194,14 +193,22 @@ impl StateApp {
     pub fn handle_event<T>(&mut self, event: &winit::event::Event<T>) -> bool {
         let window = self
             .world
-            .get_resource::<VRenderer>()
+            .get_non_send_resource::<VRenderer>()
             .unwrap()
             .window()
             .clone();
-        self.world
+
+        #[cfg(feature = "desktop")]
+        let r = self
+            .world
             .get_non_send_resource_mut::<Gui>()
             .unwrap()
-            .handle_event(&window, event)
+            .handle_event(&window, event);
+
+        #[cfg(not(feature = "desktop"))]
+        let r = false;
+
+        r
     }
 
     pub fn input(&mut self, event: &WindowEvent, can_use_mouse: bool) {
@@ -252,7 +259,7 @@ impl StateApp {
 pub fn load_map(
     mut events: EventReader<MapChangeEvent>,
     mut commands: Commands,
-    renderer: Res<VRenderer>,
+    renderer: NonSend<VRenderer>,
     game_data_opt: Option<Res<GameDataArc>>,
 ) {
     for e in events.iter() {

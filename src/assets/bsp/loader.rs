@@ -12,7 +12,7 @@ use crate::{
     assets::{bsp::gamelump::load_gamelump, studio::load_vmesh, vpk::VPKDirectory, VMT},
     game_data::GameData,
     geo::{InstancedProp, Static},
-    state::{box_cmds, spawn_command_task, CommandTaskResult, StateInstance},
+    state::StateInstance,
     transform::Transform,
     v::{
         vbuffer::VBuffer,
@@ -23,6 +23,9 @@ use crate::{
     },
     vertex::{UVAlphaVertex, UVVertex, Vertex},
 };
+
+use crate::state::{box_cmds, spawn_command_task, CommandTaskResult};
+
 use bevy_ecs::system::Commands;
 use glam::{ivec3, vec2, IVec3, Mat4, Quat, Vec3, Vec4};
 use rayon::prelude::*;
@@ -120,8 +123,11 @@ fn build_meshes(
 
         // TODO: better way to get tex/uv info from faces
 
-        let tex_s = tex.tex_s / data.width as f32;
-        let tex_t = tex.tex_t / data.height as f32;
+        let tex_s: Vec4 = tex.tex_s.into();
+        let tex_t: Vec4 = tex.tex_t.into();
+
+        let tex_s = tex_s / data.width as f32;
+        let tex_t = tex_t / data.height as f32;
 
         let lightmap_s = tex.lightmap_s;
         let lightmap_t = tex.lightmap_t;
@@ -188,7 +194,14 @@ fn build_meshes(
                     let pos = vert.vec + Vec3::lerp(v0, v1, dx);
 
                     builder.add_vert(
-                        i as u16, pos, tex_s, tex_t, lightmap_s, lightmap_t, vert.alpha, light_data,
+                        i as u16,
+                        pos,
+                        tex_s,
+                        tex_t,
+                        lightmap_s.into(),
+                        lightmap_t.into(),
+                        vert.alpha,
+                        light_data,
                     );
                 }
             }
@@ -219,8 +232,8 @@ fn build_meshes(
                         verts[i as usize],
                         tex_s,
                         tex_t,
-                        lightmap_s,
-                        lightmap_t,
+                        lightmap_s.into(),
+                        lightmap_t.into(),
                         1.0,
                         light_data,
                     );

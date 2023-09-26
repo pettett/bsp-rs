@@ -19,6 +19,7 @@ pub struct VTexture {
 impl VTexture {
     pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float; // 1.
 
+    #[cfg(feature = "desktop")]
     pub fn to_imgui(
         &self,
         device: &wgpu::Device,

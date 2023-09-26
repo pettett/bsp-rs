@@ -9,9 +9,7 @@ use imgui_wgpu::{Renderer, RendererConfig};
 
 use winit::{event::Event, window::Window};
 
-use crate::{game_data::GameData, gui::Viewable, v::vrenderer::VRenderer};
-
-use super::map_select::MapSelect;
+use crate::{gui::Viewable, v::vrenderer::VRenderer};
 
 pub struct Gui {
     imgui: imgui::Context,

@@ -4,6 +4,7 @@ pub mod camera;
 pub mod camera_controller;
 pub mod game_data;
 pub mod geo;
+#[cfg(feature = "desktop")]
 pub mod gui;
 pub mod state;
 pub mod transform;

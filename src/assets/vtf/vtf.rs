@@ -21,7 +21,9 @@ pub struct VTF {
     low_res: OnceLock<VRes<VTexture>>,
     high_res: OnceLock<VRes<VTexture>>,
 
+    #[cfg(feature = "desktop")]
     low_res_imgui: OnceLock<VRes<imgui::TextureId>>,
+    #[cfg(feature = "desktop")]
     high_res_imgui: OnceLock<VRes<imgui::TextureId>>,
 }
 
@@ -46,7 +48,9 @@ impl VTF {
             high_res_data: vec![vec![0; 0]; 0],
             low_res: OnceLock::new(),
             high_res: OnceLock::new(),
+            #[cfg(feature = "desktop")]
             low_res_imgui: OnceLock::new(),
+            #[cfg(feature = "desktop")]
             high_res_imgui: OnceLock::new(),
         }
     }
@@ -85,6 +89,8 @@ impl VTF {
     pub fn get_low_res(&self, instance: &StateInstance) -> &VRes<VTexture> {
         self.low_res.get_or_init(|| self.upload_low_res(instance))
     }
+
+    #[cfg(feature = "desktop")]
     pub fn get_high_res_imgui(
         &self,
         instance: &StateInstance,
@@ -98,6 +104,8 @@ impl VTF {
                 Err(e) => Err(*e),
             })
     }
+
+    #[cfg(feature = "desktop")]
     pub fn get_low_res_imgui(
         &self,
         instance: &StateInstance,
