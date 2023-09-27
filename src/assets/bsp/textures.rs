@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{BufRead, BufReader, Seek},
+    io::{BufRead, BufReader, Read, Seek},
 };
 
 use glam::{Vec3, Vec4};
@@ -129,7 +129,7 @@ pub struct BSPTexDataStringTable {
 impl BSPTexDataStringTable {
     pub fn get_filename(
         &self,
-        buffer: &mut BufReader<File>,
+        buffer: &mut BufReader<impl Read + Seek>,
         tex_data_string_data: &BSPLump,
     ) -> String {
         let index = self.index;

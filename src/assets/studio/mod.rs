@@ -158,8 +158,9 @@ mod mdl_tests {
 
     #[test]
     fn test_misc_dir() {
-        let dir = VPKDirectory::load(PathBuf::from(
+        let dir = VPKDirectory::load(Default::default(),PathBuf::from(
             "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_misc_dir.vpk",
+            
         ))
         .unwrap();
         for (_d, files) in &dir.files["mdl"] {
@@ -174,7 +175,7 @@ mod mdl_tests {
 
     #[test]
     fn test_single_vtx_misc_dir() {
-        let dir = VPKDirectory::load(PathBuf::from(
+        let dir = VPKDirectory::load(Default::default(),PathBuf::from(
             "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_misc_dir.vpk",
         ))
         .unwrap();
@@ -186,7 +187,7 @@ mod mdl_tests {
 
     #[test]
     fn test_single_vvd_misc_dir() {
-        let dir = VPKDirectory::load(PathBuf::from(
+        let dir = VPKDirectory::load(Default::default(),PathBuf::from(
             "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_misc_dir.vpk",
         ))
         .unwrap();
@@ -203,7 +204,7 @@ mod mdl_tests {
 
     #[test]
     fn test_single_misc_dir() {
-        let dir = VPKDirectory::load(PathBuf::from(
+        let dir = VPKDirectory::load(Default::default(),PathBuf::from(
             "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_misc_dir.vpk",
         ))
         .unwrap();

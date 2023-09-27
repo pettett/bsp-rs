@@ -27,9 +27,9 @@ pub struct BSPLump {
     pub four_cc: [u8; 4], // lump ident code
 }
 impl BSPLump {
-    pub fn decode<T: bytemuck::Zeroable>(
+    pub fn decode<T: bytemuck::Zeroable, R: Seek + Read>(
         &self,
-        buffer: &mut BufReader<File>,
+        buffer: &mut BufReader<R>,
     ) -> io::Result<Box<[T]>> {
         let item_size = mem::size_of::<T>();
 
@@ -56,12 +56,15 @@ impl BSPLump {
         Ok(table)
     }
 
-    pub fn read_binary<T: BinaryData>(&self, buffer: &mut BufReader<File>) -> io::Result<T> {
+    pub fn read_binary<T: BinaryData>(
+        &self,
+        buffer: &mut BufReader<impl Read + Seek>,
+    ) -> io::Result<T> {
         buffer.seek(std::io::SeekFrom::Start(self.file_ofs as u64))?;
         Ok(T::read(buffer, Some(self.file_len as usize))?)
     }
 
-    pub fn read_bytes(&self, buffer: &mut BufReader<File>) -> io::Result<Box<[u8]>> {
+    pub fn read_bytes(&self, buffer: &mut BufReader<impl Read + Seek>) -> io::Result<Box<[u8]>> {
         buffer.seek(std::io::SeekFrom::Start(self.file_ofs as u64))?;
         let mut bytes = bytemuck::zeroed_slice_box(self.file_len as usize);
         buffer.read_exact(&mut bytes)?;

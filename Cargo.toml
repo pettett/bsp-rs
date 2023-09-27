@@ -5,7 +5,7 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-default = ["desktop"]
+default = ["wasm"]
 desktop = ["dep:imgui", "dep:imgui-wgpu", "dep:imgui-winit-support"]
 wasm = ["dep:web-sys"]
 
@@ -16,7 +16,6 @@ env_logger = "0.10"
 log = "0.4"
 pollster = "0.3"
 bytemuck = { version = "1.13", features = ["derive", "extern_crate_alloc"] }
-puffin = "0.16"
 crate = "0.0.2"
 imgui = { version = "0.11", features = ["tables-api"], optional = true }
 imgui-wgpu = { version = "0.23", optional = true }

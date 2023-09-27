@@ -230,8 +230,8 @@ impl VRenderer {
 
         let depth_texture = VTexture::create_depth_texture(&device, &config, "depth_texture");
 
-        puffin::set_scopes_on(true); // you may want to control this with a flag
-                                     //let  puffin_ui = puffin_imgui::ProfilerUi::default();
+        //puffin::set_scopes_on(true); // you may want to control this with a flag
+        //let  puffin_ui = puffin_imgui::ProfilerUi::default();
 
         let camera_entity = world
             .spawn((camera, CameraController::new(10.), camera_uniform))

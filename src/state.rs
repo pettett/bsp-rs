@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::thread::JoinHandle;
-use std::{mem, thread, time};
+
+#[cfg(feature = "desktop")]
+use std::{thread, thread::JoinHandle};
+
+use std::{mem, time};
 
 use crate::assets::bsp::loader::load_bsp;
 use crate::camera::{update_view_proj, Camera};
@@ -11,6 +14,7 @@ use crate::camera_controller::{
 use crate::game_data::GameDataArc;
 #[cfg(feature = "desktop")]
 use crate::gui::{Gui, GuiWindow, TaskViewer};
+use crate::v::vfile::VFileSystem;
 use crate::v::vrenderer::{draw_static, VRenderer};
 use crate::v::VTexture;
 use bevy_ecs::prelude::*;
@@ -52,16 +56,19 @@ pub struct MapChangeEvent(pub PathBuf);
 #[derive(bevy_ecs::event::Event)]
 pub struct Test();
 
-pub type CommandTaskResult = Box<dyn Send + FnOnce(&mut Commands) -> ()>;
+pub type CommandTaskResult = Box<dyn Sync + Send + FnOnce(&mut Commands) -> ()>;
 
 #[derive(Component)]
 pub struct CommandTask {
     pub name: &'static str,
+    #[cfg(feature = "desktop")]
     handle: Option<JoinHandle<CommandTaskResult>>,
+    #[cfg(feature = "wasm")]
+    handle: Option<CommandTaskResult>,
 }
 
 /// A quite annoying function to cast to the correct dyn type
-pub fn box_cmds(f: impl Send + FnOnce(&mut Commands) -> () + 'static) -> CommandTaskResult {
+pub fn box_cmds(f: impl Sync + Send + FnOnce(&mut Commands) -> () + 'static) -> CommandTaskResult {
     Box::new(f) as CommandTaskResult
 }
 
@@ -77,10 +84,18 @@ pub fn command_task(
     name: &'static str,
     f: impl 'static + Send + FnOnce() -> CommandTaskResult,
 ) -> CommandTask {
-    CommandTask {
+    #[cfg(feature = "desktop")]
+    let t = CommandTask {
         name,
         handle: Some(thread::spawn(f)),
-    }
+    };
+    #[cfg(feature = "wasm")]
+    let t = CommandTask {
+        name,
+        handle: Some(f()),
+    };
+
+    t
 }
 
 // fn test(mut q: EventReader<Test>, mut c: Commands) {
@@ -99,12 +114,23 @@ pub fn command_task(
 
 fn complete_command_tasks(mut q: Query<(Entity, &mut CommandTask)>, mut c: Commands) {
     for (e, mut p) in q.iter_mut() {
+        #[cfg(feature = "desktop")]
         if p.handle.as_ref().unwrap().is_finished() {
             let t = mem::replace(&mut p.handle, None).unwrap().join();
 
             c.entity(e).despawn();
 
             if let Ok(cmd) = t {
+                cmd(&mut c);
+            }
+        }
+        #[cfg(feature = "wasm")]
+        {
+            let t = mem::replace(&mut p.handle, None);
+
+            c.entity(e).despawn();
+
+            if let Some(cmd) = t {
                 cmd(&mut c);
             }
         }
@@ -231,7 +257,7 @@ impl StateApp {
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        puffin::profile_function!();
+        //puffin::profile_function!();
 
         self.schedule.run(&mut self.world);
 
@@ -261,12 +287,25 @@ pub fn load_map(
     mut commands: Commands,
     renderer: NonSend<VRenderer>,
     game_data_opt: Option<Res<GameDataArc>>,
+    file_system_opt: Option<Res<VFileSystem>>,
 ) {
     for e in events.iter() {
         if let Some(game_data) = &game_data_opt {
             println!("Loading map {:?}", e.0);
 
-            load_bsp(&e.0, &mut commands, game_data.inner.clone(), &renderer)
+            load_bsp(
+                &e.0,
+                &mut commands,
+                game_data.inner.clone(),
+                &renderer,
+                //TODO:
+                match file_system_opt.as_ref() {
+                    Some(sys) => Some(VFileSystem {
+                        files: sys.files.clone(),
+                    }),
+                    None => None,
+                },
+            )
         } else {
             panic!("No game data to load map");
         }

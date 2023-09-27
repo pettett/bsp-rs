@@ -218,7 +218,7 @@ mod vmt_tests {
 
     #[test]
     fn test_misc_dir() {
-        let dir = VPKDirectory::load(PathBuf::from(
+        let dir = VPKDirectory::load(Default::default(),PathBuf::from(
             "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_misc_dir.vpk",
         ))
         .unwrap();
@@ -238,7 +238,7 @@ mod vmt_tests {
 
     #[test]
     fn test_misc_dir_p2() {
-        let dir = VPKDirectory::load(PathBuf::from(
+        let dir = VPKDirectory::load(Default::default(),PathBuf::from(
             "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Portal 2\\portal2\\pak01_dir.vpk",
         ))
         .unwrap();

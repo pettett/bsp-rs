@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::{self, BufReader, Seek},
+    io::{self, BufReader, Read, Seek},
 };
 
 use fixedstr::zstr;
@@ -52,7 +52,10 @@ pub struct GameLump {
     pub props: Vec<StaticPropLumpV5>,
 }
 
-pub fn load_gamelump(lump: &BSPLump, buffer: &mut BufReader<File>) -> io::Result<GameLump> {
+pub fn load_gamelump(
+    lump: &BSPLump,
+    buffer: &mut BufReader<impl Read + Seek>,
+) -> io::Result<GameLump> {
     buffer.seek(std::io::SeekFrom::Start(lump.file_ofs as u64))?;
 
     let lump_count = i32::read(buffer, None)?;

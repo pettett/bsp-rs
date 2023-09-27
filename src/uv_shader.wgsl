@@ -65,7 +65,7 @@ fn vs_main(
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	// if t.a < 0.1{
 	// 	discard;
- 
+// 	return vec4<f32>(in.tex_coords,0.0, 1.0);
     var t = textureSample(t_diffuse, s_diffuse, in.tex_coords);
 					
 	return vec4<f32>(t.rgb, 1.0);

@@ -1,8 +1,8 @@
-use crate::assets::bsp::consts::HEADER_LUMPS;
+use crate::{assets::bsp::consts::HEADER_LUMPS, v::vfile::VFileSystem};
 use std::{
     fmt,
     fs::File,
-    io::{self, BufReader, Read},
+    io::{self, BufReader, Cursor, Read, Seek},
     mem,
     path::Path,
     slice,
@@ -46,6 +46,25 @@ impl fmt::Debug for BSPHeader {
 }
 
 impl BSPHeader {
+    pub fn load_file<'a>(
+        path: &Path,
+        data: &'a VFileSystem,
+    ) -> io::Result<(Self, BufReader<Cursor<&'a [u8]>>)> {
+        let mut buffer = data.get(path).unwrap();
+
+        let mut header = Self::zeroed();
+
+        let header_size = mem::size_of::<Self>();
+        unsafe {
+            let header_slice =
+                slice::from_raw_parts_mut(&mut header as *mut _ as *mut u8, header_size);
+            // `read_exact()` comes from `Read` impl for `&[u8]`
+            buffer.read_exact(header_slice).unwrap();
+        }
+        //buffer.read_exact(&mut header.ident).unwrap();
+        Ok((header, buffer))
+    }
+
     pub fn load(path: &Path) -> io::Result<(Self, BufReader<File>)> {
         let file = File::open(path)?;
         let mut buffer = BufReader::new(file);
@@ -66,7 +85,10 @@ impl BSPHeader {
     pub fn get_lump_header(&self, lump: LumpType) -> &BSPLump {
         &self.lumps[lump as usize]
     }
-    pub fn get_lump<T: Lump + bytemuck::Zeroable>(&self, buffer: &mut BufReader<File>) -> Box<[T]> {
+    pub fn get_lump<T: Lump + bytemuck::Zeroable>(
+        &self,
+        buffer: &mut BufReader<impl Seek + Read>,
+    ) -> Box<[T]> {
         self.get_lump_header(T::lump_type()).decode(buffer).unwrap()
     }
     pub fn validate(&self) {

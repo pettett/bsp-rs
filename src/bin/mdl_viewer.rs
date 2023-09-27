@@ -11,6 +11,7 @@ use bsp_explorer::{
     vinit, vrun,
 };
 use glam::{Mat4, Vec3, Vec4};
+use ini::Ini;
 
 pub fn main() {
     println!("Starting...");
@@ -19,6 +20,11 @@ pub fn main() {
 
     // Construct a `SystemState` struct, passing in a tuple of `SystemParam`
     // as if you were writing an ordinary system.
+
+    let ini = Ini::load_from_file("conf.ini").unwrap();
+    let game_data = GameData::from_ini(&ini);
+
+    state.world_mut().insert_resource(game_data);
 
     let mut system_state: SystemState<(Commands, NonSend<VRenderer>, Res<GameDataArc>)> =
         SystemState::new(state.world_mut());

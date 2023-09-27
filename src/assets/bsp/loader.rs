@@ -16,6 +16,7 @@ use crate::{
     transform::Transform,
     v::{
         vbuffer::VBuffer,
+        vfile::VFileSystem,
         vpath::{VGlobalPath, VLocalPath},
         vrenderer::VRenderer,
         vshader::VShader,
@@ -32,6 +33,7 @@ use rayon::prelude::*;
 use std::{
     collections::HashMap,
     f32::consts::PI,
+    io::{BufReader, Read, Seek},
     path::{Path, PathBuf},
     sync::Arc,
     time::Instant,
@@ -289,11 +291,12 @@ pub fn load_bsp(
     commands: &mut Commands,
     game_data: Arc<GameData>,
     renderer: &VRenderer,
+    file_system_opt: Option<VFileSystem>,
 ) {
     let map_path = game_data.maps().join(map);
     let instance = renderer.instance();
     spawn_command_task(commands, "Loading map", move || {
-        load_bsp_task(map_path, game_data, instance)
+        load_bsp_file_task(map_path, game_data, instance, file_system_opt)
     });
 }
 
@@ -304,14 +307,30 @@ struct Shaders {
     shader_disp: Arc<VShader>,
     prop_shader: Arc<VShader>,
 }
-
-fn load_bsp_task(
+fn load_bsp_file_task(
     map_path: PathBuf,
     game_data: Arc<GameData>,
     instance: Arc<StateInstance>,
+    file_system_opt: Option<VFileSystem>,
 ) -> CommandTaskResult {
-    let (header, mut buffer) = BSPHeader::load(&map_path).unwrap();
+    match file_system_opt {
+        Some(file_system) => {
+            let (header, mut buffer) = BSPHeader::load_file(&map_path, &file_system).unwrap();
+            load_bsp_task(game_data, instance, header, buffer)
+        }
+        None => {
+            let (header, mut buffer) = BSPHeader::load(&map_path).unwrap();
+            load_bsp_task(game_data, instance, header, buffer)
+        }
+    }
+}
 
+fn load_bsp_task(
+    game_data: Arc<GameData>,
+    instance: Arc<StateInstance>,
+    header: BSPHeader,
+    mut buffer: BufReader<impl Seek + Read>,
+) -> CommandTaskResult {
     header.validate();
 
     {

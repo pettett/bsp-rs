@@ -30,11 +30,16 @@ pub async fn vinit() -> (StateApp, EventLoop<()>) {
     env_logger::init();
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
+
+    (vinit_state(window).await, event_loop)
+}
+
+pub async fn vinit_state(window: winit::window::Window) -> StateApp {
     let mut world = World::default();
 
     let renderer = VRenderer::new(window, &mut world).await;
 
-    (StateApp::new(world, renderer), event_loop)
+    StateApp::new(world, renderer)
 }
 
 pub fn vrun(mut state: StateApp, event_loop: EventLoop<()>) -> ! {

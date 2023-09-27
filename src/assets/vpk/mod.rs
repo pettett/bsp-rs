@@ -28,12 +28,16 @@
 pub mod gui;
 pub mod pak;
 
-use crate::{binaries::BinaryData, v::vpath::VPath};
+use crate::{
+    binaries::BinaryData,
+    game_data::GameData,
+    v::{vfile::VFileSystem, vpath::VPath},
+};
 use ahash::{AHasher, RandomState};
 use std::{
     collections::HashMap,
     fs::File,
-    io::{self, BufRead, BufReader, Cursor, Read},
+    io::{self, BufRead, BufReader, Cursor, Read, Seek},
     path::PathBuf,
     sync::{Arc, OnceLock},
 };
@@ -132,7 +136,10 @@ impl VPKFile {
     ) -> io::Result<&'a Arc<T>> {
         match get_cell(self).get_or_init(|| vpk.load_file::<T>(self).map(|f| Arc::new(f))) {
             Ok(x) => Ok(x),
-            Err(x) => Err(io::Error::new(x.kind(), "")),
+            Err(x) => {
+                log::error!("Error loading data, {}", x.to_string());
+                Err(io::Error::new(x.kind(), ""))
+            }
         }
     }
 
@@ -168,6 +175,7 @@ pub struct VPKDirectory {
         HashMap<String, HashMap<String, VPKFile, RandomState>, RandomState>,
         RandomState,
     >,
+    data: VFileSystem,
 }
 
 impl VPKDirectory {
@@ -189,29 +197,42 @@ impl VPKDirectory {
             header2,
             max_pack_file: 0,
             files: Default::default(),
+            data: Default::default(),
         }
     }
-    pub fn load(dir_path: PathBuf) -> io::Result<Self> {
-        let file = File::open(&dir_path)?;
-        let mut buffer = BufReader::new(file);
+    pub fn load(file_load: VFileSystem, dir_path: PathBuf) -> io::Result<Self> {
+        match file_load.clone().get(&dir_path) {
+            Some(mut buffer) => Self::read(&mut buffer, file_load, dir_path),
+            None => {
+                let file = File::open(&dir_path)?;
+                let mut buffer = BufReader::new(file);
+                Self::read(&mut buffer, file_load, dir_path)
+            }
+        }
+    }
 
-        let header1 = VPKHeaderV1::read(&mut buffer, None)?;
+    pub fn read<R: Read + Seek>(
+        buffer: &mut BufReader<R>,
+        file_load: VFileSystem,
+        dir_path: PathBuf,
+    ) -> io::Result<Self> {
+        let header1 = VPKHeaderV1::read(buffer, None)?;
         let header2 = if header1.version == 2 {
-            Some(VPKHeaderV2::read(&mut buffer, None)?)
+            Some(VPKHeaderV2::read(buffer, None)?)
         } else {
             None
         };
 
         {
             let v = header1.version;
-            println!("Loading {:?} version {}", dir_path, v);
+            println!("Loading VPK version {}", v);
         }
 
         let mut max_pack_file = 0;
         let mut files = HashMap::<_, HashMap<_, HashMap<_, _, _>, _>, _>::default();
 
         loop {
-            let ext = read_string(&mut buffer);
+            let ext = read_string(buffer);
             if ext.len() == 0 {
                 break;
             }
@@ -219,7 +240,7 @@ impl VPKDirectory {
             let ext_files = files.entry(ext).or_default();
 
             loop {
-                let dir = read_string(&mut buffer);
+                let dir = read_string(buffer);
                 if dir.len() == 0 {
                     break;
                 }
@@ -227,13 +248,13 @@ impl VPKDirectory {
                 let dir_files = ext_files.entry(dir).or_default();
 
                 loop {
-                    let filename = read_string(&mut buffer);
+                    let filename = read_string(buffer);
 
                     if filename.len() == 0 {
                         break;
                     }
 
-                    let entry = VPKDirectoryEntry::read(&mut buffer, None).unwrap();
+                    let entry = VPKDirectoryEntry::read(buffer, None).unwrap();
                     let terminator = entry.terminator;
 
                     assert_eq!(terminator, 0xffff);
@@ -276,6 +297,7 @@ impl VPKDirectory {
             header2,
             max_pack_file,
             files,
+            data: file_load,
         })
     }
 
@@ -338,23 +360,31 @@ impl VPKDirectory {
         } else {
             // Attempt to load
             let index = file_data.entry.archive_index;
+
             // replace dir with number
             let mut header_pak_path = self.dir_path.to_path_buf();
             let dir_file = self.dir_path.file_name().unwrap().to_string_lossy();
-            header_pak_path.set_file_name(dir_file.replace("_dir", &format!("_{index:0>3}")));
+            let name = dir_file.replace("_dir", &format!("_{index:0>3}"));
 
-            // open file
-            let file = File::open(header_pak_path).unwrap();
-            let mut buffer = BufReader::new(file);
-            // seek and load
-            buffer.seek_relative(file_data.entry.entry_offset as i64)?;
+            if let Some(mut buffer) = self.data.get_str(&name) {
+                F::read(&mut buffer, Some(file_data.entry.entry_length as usize))
+            } else {
+                header_pak_path.set_file_name(name);
 
-            F::read(&mut buffer, Some(file_data.entry.entry_length as usize))
+                log::error!("Failed to load {:?}", header_pak_path);
+                // open file
+                let file = File::open(header_pak_path)?;
+                let mut buffer = BufReader::new(file);
+                // seek and load
+                buffer.seek_relative(file_data.entry.entry_offset as i64)?;
+
+                F::read(&mut buffer, Some(file_data.entry.entry_length as usize))
+            }
         }
     }
 }
 
-pub fn read_string(buffer: &mut BufReader<File>) -> String {
+pub fn read_string<R: Seek + Read>(buffer: &mut BufReader<R>) -> String {
     let mut string_buf = Vec::new();
 
     buffer.read_until(0, &mut string_buf).unwrap();
@@ -363,7 +393,7 @@ pub fn read_string(buffer: &mut BufReader<File>) -> String {
     unsafe { std::str::from_utf8_unchecked(&string_buf[..]) }.to_owned()
 }
 
-pub fn read_u32(buffer: &mut BufReader<File>) -> u32 {
+pub fn read_u32<R: Seek + Read>(buffer: &mut BufReader<R>) -> u32 {
     let mut string_buf = [0; 4];
 
     buffer.read_exact(&mut string_buf).unwrap();
@@ -371,7 +401,7 @@ pub fn read_u32(buffer: &mut BufReader<File>) -> u32 {
     u32::from_le_bytes(string_buf)
 }
 
-pub fn read_u16(buffer: &mut BufReader<File>) -> u16 {
+pub fn read_u16<R: Seek + Read>(buffer: &mut BufReader<R>) -> u16 {
     let mut string_buf = [0; 2];
 
     buffer.read_exact(&mut string_buf).unwrap();
@@ -398,7 +428,7 @@ mod vpk_tests {
 
     #[test]
     fn test_dir() {
-        let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
+        let dir = VPKDirectory::load(Default::default(), PathBuf::from(PATH)).unwrap();
 
         for (ext, dirs) in &dir.files {
             println!("EXT: {}", ext);

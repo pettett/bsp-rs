@@ -20,7 +20,7 @@ mod vtf_tests {
 
     #[test]
     fn test_load() {
-        let _dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
+        let _dir = VPKDirectory::load(Default::default(), PathBuf::from(PATH)).unwrap();
         // for file in dir.get_file_names() {
         //     if file.contains(".vtf") {
         //         let data = dir.load_vtf(file).unwrap().unwrap();
@@ -34,7 +34,7 @@ mod vtf_tests {
     }
     #[test]
     fn test_load_materials_metal_metalfence001a() {
-        let dir = VPKDirectory::load(PathBuf::from(PATH)).unwrap();
+        let dir = VPKDirectory::load(Default::default(), PathBuf::from(PATH)).unwrap();
 
         let data = dir
             .load_vtf(&Into::<VGlobalPath>::into(
