@@ -14,7 +14,6 @@ default = ["console_error_panic_hook"]
 [dependencies]
 winit.workspace = true
 bytemuck.workspace = true
-env_logger.workspace = true
 log.workspace = true
 glam.workspace = true
 bevy_ecs.workspace = true

@@ -1,7 +1,9 @@
 pub mod camera;
 pub mod camera_controller;
 pub mod geo;
-#[cfg(target_arch = "x86_64")]
+// #[cfg(target_arch = "x86_64")]
+// pub mod gui;
+
 pub mod gui;
 pub mod loader;
 pub mod state;
@@ -28,15 +30,17 @@ pub async fn vinit() -> (StateApp, EventLoop<()>) {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
 
-    (vinit_state(window).await, event_loop)
+    let state = egui_winit::State::new(&event_loop);
+
+    (vinit_state(window, state).await, event_loop)
 }
 
-pub async fn vinit_state(window: winit::window::Window) -> StateApp {
+pub async fn vinit_state(window: winit::window::Window, state: egui_winit::State) -> StateApp {
     let mut world = World::default();
 
     let renderer = VRenderer::new(window, &mut world).await;
 
-    StateApp::new(world, renderer)
+    StateApp::new(world, renderer, state)
 }
 
 pub fn vrun(mut state: StateApp, event_loop: EventLoop<()>) -> ! {

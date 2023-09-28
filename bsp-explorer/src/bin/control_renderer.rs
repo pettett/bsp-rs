@@ -14,11 +14,11 @@ use bsp_explorer::{
     vinit, vrun,
 };
 
-#[cfg(target_arch = "x86_64")]
-use bsp_explorer::gui::{
-    gui::{Gui, GuiWindow},
-    map_select::MapSelect,
-};
+//#[cfg(target_arch = "x86_64")]
+//use bsp_explorer::gui::{
+//    gui::{Gui, GuiWindow},
+//    map_select::MapSelect,
+//};
 
 use ini::Ini;
 use source::prelude::GameData;
@@ -45,14 +45,14 @@ fn init_world(state: &mut StateApp) {
                 let start_map = game_data.inner.starter_map().to_owned();
                 commands.add(|w: &mut World| w.send_event(MapChangeEvent(start_map)));
 
-                #[cfg(target_arch = "x86_64")]
-                for d in game_data.inner.dirs() {
-                    commands.spawn(GuiWindow::new(d.clone()));
-                }
-                #[cfg(target_arch = "x86_64")]
-                commands.spawn(GuiWindow::new(Arc::new(
-                    MapSelect::new(game_data.inner.maps()).unwrap(),
-                )));
+                //#[cfg(target_arch = "x86_64")]
+                //for d in game_data.inner.dirs() {
+                //    commands.spawn(GuiWindow::new(d.clone()));
+                //}
+                //#[cfg(target_arch = "x86_64")]
+                //commands.spawn(GuiWindow::new(Arc::new(
+                //    MapSelect::new(game_data.inner.maps()).unwrap(),
+                //)));
 
                 commands.insert_resource(game_data);
             })

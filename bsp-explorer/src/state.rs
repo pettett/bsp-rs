@@ -8,8 +8,9 @@ use crate::camera::{update_view_proj, Camera};
 use crate::camera_controller::{
     on_key_in, on_mouse_in, on_mouse_mv, update_camera, KeyIn, MouseIn, MouseMv,
 };
-#[cfg(target_arch = "x86_64")]
-use crate::gui::{Gui, GuiWindow, TaskViewer};
+use crate::gui::gui::Gui;
+//#[cfg(target_arch = "x86_64")]
+//use crate::gui::{Gui, GuiWindow, TaskViewer};
 use crate::loader::load_bsp;
 use crate::v::vrenderer::{draw_static, VRenderer};
 use bevy_ecs::prelude::*;
@@ -128,8 +129,9 @@ fn complete_command_tasks(mut q: Query<(Entity, &mut CommandTask)>, mut c: Comma
 impl StateApp {
     /// Creating some of the wgpu types requires async code
     /// https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#state-new
-    pub fn new(mut world: World, renderer: VRenderer) -> Self {
-        #[cfg(target_arch = "x86_64")]
+    pub fn new(mut world: World, renderer: VRenderer, state: egui_winit::State) -> Self {
+        //#[cfg(target_arch = "x86_64")]
+
         world.insert_non_send_resource(Gui::init(&renderer));
         world.insert_non_send_resource(renderer);
 
@@ -141,9 +143,13 @@ impl StateApp {
         world.insert_resource(Events::<MapChangeEvent>::default());
         world.insert_resource(Events::<Test>::default());
 
+        //egui
+        world.insert_non_send_resource(state);
+        world.insert_non_send_resource(egui::Context::default());
+
         world.send_event(Test());
-        #[cfg(target_arch = "x86_64")]
-        world.spawn(GuiWindow::new_open(Arc::new(TaskViewer::new())));
+        //#[cfg(target_arch = "x86_64")]
+        //world.spawn(GuiWindow::new_open(Arc::new(TaskViewer::new())));
 
         // Add our system to the schedule
         schedule.add_systems((
@@ -212,17 +218,26 @@ impl StateApp {
             .window()
             .clone();
 
-        #[cfg(target_arch = "x86_64")]
-        let r = self
-            .world
-            .get_non_send_resource_mut::<Gui>()
-            .unwrap()
-            .handle_event(&window, event);
+        //#[cfg(target_arch = "x86_64")]
+        //let r = self
+        //    .world
+        //    .get_non_send_resource_mut::<Gui>()
+        //    .unwrap()
+        //    .handle_event(&window, event);
 
-        #[cfg(not(target_arch = "x86_64"))]
-        let r = false;
+        match &event {
+            winit::event::Event::WindowEvent { window_id, event } => {
+                let mut state = SystemState::<(
+                    NonSend<egui::Context>,
+                    NonSendMut<egui_winit::State>,
+                )>::new(&mut self.world);
 
-        r
+                let (context, mut state) = state.get_mut(&mut self.world);
+
+                state.on_event(&context, event).consumed
+            }
+            _ => false,
+        }
     }
 
     pub fn input(&mut self, event: &WindowEvent, can_use_mouse: bool) {

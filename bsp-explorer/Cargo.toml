@@ -9,19 +9,23 @@ winit.workspace = true
 source = { path = "../source" }
 common = { path = "../common" }
 bevy_ecs.workspace = true
-env_logger.workspace = true
+env_logger = "0.10"
 bytemuck.workspace = true
 wgpu.workspace = true
 glam.workspace = true
 log.workspace = true
-rayon.workspace = true
-pollster.workspace = true
+rayon = "1.7.0"
+pollster = "0.3"
 rust-ini.workspace = true
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-imgui = { version = "0.11", features = ["tables-api"] }
-imgui-wgpu = { version = "0.23" }
-imgui-winit-support = { version = "0.11" }
+# imgui = { version = "0.11", features = ["tables-api"] }
+# imgui-wgpu = { version = "0.23" }
+# imgui-winit-support = { version = "0.11" }
+egui = "0.23"
+egui-wgpu = { version = "0.23", features = ["winit"] }
+egui-winit = "0.23"
+
 
 [target.'cfg(target_arch = "wasm32")'.dependancies]
 web-sys = { version = "0.3", features = [

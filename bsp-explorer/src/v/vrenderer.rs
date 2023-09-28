@@ -4,6 +4,7 @@ use crate::{
     camera::{Camera, CameraUniform},
     camera_controller::CameraController,
     geo::{InstancedProp, Static},
+    gui::gui::{Gui, GuiWindow},
 };
 use bevy_ecs::{
     entity::Entity,
@@ -14,8 +15,8 @@ use common::{vinstance::StateInstance, vtexture::VTexture};
 use source::prelude::LightingData;
 use wgpu::util::DeviceExt;
 
-#[cfg(target_arch = "x86_64")]
-use crate::gui::gui::{Gui, GuiWindow};
+// #[cfg(target_arch = "x86_64")]
+// use crate::gui::gui::{Gui, GuiWindow};
 
 use super::VMesh;
 
@@ -35,8 +36,10 @@ pub fn draw_static(
     static_meshes: Query<(&VMesh, &Static)>,
     prop_meshes: Query<(&VMesh, &InstancedProp)>,
     cameras: Query<(&CameraUniform,)>,
-    #[cfg(target_arch = "x86_64")] gui_windows: Query<&mut GuiWindow>,
-    #[cfg(target_arch = "x86_64")] mut imgui: NonSendMut<Gui>,
+    gui_windows: Query<&mut GuiWindow>,
+    mut gui: NonSendMut<Gui>,
+    mut ctx: NonSendMut<egui::Context>,
+    mut state: NonSendMut<egui_winit::State>,
     renderer: NonSend<VRenderer>,
     lighting_opt: Option<Res<LightingData>>,
     mut commands: Commands,
@@ -118,8 +121,17 @@ pub fn draw_static(
         }
     }
 
-    #[cfg(target_arch = "x86_64")]
-    imgui.render_pass(&renderer, gui_windows, &mut encoder, &view, &mut commands);
+    //#[cfg(target_arch = "x86_64")]
+
+    gui.render_pass(
+        &renderer,
+        &mut state,
+        &ctx,
+        gui_windows,
+        &mut encoder,
+        &view,
+        &mut commands,
+    );
 
     // submit will accept anything that implements IntoIter
     renderer.queue().submit(std::iter::once(encoder.finish()));
