@@ -7,7 +7,7 @@ use std::{
     slice,
 };
 
-#[cfg(feature = "desktop")]
+#[cfg(target_arch = "x86_64")]
 use std::fs::File;
 
 use bytemuck::Zeroable;
@@ -60,7 +60,7 @@ impl BSPHeader {
         Ok((Self::load_buf(&mut buffer)?, buffer))
     }
 
-    #[cfg(feature = "desktop")]
+    #[cfg(target_arch = "x86_64")]
     pub fn load(path: &Path) -> io::Result<(Self, BufReader<File>)> {
         let file = File::open(path)?;
         let mut buffer = BufReader::new(file);

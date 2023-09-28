@@ -253,7 +253,7 @@ mod vmt_tests {
         println!("{:?}", shaders);
     }
 
-    #[cfg(feature = "desktop")]
+    #[cfg(target_arch = "x86_64")]
     #[test]
     fn test_maps() {
         let (header, mut buffer) = BSPHeader::load(Path::new(PATH)).unwrap();

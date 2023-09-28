@@ -37,7 +37,7 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-#[cfg(feature = "desktop")]
+#[cfg(target_arch = "x86_64")]
 use std::fs::File;
 
 use super::{
@@ -203,7 +203,7 @@ impl VPKDirectory {
         match file_load.clone().get(&dir_path) {
             Some(mut buffer) => Self::read(&mut buffer, file_load, dir_path),
             None => {
-                #[cfg(feature = "desktop")]
+                #[cfg(target_arch = "x86_64")]
                 {
                     let file = File::open(&dir_path)?;
                     let mut buffer = BufReader::new(file);
@@ -369,7 +369,7 @@ impl VPKDirectory {
             let dir_file = self.dir_path.file_name().unwrap().to_string_lossy();
             let name = dir_file.replace("_dir", &format!("_{index:0>3}"));
 
-            #[cfg(feature = "wasm")]
+            #[cfg(target_arch = "wasm32")]
             if let Some(mut buffer) = self.data.get_str(&name) {
                 // seek and load
                 buffer.seek_relative(file_data.entry.entry_offset as i64)?;
@@ -377,7 +377,7 @@ impl VPKDirectory {
                 return F::read(&mut buffer, Some(file_data.entry.entry_length as usize));
             }
 
-            #[cfg(feature = "desktop")]
+            #[cfg(target_arch = "x86_64")]
             {
                 header_pak_path.set_file_name(name);
 
@@ -428,7 +428,7 @@ mod vpk_tests {
         "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\hl2_textures_dir.vpk";
 
     #[test]
-    #[cfg(feature = "desktop")]
+    #[cfg(target_arch = "x86_64")]
     fn test_header() {
         let file = File::open(PATH).unwrap();
         let mut buffer = BufReader::new(file);

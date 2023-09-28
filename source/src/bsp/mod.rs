@@ -41,7 +41,7 @@ pub use lump::Lump;
 // The data in the BSP file can be stored in little-endian for
 // PC or in big-endian for consoles such as the PlayStation 3 and Xbox 360. Byte-swapping is required when loading a
 // little-endian file on a big-endian format platform such as Java and vice versa.
-#[cfg(feature = "desktop")]
+#[cfg(target_arch = "x86_64")]
 #[cfg(test)]
 mod bsp_tests {
     use std::path::Path;

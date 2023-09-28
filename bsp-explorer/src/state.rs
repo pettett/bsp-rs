@@ -1,14 +1,14 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-#[cfg(feature = "desktop")]
+#[cfg(target_arch = "x86_64")]
 use std::{thread, thread::JoinHandle};
 
 use crate::camera::{update_view_proj, Camera};
 use crate::camera_controller::{
     on_key_in, on_mouse_in, on_mouse_mv, update_camera, KeyIn, MouseIn, MouseMv,
 };
-#[cfg(feature = "desktop")]
+#[cfg(target_arch = "x86_64")]
 use crate::gui::{Gui, GuiWindow, TaskViewer};
 use crate::loader::load_bsp;
 use crate::v::vrenderer::{draw_static, VRenderer};
@@ -49,9 +49,9 @@ pub type CommandTaskResult = Box<dyn Sync + Send + FnOnce(&mut Commands) -> ()>;
 #[derive(Component)]
 pub struct CommandTask {
     pub name: &'static str,
-    #[cfg(feature = "desktop")]
+    #[cfg(target_arch = "x86_64")]
     handle: Option<JoinHandle<CommandTaskResult>>,
-    #[cfg(not(feature = "desktop"))]
+    #[cfg(not(target_arch = "x86_64"))]
     handle: Option<CommandTaskResult>,
 }
 
@@ -72,12 +72,12 @@ pub fn command_task(
     name: &'static str,
     f: impl 'static + Send + FnOnce() -> CommandTaskResult,
 ) -> CommandTask {
-    #[cfg(feature = "desktop")]
+    #[cfg(target_arch = "x86_64")]
     let t = CommandTask {
         name,
         handle: Some(thread::spawn(f)),
     };
-    #[cfg(not(feature = "desktop"))]
+    #[cfg(not(target_arch = "x86_64"))]
     let t = CommandTask {
         name,
         handle: Some(f()),
@@ -102,7 +102,7 @@ pub fn command_task(
 
 fn complete_command_tasks(mut q: Query<(Entity, &mut CommandTask)>, mut c: Commands) {
     for (e, mut p) in q.iter_mut() {
-        #[cfg(feature = "desktop")]
+        #[cfg(target_arch = "x86_64")]
         if p.handle.as_ref().unwrap().is_finished() {
             let t = mem::replace(&mut p.handle, None).unwrap().join();
 
@@ -112,7 +112,7 @@ fn complete_command_tasks(mut q: Query<(Entity, &mut CommandTask)>, mut c: Comma
                 cmd(&mut c);
             }
         }
-        #[cfg(not(feature = "desktop"))]
+        #[cfg(not(target_arch = "x86_64"))]
         {
             let t = mem::replace(&mut p.handle, None);
 
@@ -129,7 +129,7 @@ impl StateApp {
     /// Creating some of the wgpu types requires async code
     /// https://sotrh.github.io/learn-wgpu/beginner/tutorial2-surface/#state-new
     pub fn new(mut world: World, renderer: VRenderer) -> Self {
-        #[cfg(feature = "desktop")]
+        #[cfg(target_arch = "x86_64")]
         world.insert_non_send_resource(Gui::init(&renderer));
         world.insert_non_send_resource(renderer);
 
@@ -142,7 +142,7 @@ impl StateApp {
         world.insert_resource(Events::<Test>::default());
 
         world.send_event(Test());
-        #[cfg(feature = "desktop")]
+        #[cfg(target_arch = "x86_64")]
         world.spawn(GuiWindow::new_open(Arc::new(TaskViewer::new())));
 
         // Add our system to the schedule
@@ -212,14 +212,14 @@ impl StateApp {
             .window()
             .clone();
 
-        #[cfg(feature = "desktop")]
+        #[cfg(target_arch = "x86_64")]
         let r = self
             .world
             .get_non_send_resource_mut::<Gui>()
             .unwrap()
             .handle_event(&window, event);
 
-        #[cfg(not(feature = "desktop"))]
+        #[cfg(not(target_arch = "x86_64"))]
         let r = false;
 
         r

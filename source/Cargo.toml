@@ -3,10 +3,6 @@ name = "source"
 version = "0.1.0"
 edition.workspace = true
 
-[features]
-default = ["desktop"]
-desktop = []
-
 [dependencies]
 common = { path = "../common" }
 wgpu.workspace = true

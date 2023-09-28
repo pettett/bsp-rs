@@ -14,7 +14,7 @@ use common::{vinstance::StateInstance, vtexture::VTexture};
 use source::prelude::LightingData;
 use wgpu::util::DeviceExt;
 
-#[cfg(feature = "desktop")]
+#[cfg(target_arch = "x86_64")]
 use crate::gui::gui::{Gui, GuiWindow};
 
 use super::VMesh;
@@ -35,8 +35,8 @@ pub fn draw_static(
     static_meshes: Query<(&VMesh, &Static)>,
     prop_meshes: Query<(&VMesh, &InstancedProp)>,
     cameras: Query<(&CameraUniform,)>,
-    #[cfg(feature = "desktop")] gui_windows: Query<&mut GuiWindow>,
-    #[cfg(feature = "desktop")] mut imgui: NonSendMut<Gui>,
+    #[cfg(target_arch = "x86_64")] gui_windows: Query<&mut GuiWindow>,
+    #[cfg(target_arch = "x86_64")] mut imgui: NonSendMut<Gui>,
     renderer: NonSend<VRenderer>,
     lighting_opt: Option<Res<LightingData>>,
     mut commands: Commands,
@@ -118,7 +118,7 @@ pub fn draw_static(
         }
     }
 
-    #[cfg(feature = "desktop")]
+    #[cfg(target_arch = "x86_64")]
     imgui.render_pass(&renderer, gui_windows, &mut encoder, &view, &mut commands);
 
     // submit will accept anything that implements IntoIter

@@ -111,7 +111,7 @@ mod gamelump_tests {
     use super::*;
 
     const PATH : &str = "D:\\Program Files (x86)\\Steam\\steamapps\\common\\Half-Life 2\\hl2\\maps\\d1_trainstation_02.bsp";
-    #[cfg(feature = "desktop")]
+    #[cfg(target_arch = "x86_64")]
     #[test]
     fn static_props() {
         let (header, mut buffer) = BSPHeader::load(Path::new(PATH)).unwrap();

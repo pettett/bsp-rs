@@ -33,3 +33,5 @@
     - [ ] No lightmap data?
 - [ ] TF2
 - [ ] Unify getting texture reference from material
+- [x] Web first playable
+    - [ ] Move filesystem references from source package

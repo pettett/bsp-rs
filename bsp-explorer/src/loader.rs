@@ -301,7 +301,7 @@ fn load_bsp_file_task(
             load_bsp_task(game_data, instance, header, buffer)
         }
         None => {
-            #[cfg(feature = "desktop")]
+            #[cfg(target_arch = "x86_64")]
             {
                 let file = File::open(map_path).unwrap();
                 let mut buffer = BufReader::new(file);

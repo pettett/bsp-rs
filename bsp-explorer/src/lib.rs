@@ -1,7 +1,7 @@
 pub mod camera;
 pub mod camera_controller;
 pub mod geo;
-#[cfg(feature = "desktop")]
+#[cfg(target_arch = "x86_64")]
 pub mod gui;
 pub mod loader;
 pub mod state;
