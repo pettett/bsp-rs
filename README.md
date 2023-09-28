@@ -3,7 +3,13 @@
 ![Road](readme/road.png)
 ![Station](readme/station.png)
 
-# TODO
+## Building on web
+
+1. Run `wasm-pack build --dev` in `/bsp-web` to built the package.
+2. Run `npm install` in `/bsp-web/www` on the first time running to init the packages.
+3. Run `npm run start` in `/bsp-web/www` to start the dev server.
+
+## TODO
 
 - [x] Unify PakEntry and VPKEntry
 - [ ] Better error handling
@@ -35,3 +41,4 @@
 - [ ] Unify getting texture reference from material
 - [x] Web first playable
     - [ ] Move filesystem references from source package
+    - [ ] Fix colour mismatch (srgb)
