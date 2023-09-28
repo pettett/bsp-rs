@@ -1,0 +1,12 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition.workspace = true
+
+
+[dependencies]
+wgpu.workspace = true
+bytemuck.workspace = true
+bevy_ecs.workspace = true
+log.workspace = true
+glam.workspace = true
