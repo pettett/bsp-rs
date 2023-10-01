@@ -145,7 +145,8 @@ impl StateApp {
 
         //egui
         world.insert_non_send_resource(state);
-        world.insert_non_send_resource(egui::Context::default());
+        let ctx = egui::Context::default();
+        world.insert_non_send_resource(ctx);
 
         world.send_event(Test());
         //#[cfg(target_arch = "x86_64")]

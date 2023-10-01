@@ -1,7 +1,5 @@
 use std::{fmt, sync::OnceLock};
 
-use wgpu::{Device, Queue};
-
 use super::consts::ImageFormat;
 use crate::vtf::header::{VTFHeader, VTFHeader73};
 use common::{vinstance::StateInstance, vtexture::VTexture};
@@ -17,8 +15,8 @@ pub struct VTF {
     low_res: OnceLock<VRes<VTexture>>,
     high_res: OnceLock<VRes<VTexture>>,
 
-    pub low_res_imgui: OnceLock<VRes<usize>>,
-    pub high_res_imgui: OnceLock<VRes<usize>>,
+    pub low_res_imgui: OnceLock<VRes<u64>>,
+    pub high_res_imgui: OnceLock<VRes<u64>>,
 }
 
 impl fmt::Debug for VTF {

@@ -7,7 +7,7 @@ use crate::v::vrenderer::VRenderer;
 pub trait Viewable: Sync + Send {
     fn gui_view(
         &self,
-        ui: &Ui,
+        ui: &mut Ui,
         renderer: &VRenderer,
         ui_renderer: &mut Renderer,
         commands: &mut Commands,

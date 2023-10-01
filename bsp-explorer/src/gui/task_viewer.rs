@@ -32,15 +32,15 @@ impl TaskViewer {
 impl Viewable for TaskViewer {
     fn gui_view(
         &self,
-        ui: &imgui::Ui,
-        _renderer: &VRenderer,
-        _ui_renderer: &mut imgui_wgpu::Renderer,
+        ui: &mut egui::Ui,
+        renderer: &VRenderer,
+        ui_renderer: &mut egui_wgpu::Renderer,
         commands: &mut Commands,
     ) {
-        ui.text("Current entities");
+        ui.label("Current entities");
 
         for t in self.tasks.lock().unwrap().iter() {
-            ui.text(t);
+            ui.label(*t);
         }
 
         // update cache of running tasks

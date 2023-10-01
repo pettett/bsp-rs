@@ -32,32 +32,23 @@ impl GuiWindow {
     pub fn new_open(view: Arc<dyn Viewable>) -> Self {
         Self { opened: true, view }
     }
-    pub fn draw_menu(
-        &mut self,
-        ui: &mut egui::Ui,
-        _renderer: &VRenderer,
-        _ui_renderer: &mut Renderer,
-    ) {
-        ui.checkbox(&mut self.opened, self.view.gui_label());
-    }
+
     pub fn draw_window(
         &mut self,
-        ui: &egui::Ui,
+        ctx: &egui::Context,
         renderer: &VRenderer,
         ui_renderer: &mut Renderer,
         commands: &mut Commands,
     ) {
-        //if self.opened {
-        //    let window = ui.window(self.view.gui_label());
-        //    window
-        //        .opened(&mut self.opened)
-        //        .size([300.0, 600.0], Condition::FirstUseEver)
-        //        .position([400.0, 0.0], Condition::FirstUseEver)
-        //        .build(|| {
-        //            self.view.gui_view(ui, renderer, ui_renderer, commands);
-        //            //end
-        //        });
-        //}
+        if self.opened {
+            egui::Window::new(self.view.gui_label())
+                .fixed_size(egui::Vec2 { x: 300.0, y: 600.0 })
+                .show(ctx, |ui| {
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        self.view.gui_view(ui, renderer, ui_renderer, commands);
+                    });
+                });
+        }
     }
 }
 
@@ -77,9 +68,17 @@ impl Gui {
         //self.imgui.io_mut().update_delta_time(now - self.last_frame);
         self.last_frame = now;
 
-        let id = Id::new(0);
-
         let full_output = ctx.run(state.take_egui_input(&renderer.window()), |ctx| {
+            egui::TopBottomPanel::top("menu").show(&ctx, |ui| {
+                egui::menu::bar(ui, |ui| {
+                    for mut window in windows.iter_mut() {
+                        ui.checkbox(&mut window.opened, "Open");
+                    }
+
+                    //ui.menu_button("File", |ui| if ui.button("Open").clicked() {});
+                });
+            });
+
             egui::Window::new("Test")
                 .fixed_size(egui::Vec2 { x: 100.0, y: 100.0 })
                 .show(&ctx, |ui| {
@@ -87,6 +86,10 @@ impl Gui {
                     ui.add_space(10.0);
                     ui.label("Hello egui!");
                 });
+
+            for mut window in windows.iter_mut() {
+                window.draw_window(ctx, renderer, &mut self.renderer, commands);
+            }
         });
         //self.platform
         //    .prepare_frame(self.imgui.io_mut(), renderer.window())
@@ -95,13 +98,9 @@ impl Gui {
         //let ui = self.imgui.frame();
 
         //if let Some(_menu_bar) = ui.begin_main_menu_bar() {
-        //    for mut window in windows.iter_mut() {
-        //        window.draw_menu(ui, renderer, &mut self.renderer);
-        //    }
-        //}
-
-        //for mut window in windows.iter_mut() {
-        //    window.draw_window(ui, renderer, &mut self.renderer, commands);
+        //
+        //
+        //
         //}
 
         // if self.last_cursor != ui.mouse_cursor() {
@@ -117,6 +116,10 @@ impl Gui {
                 pixels_per_point: state.pixels_per_point(),
             };
 
+            for (id, image_delta) in &full_output.textures_delta.set {
+                self.renderer
+                    .update_texture(renderer.device(), renderer.queue(), *id, image_delta);
+            }
             self.renderer.update_buffers(
                 renderer.device(),
                 renderer.queue(),
@@ -154,45 +157,6 @@ impl Gui {
 
     pub fn init(renderer: &VRenderer) -> Self {
         // Set up dear imgui
-
-        let hidpi_factor = renderer.window().scale_factor();
-        let font_size = (13.0 * hidpi_factor) as f32;
-        // imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
-
-        // imgui.fonts().add_font(&[FontSource::DefaultFontData {
-        //     config: Some(imgui::FontConfig {
-        //         oversample_h: 1,
-        //         pixel_snap_h: true,
-        //         size_pixels: font_size,
-        //         ..Default::default()
-        //     }),
-        // }]);
-
-        //
-        // Set up dear imgui wgpu renderer
-        //
-
-        //let renderer_config = RendererConfig {
-        //    texture_format: renderer
-        //        .surface()
-        //        .get_current_texture()
-        //        .unwrap()
-        //        .texture
-        //        .format(),
-        //    ..Default::default()
-        //};
-
-        // let imgui_renderer = Renderer::new(
-        //     &mut imgui,
-        //     renderer.device(),
-        //     renderer.queue(),
-        //     renderer_config,
-        // );
-
-        //let dx5_data = dir.load_vtf("materials/metal/metalfence001a.vtf").unwrap();
-        //let dx1_data = dir.load_vtf("materials/metal/metalfloor001a.vtf").unwrap();
-
-        //let last_cursor = None;
 
         let renderer =
             egui_wgpu::Renderer::new(renderer.device(), renderer.instance.format, None, 1);
