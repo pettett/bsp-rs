@@ -49,7 +49,7 @@ impl Viewable for MapSelect {
     ) {
         for map_path in &self.file_names {
             let map_name = map_path.file_name().unwrap().to_str().unwrap();
-            if ui.button(map_name) {
+            if ui.button(map_name).clicked() {
                 println!("Loading {}", map_name);
                 let map_path_clone = map_path.clone();
 

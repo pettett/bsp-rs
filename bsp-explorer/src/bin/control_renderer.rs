@@ -9,7 +9,7 @@ use bevy_ecs::{
     world::World,
 };
 use bsp_explorer::{
-    gui::{gui::GuiWindow, Viewable},
+    gui::{gui::GuiWindow, map_select::MapSelect, Viewable},
     state::{box_cmds, command_task, spawn_command_task, MapChangeEvent, StateApp},
     v::vrenderer::VRenderer,
     vinit, vrun,
@@ -45,18 +45,14 @@ fn init_world(state: &mut StateApp) {
             box_cmds(|commands| {
                 let start_map = game_data.inner.starter_map().to_owned();
                 commands.add(|w: &mut World| w.send_event(MapChangeEvent(start_map)));
-                for dir in game_data.inner.dirs() {
-                    commands.spawn((GuiWindow::new(dir.clone())));
+
+                for d in game_data.inner.dirs() {
+                    commands.spawn(GuiWindow::new(d.clone()));
                 }
 
-                //#[cfg(target_arch = "x86_64")]
-                //for d in game_data.inner.dirs() {
-                //    commands.spawn(GuiWindow::new(d.clone()));
-                //}
-                //#[cfg(target_arch = "x86_64")]
-                //commands.spawn(GuiWindow::new(Arc::new(
-                //    MapSelect::new(game_data.inner.maps()).unwrap(),
-                //)));
+                commands.spawn(GuiWindow::new(Arc::new(
+                    MapSelect::new(game_data.inner.maps()).unwrap(),
+                )));
 
                 commands.insert_resource(game_data);
             })

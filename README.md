@@ -1,5 +1,6 @@
 # BSP-RS
 
+![Egui](readme/egui.png)
 ![Road](readme/road.png)
 ![Station](readme/station.png)
 
@@ -42,4 +43,4 @@
 - [x] Web first playable
     - [ ] Move filesystem references from source package
     - [ ] Fix colour mismatch (srgb)
-    - [ ] Use egui
+    - [x] Use egui

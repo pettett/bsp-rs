@@ -1,6 +1,6 @@
 use std::{
-    io::{BufReader, Cursor, Seek},
-    path::{Path, PathBuf},
+    io::{BufReader, Cursor},
+    path::Path,
     sync::Arc,
 };
 
