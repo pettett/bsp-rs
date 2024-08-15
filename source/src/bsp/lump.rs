@@ -25,6 +25,7 @@ pub struct BSPLump {
     pub version: i32,     // lump format version
     pub four_cc: [u8; 4], // lump ident code
 }
+ 
 impl BSPLump {
     pub fn decode<T: bytemuck::Zeroable, R: Seek + Read>(
         &self,

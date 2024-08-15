@@ -39,7 +39,6 @@ fn init_world(state: &mut StateApp) {
         .world_mut()
         .spawn(command_task("Loading game data", || {
             let ini = Ini::load_from_file("conf.ini").unwrap();
-
             let game_data = GameData::from_ini(&ini);
 
             box_cmds(|commands| {

@@ -7,16 +7,16 @@
 		{
 			"type": "lldb",
 			"request": "launch",
-			"name": "Debug unit tests in library 'bsp-explorer'",
+			"name": "Debug unit tests in library 'source'",
 			"cargo": {
 				"args": [
 					"test",
 					"--no-run",
 					"--lib",
-					"--package=bsp-explorer"
+					"--package=source"
 				],
 				"filter": {
-					"name": "bsp-explorer",
+					"name": "source",
 					"kind": "lib"
 				}
 			},
@@ -26,35 +26,17 @@
 		{
 			"type": "lldb",
 			"request": "launch",
-			"name": "Debug executable 'bsp_readout'",
-			"cargo": {
-				"args": [
-					"build",
-					"--bin=bsp_readout",
-					"--package=bsp-explorer"
-				],
-				"filter": {
-					"name": "bsp_readout",
-					"kind": "bin"
-				}
-			},
-			"args": [],
-			"cwd": "${workspaceFolder}"
-		},
-		{
-			"type": "lldb",
-			"request": "launch",
-			"name": "Debug unit tests in executable 'bsp_readout'",
+			"name": "Debug unit tests in library 'common'",
 			"cargo": {
 				"args": [
 					"test",
 					"--no-run",
-					"--bin=bsp_readout",
-					"--package=bsp-explorer"
+					"--lib",
+					"--package=common"
 				],
 				"filter": {
-					"name": "bsp_readout",
-					"kind": "bin"
+					"name": "common",
+					"kind": "lib"
 				}
 			},
 			"args": [],
@@ -63,15 +45,15 @@
 		{
 			"type": "lldb",
 			"request": "launch",
-			"name": "Debug executable 'control_renderer'",
+			"name": "Debug executable 'source-explorer'",
 			"cargo": {
 				"args": [
 					"build",
-					"--bin=control_renderer",
-					"--package=bsp-explorer"
+					"--bin=source-explorer",
+					"--package=source-explorer"
 				],
 				"filter": {
-					"name": "control_renderer",
+					"name": "source-explorer",
 					"kind": "bin"
 				}
 			},
@@ -81,53 +63,16 @@
 		{
 			"type": "lldb",
 			"request": "launch",
-			"name": "Debug unit tests in executable 'control_renderer'",
+			"name": "Debug unit tests in executable 'source-explorer'",
 			"cargo": {
 				"args": [
 					"test",
 					"--no-run",
-					"--bin=control_renderer",
-					"--package=bsp-explorer"
+					"--bin=source-explorer",
+					"--package=source-explorer"
 				],
 				"filter": {
-					"name": "control_renderer",
-					"kind": "bin"
-				}
-			},
-			"args": [],
-			"cwd": "${workspaceFolder}"
-		},
-		{
-			"type": "lldb",
-			"request": "launch",
-			"name": "Debug executable 'mdl_viewer'",
-			"cargo": {
-				"args": [
-					"build",
-					"--bin=mdl_viewer",
-					"--package=bsp-explorer"
-				],
-				"filter": {
-					"name": "mdl_viewer",
-					"kind": "bin"
-				}
-			},
-			"args": [],
-			"cwd": "${workspaceFolder}"
-		},
-		{
-			"type": "lldb",
-			"request": "launch",
-			"name": "Debug unit tests in executable 'mdl_viewer'",
-			"cargo": {
-				"args": [
-					"test",
-					"--no-run",
-					"--bin=mdl_viewer",
-					"--package=bsp-explorer"
-				],
-				"filter": {
-					"name": "mdl_viewer",
+					"name": "source-explorer",
 					"kind": "bin"
 				}
 			},

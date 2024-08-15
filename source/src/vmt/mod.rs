@@ -10,9 +10,11 @@
 
 use std::{
     collections::HashMap,
-    io::{Read, Seek},
+    io::{self, Read, Seek},
     sync::{Arc, OnceLock},
 };
+
+use thiserror::Error;
 
 use crate::binaries::BinaryData;
 
@@ -31,6 +33,12 @@ pub struct VMT {
     pub patch: OnceLock<Option<Arc<VMT>>>,
 }
 
+#[derive(Error, Debug)]
+pub enum VMTError{
+	#[error("Failed to load VMT `{0}`")]
+	Invalid(String),
+}
+
 impl VMT {
     pub fn new(source: String, shader: String) -> Self {
         Self {
@@ -39,6 +47,11 @@ impl VMT {
             data: Default::default(),
             patch: Default::default(),
         }
+    }
+
+    pub fn from_string(source: String) -> Result<Self, VMTError> {
+        let mut s = source.as_str();
+        consume_vmt(&mut s).map_err(|e|VMTError::Invalid(source))
     }
 
     pub fn shader(&self) -> &str {
@@ -91,17 +104,17 @@ fn view_up_to_line(data: &str) -> &str {
     }
 }
 
-fn consume_line(data: &mut &str) -> Result<(), ()> {
+fn consume_line(data: &mut &str) -> Result<(), VMTError> {
     if let Some(next_newline) = data[..].find("\n") {
         // clip up to next new line
         *data = &data[next_newline + 1..];
         Ok(())
     } else {
-        Err(())
+        Err(VMTError::Invalid("".to_owned()))
     }
 }
 
-fn consume_string(data: &mut &str) -> Result<String, ()> {
+fn consume_string(data: &mut &str) -> Result<String, VMTError> {
     *data = data.trim();
     let str = if let Some(after) = data.find(char::is_whitespace) {
         let str = data[..after].trim().trim_matches('"').to_ascii_lowercase();
@@ -116,10 +129,10 @@ fn consume_string(data: &mut &str) -> Result<String, ()> {
     return Ok(str);
 }
 
-fn consume_word(data: &mut &str) -> Result<String, ()> {
-    let next = if data.find('"').ok_or(())? == 0 { 1 } else { 0 };
+fn consume_word(data: &mut &str) -> Result<String, VMTError> {
+    let next = if data.find('"').ok_or(VMTError::Invalid("".to_owned()))? == 0 { 1 } else { 0 };
 
-    let after = data[next..].find(&['"', ' ', '\n']).ok_or(())?;
+    let after = data[next..].find(&['"', ' ', '\n']).ok_or(VMTError::Invalid("".to_owned()))?;
 
     let str = data[next..next + after]
         .trim()
@@ -131,7 +144,7 @@ fn consume_word(data: &mut &str) -> Result<String, ()> {
     return Ok(str);
 }
 
-fn consume_vmt(data: &mut &str) -> Result<VMT, ()> {
+fn consume_vmt(data: &mut &str) -> Result<VMT, VMTError> {
     *data = data.trim();
 
     let mut vmt = VMT::new(data.to_owned(), consume_word(data)?);
@@ -167,12 +180,11 @@ impl BinaryData for VMT {
         buffer.read_exact(&mut bytes)?;
 
         let mut data = String::from_utf8(bytes).unwrap();
-
+ 
         remove_comments(&mut data);
 
-        let vmt = consume_vmt(&mut data.as_str()).unwrap();
-
-        Ok(vmt)
+        consume_vmt(&mut data.as_str())
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Cannot read VMT"))
     }
 }
 

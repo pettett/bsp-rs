@@ -33,7 +33,7 @@ use ahash::{AHasher, RandomState};
 use std::{
     collections::HashMap,
     io::{self, BufRead, BufReader, Cursor, Read, Seek},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, OnceLock},
 };
 
@@ -105,6 +105,14 @@ struct VPKDirectoryEntry {
     terminator: u16, //  = 0xffff
 }
 
+pub enum VPKFileType {
+    VTF(VTF),
+    VMT(VMT),
+    MDL(MDL),
+    VVD(VVD),
+    VTX(VTX),
+}
+
 pub struct VPKFile {
     entry: VPKDirectoryEntry,
     preload: Option<Vec<u8>>,
@@ -161,6 +169,20 @@ impl VPKFile {
     pub fn vtf(&self) -> &OnceLock<io::Result<Arc<VTF>>> {
         &self.vtf
     }
+
+    pub fn len(&self) -> u32 {
+        self.entry.entry_length
+    }
+    pub fn offset(&self) -> u32 {
+        self.entry.entry_offset
+    }
+    pub fn archive(&self) -> u16 {
+        self.entry.archive_index
+    }
+
+    pub fn preload(&self) -> Option<&Vec<u8>> {
+        self.preload.as_ref()
+    }
 }
 
 pub struct VPKDirectory {
@@ -174,6 +196,7 @@ pub struct VPKDirectory {
         HashMap<String, HashMap<String, VPKFile, RandomState>, RandomState>,
         RandomState,
     >,
+    pak_archives: Vec<PathBuf>,
     data: VFileSystem,
 }
 
@@ -197,6 +220,8 @@ impl VPKDirectory {
             max_pack_file: 0,
             files: Default::default(),
             data: Default::default(),
+            pak_archives: Default::default(),
+			
         }
     }
     pub fn load(file_load: VFileSystem, dir_path: PathBuf) -> io::Result<Self> {
@@ -294,12 +319,25 @@ impl VPKDirectory {
             }
         }
 
+		let mut pak_archives = Vec::new();
+        for i in 0..=max_pack_file {
+            // replace dir with number
+            let mut header_pak_path =  dir_path.to_path_buf();
+            let dir_file = dir_path.file_name().unwrap().to_string_lossy();
+            let name = dir_file.replace("_dir", &format!("_{i:0>3}"));
+
+            header_pak_path.set_file_name(name);
+            pak_archives.push(header_pak_path);
+        }
+
+
         Ok(Self {
             dir_path,
             header1,
             header2,
             max_pack_file,
             files,
+			pak_archives,
             data: file_load,
         })
     }
@@ -320,15 +358,8 @@ impl VPKDirectory {
     pub fn load_vtx(&self, path: &dyn VPath) -> io::Result<&Arc<VTX>> {
         self.load_file_once(path, |f| &f.vtx)
     }
-    pub fn load_file_once<
-        'a,
-        T: BinaryData,
-        F: FnOnce(&'a VPKFile) -> &'a OnceLock<io::Result<Arc<T>>>,
-    >(
-        &'a self,
-        path: &dyn VPath,
-        get_cell: F,
-    ) -> io::Result<&'a Arc<T>> {
+
+    pub fn file_data<'a>(&'a self, path: &dyn VPath) -> io::Result<&'a VPKFile> {
         let ext_files = self.files.get(path.ext()).ok_or(io::Error::new(
             io::ErrorKind::InvalidInput,
             format!("Extension {} not present", path.ext()),
@@ -347,6 +378,20 @@ impl VPKDirectory {
             io::ErrorKind::InvalidInput,
             format!("File {} not present", path.filename()),
         ))?;
+
+        Ok(file_data)
+    }
+
+    pub fn load_file_once<
+        'a,
+        T: BinaryData,
+        F: FnOnce(&'a VPKFile) -> &'a OnceLock<io::Result<Arc<T>>>,
+    >(
+        &'a self,
+        path: &dyn VPath,
+        get_cell: F,
+    ) -> io::Result<&'a Arc<T>> {
+        let file_data = self.file_data(path)?;
 
         file_data.load_file(self, get_cell)
     }
@@ -393,6 +438,14 @@ impl VPKDirectory {
             panic!("Could not find {} without desktop support", name)
         }
     }
+
+    pub fn max_pack_file(&self) -> u16 {
+        self.max_pack_file
+    }
+	
+	pub fn pak_archive(&self, archive:u16) -> &Path {
+		&self.pak_archives[archive as usize]
+	}
 }
 
 pub fn read_string<R: Seek + Read>(buffer: &mut BufReader<R>) -> String {

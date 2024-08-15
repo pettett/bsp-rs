@@ -9,12 +9,12 @@ use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct VFile {
-    pub data: Vec<u8>,
+    data: Vec<u8>,
 }
 
 #[derive(Resource, Default, Clone)]
 pub struct VFileSystem {
-    pub files: Arc<HashMap<String, VFile>>,
+    files: Arc<HashMap<String, VFile>>,
 }
 
 impl VFileSystem {
@@ -30,7 +30,7 @@ impl VFileSystem {
                 Some(BufReader::new(c))
             }
             None => {
-                log::error!("{:?} file not found", path);
+                // log::error!("{:?} file not loaded", path);
                 None
             }
         }

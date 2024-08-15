@@ -52,7 +52,7 @@ impl Lump for BSPSurfEdge {
 }
 
 impl BSPSurfEdge {
-    pub fn get_edge(&self, edges: &Box<[BSPEdge]>) -> (u16, u16) {
+    pub fn get_edge(&self, edges: &[BSPEdge]) -> (u16, u16) {
         let id = self.index.abs() as usize;
         let rev = self.index.signum();
         let edge = edges[id];

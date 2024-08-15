@@ -1,0 +1,60 @@
+[package]
+name = "source-explorer"
+version = "0.1.0"
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+winit.workspace = true
+source = { path = "../source" }
+common = { path = "../common" }
+bevy_ecs.workspace = true
+env_logger = "0.11"
+bytemuck.workspace = true
+wgpu.workspace = true
+glam.workspace = true
+log.workspace = true
+# rayon = "1.7.0"
+# pollster = "0.3"
+rust-ini.workspace = true
+egui = "0.28"
+bevy_egui = "0.28"
+smooth-bevy-cameras = "0.12"
+thiserror="1.0"
+
+[dependencies.bevy]
+version = "0.14.1"
+default-features = false
+features = [
+	"wayland",
+	"android_shared_stdcxx",
+	"bevy_animation",
+	"bevy_asset",
+	# "bevy_audio",
+	"bevy_color",
+	"bevy_core_pipeline",
+	"bevy_gilrs",
+	"bevy_gizmos",
+	"bevy_gltf",
+	"bevy_pbr",
+	# "bevy_picking",
+	"bevy_render",
+	"bevy_scene",
+	"bevy_sprite",
+	"bevy_state",
+	"bevy_text",
+	"bevy_ui",
+	"bevy_winit",
+	"default_font",
+	"hdr",
+	"ktx2",
+	"multi_threaded",
+	"png",
+	"smaa_luts",
+	"sysinfo_plugin",
+	"tonemapping_luts",
+	"vorbis",
+	"webgl2",
+	"x11",
+	"zstd",
+]

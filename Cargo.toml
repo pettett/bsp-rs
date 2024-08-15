@@ -2,19 +2,34 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-members = ["source", "bsp-web", "bsp-explorer", "common"]
-default-members = ["bsp-explorer"]
+members = [
+	"source",
+	#  "bsp-web", 
+	#  "bsp-explorer", 
+	"common",
+	"source-explorer",
+]
+# default-members = ["bsp-explorer"]
 resolver = "2"
 package.edition = "2021"
 
 [workspace.dependencies]
 winit = "0.28"
-wgpu = { version = "0.17", features = ["fragile-send-sync-non-atomic-wasm"] }
+wgpu = { version = "0.20" }
 log = "0.4"
 bytemuck = { version = "1.13", features = ["derive", "extern_crate_alloc"] }
-glam = { version = "0.24.1", features = [
+glam = { version = "0.27.0", features = [
 	"bytemuck",
 ] } #https://docs.rs/glam/latest/glam/
-bevy_ecs = "0.11.2"
+bevy_ecs = {version = "0.14.1"}
 rust-ini = "0.19.0"
 ahash = "0.8.3"
+
+
+# Enable a small amount of optimization in the dev profile.
+[profile.dev]
+opt-level = 1
+
+# Enable a large amount of optimization in the dev profile for dependencies.
+[profile.dev.package."*"]
+opt-level = 3

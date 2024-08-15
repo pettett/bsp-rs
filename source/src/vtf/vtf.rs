@@ -104,14 +104,30 @@ impl VTF {
         ))
     }
 
-    fn upload(
+    pub fn descriptor_high_res(&self) -> wgpu::TextureDescriptor<'static> {
+        self.descriptor(
+            self.width(),
+            self.height(),
+            self.header.high_res_image_format,
+            1,
+        )
+    }
+
+    pub fn high_res_data(&self) -> &[Vec<u8>] {
+        &self.high_res_data
+    }
+
+	pub fn high_res_image_format(&self) -> ImageFormat{
+		self.header.high_res_image_format
+	}
+
+    pub fn descriptor(
         &self,
-        instance: &StateInstance,
         width: u32,
         height: u32,
         format: ImageFormat,
-        mipped_data: &[Vec<u8>],
-    ) -> VTexture {
+        mip_levels: u32,
+    ) -> wgpu::TextureDescriptor<'static> {
         let wgpu_format = format.try_into().unwrap();
         //println!("{:?} {:?}", format, wgpu_format);
         let size = wgpu::Extent3d {
@@ -119,11 +135,11 @@ impl VTF {
             height,
             depth_or_array_layers: 1,
         };
-        let texture = instance.device.create_texture(&wgpu::TextureDescriptor {
+        wgpu::TextureDescriptor {
             // All textures are stored as 3D, we represent our 2D texture
             // by setting depth to 1.
             size,
-            mip_level_count: mipped_data.len() as u32,
+            mip_level_count: mip_levels,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             // Most images are stored using sRGB so we need to reflect that here.
@@ -140,7 +156,21 @@ impl VTF {
             // texture format is not supported on the WebGL2
             // backend.
             view_formats: &[],
-        });
+        }
+    }
+
+    fn upload(
+        &self,
+        instance: &StateInstance,
+        width: u32,
+        height: u32,
+        format: ImageFormat,
+        mipped_data: &[Vec<u8>],
+    ) -> VTexture {
+        let texture =
+            instance
+                .device
+                .create_texture(&self.descriptor(width, height, format, mipped_data.len() as _));
         for mip_level in 0..mipped_data.len() {
             let mip_size = wgpu::Extent3d {
                 width: width >> mip_level,

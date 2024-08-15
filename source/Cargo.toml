@@ -8,7 +8,7 @@ common = { path = "../common" }
 wgpu.workspace = true
 bytemuck.workspace = true
 flagset = "0.4.3"
-bevy_ecs.workspace = true
+# bevy_ecs.workspace = true
 log.workspace = true
 num-traits = "0.2.16"
 num-derive = "0.4.0"
@@ -17,3 +17,4 @@ fixedstr = "0.4.5"
 ahash.workspace = true
 stream-unzip = "0.2.1"
 rust-ini.workspace = true
+thiserror = "1.0"

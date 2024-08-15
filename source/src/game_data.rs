@@ -1,4 +1,3 @@
-use bevy_ecs::system::Resource;
 use common::{vfile::VFileSystem, vpath::VPath};
 use ini::Ini;
 use std::{
@@ -9,11 +8,6 @@ use std::{
 };
 
 use crate::{binaries::BinaryData, prelude::*};
-
-#[derive(Resource)]
-pub struct GameDataArc {
-    pub inner: Arc<GameData>,
-}
 
 pub struct GameData {
     path: PathBuf,
@@ -56,7 +50,7 @@ impl GameData {
         }
         None
     }
-    pub fn from_ini(ini: &Ini) -> GameDataArc {
+    pub fn from_ini(ini: &Ini) -> Self {
         println!("Loading game data... ");
         let now = Instant::now();
 
@@ -83,16 +77,14 @@ impl GameData {
         }
 
         println!("Took {:?}", now.elapsed());
-        GameDataArc {
-            inner: Arc::new(GameData {
-                starter_map: maps.join(map),
-                maps,
-                dirs,
-                path,
-            }),
+        GameData {
+            starter_map: maps.join(map),
+            maps,
+            dirs,
+            path,
         }
     }
-    pub fn load_game(game: Game, file_load: VFileSystem) -> GameDataArc {
+    pub fn load_game(game: Game, file_load: VFileSystem) -> Self {
         let path = PathBuf::new();
         // Path::new("D:\\Program Files (x86)\\Steam\\steamapps\\common").join(match game {
         //     Game::HalfLife2 | Game::HalfLife2Ep1 | Game::HalfLife2Ep2 => "Half-Life 2",
@@ -100,74 +92,69 @@ impl GameData {
         //     Game::Portal2 => "Portal 2",
         //     Game::TeamFortress2 => "Team Fortress 2",
         // });
-        GameDataArc {
-            inner: Arc::new(match game {
-                Game::HalfLife2 => Self {
-                    dirs: vec![
-                        Arc::new(
-                            VPKDirectory::load(
-                                file_load.clone(),
-                                path.join("hl2_textures_dir.vpk"),
-                            )
+        match game {
+            Game::HalfLife2 => Self {
+                dirs: vec![
+                    Arc::new(
+                        VPKDirectory::load(file_load.clone(), path.join("hl2_textures_dir.vpk"))
                             .unwrap(),
-                        ),
-                        Arc::new(
-                            VPKDirectory::load(file_load.clone(), path.join("hl2_misc_dir.vpk"))
-                                .unwrap(),
-                        ),
-                    ],
-                    starter_map: Path::new("d1_trainstation_02.bsp").to_owned(),
-                    maps: path.clone(),
-                    path,
-                },
-                // Game::HalfLife2Ep1 => Self {
-                //     dirs: vec![
-                //         Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
-                //         Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
-                //         Arc::new(VPKDirectory::load(path.join("episodic\\ep1_pak_dir.vpk")).unwrap()),
-                //     ],
-                //     starter_map: Path::new("ep1_c17_01.bsp"),
-                //     maps: path.join("episodic\\maps"),
-                //     path,
-                // },
-                // Game::HalfLife2Ep2 => Self {
-                //     dirs: vec![
-                //         Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
-                //         Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
-                //         Arc::new(VPKDirectory::load(path.join("ep2\\ep2_pak_dir.vpk")).unwrap()),
-                //     ],
-                //     starter_map: Path::new("ep2_outland_07.bsp"),
-                //     maps: path.join("ep2\\maps"),
-                //     path,
-                // },
-                // Game::Portal => Self {
-                //     dirs: vec![
-                //         Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
-                //         Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
-                //         Arc::new(VPKDirectory::load(path.join("portal\\portal_pak_dir.vpk")).unwrap()),
-                //     ],
-                //     starter_map: Path::new("testchmb_a_02.bsp"),
-                //     maps: path.join("portal\\maps"),
-                //     path,
-                // },
-                // Game::Portal2 => Self {
-                //     dirs: vec![Arc::new(
-                //         VPKDirectory::load(path.join("portal2\\pak01_dir.vpk")).unwrap(),
-                //     )],
-                //     starter_map: Path::new("sp_a4_laser_platform.bsp"),
-                //     maps: path.join("portal2\\maps"),
-                //     path,
-                // },
-                // Game::TeamFortress2 => Self {
-                //     dirs: vec![
-                //         Arc::new(VPKDirectory::load(path.join("tf\\tf2_misc_dir.vpk")).unwrap()),
-                //         Arc::new(VPKDirectory::load(path.join("tf\\tf2_textures_dir.vpk")).unwrap()),
-                //     ],
-                //     starter_map: Path::new("ctf_2fort.bsp"),
-                //     maps: path.join("tf\\maps"),
-                //     path,
-                // },
-            }),
+                    ),
+                    Arc::new(
+                        VPKDirectory::load(file_load.clone(), path.join("hl2_misc_dir.vpk"))
+                            .unwrap(),
+                    ),
+                ],
+                starter_map: Path::new("d1_trainstation_02.bsp").to_owned(),
+                maps: path.clone(),
+                path,
+            },
+            // Game::HalfLife2Ep1 => Self {
+            //     dirs: vec![
+            //         Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
+            //         Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
+            //         Arc::new(VPKDirectory::load(path.join("episodic\\ep1_pak_dir.vpk")).unwrap()),
+            //     ],
+            //     starter_map: Path::new("ep1_c17_01.bsp"),
+            //     maps: path.join("episodic\\maps"),
+            //     path,
+            // },
+            // Game::HalfLife2Ep2 => Self {
+            //     dirs: vec![
+            //         Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
+            //         Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
+            //         Arc::new(VPKDirectory::load(path.join("ep2\\ep2_pak_dir.vpk")).unwrap()),
+            //     ],
+            //     starter_map: Path::new("ep2_outland_07.bsp"),
+            //     maps: path.join("ep2\\maps"),
+            //     path,
+            // },
+            // Game::Portal => Self {
+            //     dirs: vec![
+            //         Arc::new(VPKDirectory::load(path.join("hl2\\hl2_textures_dir.vpk")).unwrap()),
+            //         Arc::new(VPKDirectory::load(path.join("hl2\\hl2_misc_dir.vpk")).unwrap()),
+            //         Arc::new(VPKDirectory::load(path.join("portal\\portal_pak_dir.vpk")).unwrap()),
+            //     ],
+            //     starter_map: Path::new("testchmb_a_02.bsp"),
+            //     maps: path.join("portal\\maps"),
+            //     path,
+            // },
+            // Game::Portal2 => Self {
+            //     dirs: vec![Arc::new(
+            //         VPKDirectory::load(path.join("portal2\\pak01_dir.vpk")).unwrap(),
+            //     )],
+            //     starter_map: Path::new("sp_a4_laser_platform.bsp"),
+            //     maps: path.join("portal2\\maps"),
+            //     path,
+            // },
+            // Game::TeamFortress2 => Self {
+            //     dirs: vec![
+            //         Arc::new(VPKDirectory::load(path.join("tf\\tf2_misc_dir.vpk")).unwrap()),
+            //         Arc::new(VPKDirectory::load(path.join("tf\\tf2_textures_dir.vpk")).unwrap()),
+            //     ],
+            //     starter_map: Path::new("ctf_2fort.bsp"),
+            //     maps: path.join("tf\\maps"),
+            //     path,
+            // },
         }
     }
 

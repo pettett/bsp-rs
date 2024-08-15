@@ -28,7 +28,10 @@ impl BinaryData for VTF {
         assert!(header.width < 4096);
         assert!(header.height < 4096);
 
-        if header.version[0] == 7 && header.version[1] == 3 {
+        let major = header.version[0];
+        let minor = header.version[1];
+
+        if major == 7 && minor == 3 {
             let h_7_3 = VTFHeader73::read(buffer, None)?;
             data_read += mem::size_of::<VTFHeader73>() as i64;
 
@@ -94,16 +97,24 @@ impl BinaryData for VTF {
             Ok(tex)
         } else {
             // load data
+            if minor == 1 {
+                let mut b = [0];
+                buffer.read_exact(&mut b)?;
+				data_read += 1;
+            }
 
             //TODO: There appears to be one byte of something
             let remaining_header = header_size - data_read;
             if remaining_header > 0 {
                 log::warn!(
-                    "Not all header has been read, skipping {} bytes",
+                    "[{}.{}] Not all header has been read, skipping {} bytes",
+                    major,
+                    minor,
                     remaining_header
                 );
                 buffer.seek_relative(remaining_header)?;
-            }
+            } 
+			
             let low_res_data: Vec<u8> = read_low_res(&header, buffer)?;
             let high_res_data = read_high_res(&header, buffer)?;
 

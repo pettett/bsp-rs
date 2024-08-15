@@ -66,7 +66,7 @@ pub struct BSPFace {
 }
 
 impl BSPFace {
-    pub fn get_verts(&self, edges: &Box<[BSPEdge]>, surfedges: &Box<[BSPSurfEdge]>) -> Vec<usize> {
+    pub fn get_verts(&self, edges: &[BSPEdge], surfedges: &[BSPSurfEdge]) -> Vec<usize> {
         (0..self.num_edges)
             .map(|i| {
                 surfedges[self.first_edge as usize + i as usize]

@@ -1,10 +1,8 @@
-use bevy_ecs::system::Resource;
 use common::vbuffer::VBuffer;
 use glam::{vec3, vec4, Vec3, Vec4};
 
 use super::{consts::MAX_MAP_LIGHTING, Lump, LumpType};
 
-#[derive(Resource)]
 pub struct LightingData {
     pub buffer: VBuffer,
 }

@@ -150,6 +150,7 @@ impl VShader {
                         module: &shader,
                         entry_point: "vs_main", // 1.
                         buffers: &[<V>::desc()],
+                        compilation_options: Default::default()
                     },
                     fragment: Some(wgpu::FragmentState {
                         // 3.
@@ -161,6 +162,7 @@ impl VShader {
                             blend: Some(wgpu::BlendState::REPLACE),
                             write_mask: wgpu::ColorWrites::ALL,
                         })],
+                        compilation_options: Default::default()
                     }),
                     primitive: wgpu::PrimitiveState {
                         topology, // 1.
@@ -259,6 +261,7 @@ impl VShader {
                         module: &shader,
                         entry_point: "vs_main", // 1.
                         buffers: &[<V>::desc(), <I>::desc()],
+                        compilation_options: Default::default()
                     },
                     fragment: Some(wgpu::FragmentState {
                         // 3.
@@ -270,6 +273,7 @@ impl VShader {
                             blend: Some(wgpu::BlendState::REPLACE),
                             write_mask: wgpu::ColorWrites::ALL,
                         })],
+                        compilation_options: Default::default()
                     }),
                     primitive: wgpu::PrimitiveState {
                         topology, // 1.
