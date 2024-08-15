@@ -109,7 +109,7 @@ impl VTF {
             self.width(),
             self.height(),
             self.header.high_res_image_format,
-            1,
+            self.high_res_data.len() as _,
         )
     }
 

@@ -47,8 +47,11 @@ impl AssetLoader for VTFAssetLoader {
 }
 
 fn vtf_to_image(vtf: &VTF) -> Image {
+
+
+
     Image {
-        data: vtf.high_res_data()[0].clone(),
+        data: vtf.high_res_data().concat(),
         texture_descriptor: vtf.descriptor_high_res(),
         asset_usage: RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
         sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {

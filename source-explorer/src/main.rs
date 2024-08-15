@@ -7,8 +7,9 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{self, BufReader, Cursor, Read},
+    mem,
     ops::Deref,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -172,7 +173,7 @@ pub fn load_vmesh(
     game_data: &GameData,
     asset_server: &AssetServer,
     meshes: &mut ResMut<Assets<Mesh>>,
-) -> Result<(Handle<Mesh>, Handle<Image>), &'static str> {
+) -> Result<(Handle<Mesh>, Handle<StandardMaterial>), &'static str> {
     let mdl = game_data
         .load(mdl_path, VPKFile::mdl)
         .ok_or("No mdl file")?;
@@ -238,6 +239,11 @@ pub fn load_vmesh(
                 }
             }
 
+            // reverse face order (cause its easy)
+            for tri in indices.chunks_exact_mut(3) {
+                tri.swap(1, 2);
+            }
+
             for s in &strip_group.strips {
                 let ind_start = s.header.index_offset as usize;
                 let ind_count = s.header.num_indices as usize;
@@ -249,44 +255,14 @@ pub fn load_vmesh(
                 //     shader_tex,
                 // );
 
-                let mat_path = VSplitPath::new(&mat_dir, &mdl.textures[0].name, "vmt");
-
-                let vmt = game_data
-                    .load(&mat_path, VPKFile::vmt)
-                    .ok_or("No VMT material file")?;
-
-                let tex_path = {
-                    let Some(tex_path) = vmt.get_basetex() else {
-                        return Err("Could not find texture param in vmt");
-                    };
-
-                    tex_path.replace('\\', "/")
-                };
-
-                // let vtf_path = VLocalPath::new("materials", &tex_path, "vtf");
-
-                // let vtf = game_data
-                //     .load(&vtf_path, VPKFile::vtf)
-                //     .ok_or("No VTF texture file")?;
+                let mat =
+                    asset_server.load(format!("vpk://{mat_dir}/{}.vmt", mdl.textures[0].name));
 
                 let mesh =
                     builder_to_mesh2(&verts, &indices[ind_start..ind_start + ind_count], meshes);
                 // let image = vtf_to_image(vtf, images);
 
-                let vtf_path = PathBuf::from(format!("materials/{}.vtf", tex_path));
-                let source = AssetSourceId::from("vpk");
-                let asset_path = AssetPath::from_path(&vtf_path).with_source(source);
-
-                let image: Handle<Image> = asset_server.load(asset_path);
-
-                // let vtex = vtf
-                //     .get_high_res(instance)
-                //     .as_ref()
-                //     .map_err(|()| "Failed to load high res")?;
-
-                // m.load_tex(&instance.device, 0, vtex);
-
-                return Ok((mesh, image));
+                return Ok((mesh, mat));
             }
         }
     }
@@ -317,8 +293,6 @@ fn load(
     let game_data = GameData::from_ini(&ini);
 
     // println!("{:?}",game_data.dirs()[0].files);
-
-    let files = VFileSystem::default();
 
     let (header, mut buffer) = BSPHeader::load(&game_data.starter_map()).unwrap();
 
@@ -399,7 +373,7 @@ fn load(
 
         // println!("{}", path);
 
-        let Ok((mesh, image)) = load_vmesh(
+        let Ok((mesh, material)) = load_vmesh(
             &VGlobalPath::new(path),
             &game_data,
             &asset_server,
@@ -421,12 +395,7 @@ fn load(
                 SourceObject { egui: None },
                 MaterialMeshBundle::<StandardMaterial> {
                     mesh,
-                    material: materials.add(StandardMaterial {
-                        base_color: Color::WHITE,
-                        base_color_texture: Some(image),
-
-                        ..default()
-                    }),
+                    material,
                     transform,
                     ..default()
                 },
@@ -451,27 +420,40 @@ fn load(
 
         let vmt_path = PathBuf::from(format!("materials/{}.vmt", mat_name));
         let source = AssetSourceId::from("vpk");
-        let asset_path = AssetPath::from_path(&vmt_path).with_source(source);
 
-        match pak_vpk.load_vmt(&mat_path) {
-            Ok(vmt) => {}
+        let material: Option<Handle<StandardMaterial>> = match pak_vpk.load_vmt(&mat_path) {
+            Ok(vmt) => {
+                if vmt.shader() == "patch" {
+                    if let Some(inc) = vmt.get("include") {
+                        Some(
+                            asset_server
+                                .load(AssetPath::from_path(Path::new(inc)).with_source(source)),
+                        )
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
             Err(err) => {
-                let material: Handle<StandardMaterial> = asset_server.load(asset_path);
-
-                let obj = commands
-                    .spawn((
-                        SourceObject { egui: None },
-                        MaterialMeshBundle::<StandardMaterial> {
-                            mesh,
-                            material,
-                            ..default()
-                        },
-                    ))
-                    .id();
-
-                commands.entity(scene).push_children(&[obj]);
+                Some(asset_server.load(AssetPath::from_path(&vmt_path).with_source(source)))
             }
         };
+        if let Some(material) = material {
+            let obj = commands
+                .spawn((
+                    SourceObject { egui: None },
+                    MaterialMeshBundle::<StandardMaterial> {
+                        mesh,
+                        material,
+                        ..default()
+                    },
+                ))
+                .id();
+
+            commands.entity(scene).push_children(&[obj]);
+        }
 
         // vmt_materials.get(vmt.id()).unwrap();
 
@@ -608,7 +590,7 @@ fn load(
     // ambient light
     commands.insert_resource(AmbientLight {
         color: WHITE.into(),
-        brightness: 1000.0,
+        brightness: 100.0,
     });
 
     // camera

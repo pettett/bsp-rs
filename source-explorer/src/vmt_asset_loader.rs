@@ -59,7 +59,8 @@ impl AssetLoader for VMTAssetLoader {
                 println!("Loading dependency image from {}", asset_path);
 
                 Ok(StandardMaterial {
-                    base_color_texture: Some(load_context.load(asset_path)),
+                    emissive_texture: Some(load_context.load(asset_path)),
+					emissive: LinearRgba::WHITE,
                     ..default()
                 })
                 // None
